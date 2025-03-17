@@ -77,7 +77,8 @@ std::vector<uint8_t> LogEntry::serialize() const
     }
 
     // Sequence number
-    oss << "|" << m_sequenceNumber;
+    oss << "|";
+    oss << std::dec << m_sequenceNumber;
 
     // Convert to string and then to a byte vector
     std::string logData = oss.str();
