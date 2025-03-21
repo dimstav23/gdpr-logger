@@ -14,16 +14,13 @@ private:
     bool m_shutdown{false};
 
 public:
-    // default constructor (when instance of this object is created)
     ThreadSafeQueue() = default;
-    // default destructor (when instance of this object is destroyed)
     ~ThreadSafeQueue() = default;
 
     // Disable copy semantics
     ThreadSafeQueue(const ThreadSafeQueue &) = delete;
     ThreadSafeQueue &operator=(const ThreadSafeQueue &) = delete;
 
-    // Enqueue an item into the queue
     void enqueue(const T &item)
     {
         {
