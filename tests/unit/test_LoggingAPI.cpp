@@ -212,16 +212,16 @@ TEST_F(LoggingAPITest, ThreadSafetySingleton)
     }
 }
 
-/*
 // Test thread safety of API operations
 TEST_F(LoggingAPITest, ThreadSafetyOperations)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
     EXPECT_TRUE(api.initialize(mockQueue));
 
-    // Allow unlimited calls to enqueue
     EXPECT_CALL(*mockQueue, enqueue(::testing::_))
         .WillRepeatedly(::testing::Return(true));
+    EXPECT_CALL(*mockQueue, flush())
+        .WillOnce(::testing::Return(true));
 
     std::vector<std::thread> threads;
     for (int i = 0; i < 10; i++)
@@ -247,7 +247,6 @@ TEST_F(LoggingAPITest, ThreadSafetyOperations)
 
     EXPECT_TRUE(api.shutdown(true));
 }
-*/
 
 // Main function that runs all the tests
 int main(int argc, char **argv)
