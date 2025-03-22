@@ -9,18 +9,9 @@
 #include <mutex>
 #include <functional>
 
-// Interface for the log queue - to be implemented separately
-class ILogQueue
-{
-public:
-    virtual ~ILogQueue() = default;
-
-    virtual bool enqueue(const LogEntry &entry) = 0;
-
-    virtual bool isEmpty() const = 0;
-
-    virtual bool flush() = 0;
-};
+// Forward declaration of the ILogQueue interface
+// The full definition is in Buffer.hpp
+class ILogQueue;
 
 // Main Logging API class that provides the interface for logging
 class LoggingAPI

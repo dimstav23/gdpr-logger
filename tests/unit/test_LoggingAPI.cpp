@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 #include "LoggingAPI.hpp"
+#include "LockFreeBuffer.hpp"
 #include <chrono>
 #include <thread>
 
@@ -8,8 +9,10 @@ class MockLogQueue : public ILogQueue
 {
 public:
     MOCK_METHOD(bool, enqueue, (const LogEntry &entry), (override));
-    MOCK_METHOD(bool, isEmpty, (), (const, override));
+    MOCK_METHOD(bool, dequeue, (LogEntry & entry), (override));
+    MOCK_METHOD(size_t, dequeueBatch, (std::vector<LogEntry> & entries, size_t maxEntries), (override));
     MOCK_METHOD(bool, flush, (), (override));
+    MOCK_METHOD(size_t, size, (), (const, override));
 };
 
 class LoggingAPITest : public ::testing::Test
