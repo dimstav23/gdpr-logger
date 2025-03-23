@@ -64,10 +64,6 @@ bool LockFreeQueue::enqueue(const LogEntry &entry)
 
             return true;
         }
-
-        // If we got here, another thread modified m_head first
-        // currentHead has been updated by compare_exchange_weak
-        // Try again with the new currentHead value
     }
 }
 
@@ -106,12 +102,9 @@ bool LockFreeQueue::dequeue(LogEntry &entry)
 
             // Mark the node as not ready
             m_buffer[currentTail].ready.store(false, std::memory_order_release);
-
+            m_flushCondition.notify_one();
             return true;
         }
-
-        // If we got here, another thread modified m_tail first
-        // Try again with the new currentTail value
     }
 }
 
