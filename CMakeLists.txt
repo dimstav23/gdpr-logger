@@ -21,6 +21,7 @@ add_library(GDPR_Logging_lib
     src/LoggingAPI.cpp
     src/LockFreeBuffer.cpp
     src/Compression.cpp
+#    src/Crypto.cpp
 )
 
 # Create the main executable for production code
@@ -43,8 +44,13 @@ target_link_libraries(test_lock_free_buffer GDPR_Logging_lib GTest::GTest GTest:
 add_executable(test_compression tests/unit/test_Compression.cpp src/Compression.cpp src/LogEntry.cpp)
 target_link_libraries(test_compression GDPR_Logging_lib GTest::GTest GTest::Main pthread OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
 
+# Create a test executable for Crypto
+add_executable(test_crypto tests/unit/test_Crypto.cpp src/Crypto.cpp)
+target_link_libraries(test_crypto GDPR_Logging_lib GTest::GTest GTest::Main pthread OpenSSL::SSL OpenSSL::Crypto)
+
 # Register the tests with CTest
 add_test(NAME LogEntryTests COMMAND test_log_entry)
 add_test(NAME LoggingAPITests COMMAND test_logging_api)
 add_test(NAME LockFreeBufferTests COMMAND test_lock_free_buffer)
 add_test(NAME CompressionTests COMMAND test_compression)
+add_test(NAME CryptoTests COMMAND test_crypto)
