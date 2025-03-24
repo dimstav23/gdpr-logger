@@ -85,7 +85,6 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
     EXPECT_EQ(newEntry.getSequenceNumber(), 42);
     EXPECT_EQ(newEntry.getPreviousHash(), prevHash);
-    auto now = std::chrono::system_clock::now();
     EXPECT_NEAR(std::chrono::system_clock::to_time_t(newEntry.getTimestamp()),
                 std::chrono::system_clock::to_time_t(entry.getTimestamp()), 1);
 }

@@ -1,60 +1,10 @@
 cmake_minimum_required(VERSION 3.10)
 project(GDPR_Logging)
 
-set(CMAKE_CXX_STANDARD 17)
-set(CMAKE_CXX_STANDARD_REQUIRED ON)
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
 
-# Enable testing
-enable_testing()
-
-# Find dependencies
-find_package(OpenSSL REQUIRED)
-find_package(GTest REQUIRED)
-find_package(ZLIB REQUIRED)
-
-# Include directories
-include_directories(include)
-
-# Create a library for the core functionality
-add_library(GDPR_Logging_lib
-    src/LogEntry.cpp
-    src/LoggingAPI.cpp
-    src/LockFreeBuffer.cpp
-    src/Compression.cpp
-    src/Crypto.cpp
-)
-
-# Create the main executable for production code
-add_executable(GDPR_Logging_exe src/main.cpp)
-target_link_libraries(GDPR_Logging_exe GDPR_Logging_lib OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
-
-# Create test executables for the unit tests
-# LogEntry
-add_executable(test_log_entry tests/unit/test_LogEntry.cpp src/LogEntry.cpp)
-target_link_libraries(test_log_entry GDPR_Logging_lib GTest::GTest GTest::Main pthread OpenSSL::SSL OpenSSL::Crypto)
-# LoggingAPI
-add_executable(test_logging_api tests/unit/test_LoggingAPI.cpp src/LoggingAPI.cpp src/LogEntry.cpp)
-target_link_libraries(test_logging_api GDPR_Logging_lib GTest::GTest GTest::Main GTest::gmock GTest::gmock_main pthread OpenSSL::SSL OpenSSL::Crypto)
-# LockFreeBuffer
-add_executable(test_lock_free_buffer tests/unit/test_LockFreeBuffer.cpp src/LockFreeBuffer.cpp src/LogEntry.cpp)
-target_link_libraries(test_lock_free_buffer GDPR_Logging_lib GTest::GTest GTest::Main GTest::gmock GTest::gmock_main pthread OpenSSL::SSL OpenSSL::Crypto)
-# Compression
-add_executable(test_compression tests/unit/test_Compression.cpp src/Compression.cpp src/LogEntry.cpp)
-target_link_libraries(test_compression GDPR_Logging_lib GTest::GTest GTest::Main pthread OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
-# Crypto
-add_executable(test_crypto tests/unit/test_Crypto.cpp src/Crypto.cpp)
-target_link_libraries(test_crypto GDPR_Logging_lib GTest::GTest GTest::Main pthread OpenSSL::SSL OpenSSL::Crypto)
-
-# Create test executables for the integration test
-add_executable(test_compression_crypto tests/integration/test_CompressionCrypto.cpp)
-target_link_libraries(test_compression_crypto GDPR_Logging_lib GTest::GTest GTest::Main pthread OpenSSL::SSL OpenSSL::Crypto ZLIB::ZLIB)
-
-# Register the unit tests with CTest
-add_test(NAME LogEntryTests COMMAND test_log_entry)
-add_test(NAME LoggingAPITests COMMAND test_logging_api)
-add_test(NAME LockFreeBufferTests COMMAND test_lock_free_buffer)
-add_test(NAME CompressionTests COMMAND test_compression)
-add_test(NAME CryptoTests COMMAND test_crypto)
-
-# Register the integration tests with CTest
-add_test(NAME CompressionCryptoTests COMMAND test_compression_crypto)
+include(project_settings)
+include(dependencies)
+include(library)
+include(executable)
+include(testing)
