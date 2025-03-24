@@ -6,6 +6,7 @@ set(TEST_SOURCES
     tests/unit/test_LockFreeBuffer.cpp
     tests/unit/test_Compression.cpp
     tests/unit/test_Crypto.cpp
+    tests/unit/test_Writer.cpp
     tests/integration/test_CompressionCrypto.cpp
 )
 
@@ -31,4 +32,5 @@ add_gdpr_test(test_logging_api tests/unit/test_LoggingAPI.cpp)
 add_gdpr_test(test_lock_free_buffer tests/unit/test_LockFreeBuffer.cpp)
 add_gdpr_test(test_compression tests/unit/test_Compression.cpp)
 add_gdpr_test(test_crypto tests/unit/test_Crypto.cpp)
+add_gdpr_test(test_writer tests/unit/test_Writer.cpp)
 add_gdpr_test(test_compression_crypto tests/integration/test_CompressionCrypto.cpp)

@@ -4,6 +4,7 @@ set(LIBRARY_SOURCES
     src/LockFreeBuffer.cpp
     src/Compression.cpp
     src/Crypto.cpp
+    src/Writer.cpp
 )
 
 add_library(GDPR_Logging_lib ${LIBRARY_SOURCES})

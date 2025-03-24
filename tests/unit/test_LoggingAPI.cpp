@@ -13,6 +13,7 @@ public:
     MOCK_METHOD(size_t, dequeueBatch, (std::vector<LogEntry> & entries, size_t maxEntries), (override));
     MOCK_METHOD(bool, flush, (), (override));
     MOCK_METHOD(size_t, size, (), (const, override));
+    virtual ~MockLogQueue() = default;
 };
 
 class LoggingAPITest : public ::testing::Test
