@@ -8,6 +8,7 @@ set(TEST_SOURCES
     tests/unit/test_Crypto.cpp
     tests/unit/test_Writer.cpp
     tests/integration/test_CompressionCrypto.cpp
+    tests/integration/test_WriterBuffer.cpp
 )
 
 macro(add_gdpr_test TEST_NAME TEST_SOURCE)
@@ -34,3 +35,4 @@ add_gdpr_test(test_compression tests/unit/test_Compression.cpp)
 add_gdpr_test(test_crypto tests/unit/test_Crypto.cpp)
 add_gdpr_test(test_writer tests/unit/test_Writer.cpp)
 add_gdpr_test(test_compression_crypto tests/integration/test_CompressionCrypto.cpp)
+add_gdpr_test(writer_buffer tests/integration/test_WriterBuffer.cpp)
