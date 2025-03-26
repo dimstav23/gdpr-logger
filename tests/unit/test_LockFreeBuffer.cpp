@@ -359,7 +359,6 @@ TEST_F(LockFreeQueueThreadTest, RandomizedStressTest)
 {
     const int NUM_THREADS = 8;
     const int OPS_PER_THREAD = 5000;
-    const int TOTAL_OPS = NUM_THREADS * OPS_PER_THREAD;
 
     std::atomic<int> totalEnqueued(0);
     std::atomic<int> totalDequeued(0);
@@ -439,46 +438,6 @@ TEST_F(LockFreeQueueThreadTest, CapacityEnforcement)
     LogEntry entry;
     EXPECT_TRUE(smallQueue->dequeue(entry));
     EXPECT_TRUE(smallQueue->enqueue(createTestEntry(enqueued)));
-}
-
-// Performance benchmark test
-TEST_F(LockFreeQueueThreadTest, PerformanceBenchmark)
-{
-    const int NUM_OPERATIONS = 1000000;
-
-    // Measure enqueue performance
-    auto start = std::chrono::high_resolution_clock::now();
-
-    for (int i = 0; i < NUM_OPERATIONS; i++)
-    {
-        queue->enqueue(createTestEntry(i));
-    }
-
-    auto enqueueTime = std::chrono::high_resolution_clock::now() - start;
-
-    // Measure dequeue performance
-    start = std::chrono::high_resolution_clock::now();
-
-    LogEntry entry;
-    for (int i = 0; i < NUM_OPERATIONS; i++)
-    {
-        queue->dequeue(entry);
-    }
-
-    auto dequeueTime = std::chrono::high_resolution_clock::now() - start;
-
-    // Output performance metrics
-    std::cout << "Enqueue time: "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(enqueueTime).count()
-              << "ms ("
-              << (NUM_OPERATIONS * 1000.0 / std::chrono::duration_cast<std::chrono::milliseconds>(enqueueTime).count())
-              << " ops/sec)" << std::endl;
-
-    std::cout << "Dequeue time: "
-              << std::chrono::duration_cast<std::chrono::milliseconds>(dequeueTime).count()
-              << "ms ("
-              << (NUM_OPERATIONS * 1000.0 / std::chrono::duration_cast<std::chrono::milliseconds>(dequeueTime).count())
-              << " ops/sec)" << std::endl;
 }
 
 // Test timed operations
