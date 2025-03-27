@@ -17,10 +17,6 @@ static size_t nextPowerOf2(size_t n)
     return power;
 }
 
-///////////////////////////////
-// LockFreeQueue Implementation
-///////////////////////////////
-
 LockFreeQueue::LockFreeQueue(size_t capacity)
     : m_capacity(nextPowerOf2(capacity)), m_mask(m_capacity - 1)
 {
