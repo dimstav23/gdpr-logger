@@ -1,85 +1,103 @@
 #ifndef SEGMENTED_STORAGE_HPP
 #define SEGMENTED_STORAGE_HPP
 
-#include <filesystem>
-#include <fstream>
-#include <chrono>
-#include <vector>
-#include <mutex>
 #include <string>
-#include <sstream>
-#include <iomanip>
-#include <stdexcept>
-#include <openssl/sha.h>
+#include <vector>
+#include <atomic>
+#include <mutex>
+#include <filesystem>
+#include <cstdint>
+#include <memory>
+#include <fstream>
 
 class SegmentedStorage
 {
 public:
-    // Configuration for segment management
-    struct SegmentConfig
-    {
-        size_t max_segment_size_bytes = 100 * 1024 * 1024;
-        std::chrono::minutes max_segment_duration{60};
-    };
+    /**
+     * Constructor for SegmentedStorage.
+     *
+     * @param basePath Base directory for storing log segments
+     * @param baseFilename Base filename for log segments
+     * @param maxSegmentSize Maximum size for each segment in bytes before rolling to a new segment
+     * @param bufferSize Size of the write buffer in bytes
+     */
+    SegmentedStorage(const std::string &basePath,
+                     const std::string &baseFilename,
+                     size_t maxSegmentSize = 100 * 1024 * 1024, // 100 MB default
+                     size_t bufferSize = 64 * 1024);            // 64 KB buffer default
 
-    // Segment metadata structure
-    struct SegmentMetadata
-    {
-        std::filesystem::path filename;
-        std::chrono::system_clock::time_point created_at;
-        size_t size_bytes = 0;
-        std::string segment_hash;
-    };
+    ~SegmentedStorage();
 
-    // Constructor
-    SegmentedStorage(
-        const std::filesystem::path &base_directory,
-        const SegmentConfig &config = SegmentConfig());
+    /**
+     * Write data to the current segment.
+     * Thread-safe method allowing concurrent writes.
+     *
+     * @param data Pointer to the data to write
+     * @param size Size of the data in bytes
+     * @return Actual number of bytes written
+     */
+    size_t write(const uint8_t *data, size_t size);
 
-    // Write a log entry to the current segment
-    void write_entry(const std::string &log_entry);
+    /**
+     * Write vector data to the current segment.
+     * Thread-safe method allowing concurrent writes.
+     *
+     * @param data Vector containing the data to write
+     * @return Actual number of bytes written
+     */
+    size_t write(const std::vector<uint8_t> &data);
 
-    // Retrieve completed segments for export/auditing
-    std::vector<SegmentMetadata> get_completed_segments();
+    // Flush any buffered data to disk.
+    void flush();
 
-    // Export a specific segment
-    void export_segment(
-        const std::filesystem::path &segment_path,
-        const std::filesystem::path &export_path);
+    /**
+     * Get the current segment index.
+     *
+     * @return Current segment index
+     */
+    size_t getCurrentSegmentIndex() const;
+
+    /**
+     * Get the current size of the active segment.
+     *
+     * @return Current segment size in bytes
+     */
+    size_t getCurrentSegmentSize() const;
+
+    /**
+     * Get the path to the current segment file.
+     *
+     * @return Path to the current segment file
+     */
+    std::string getCurrentSegmentPath() const;
+
+    // Force creation of a new segment file, returns Path to the newly created segment file
+    std::string rotateSegment();
 
 private:
-    // Current active segment file
-    std::ofstream current_segment;
+    std::string m_basePath;
+    std::string m_baseFilename;
+    size_t m_maxSegmentSize;
+    size_t m_bufferSize;
 
-    // Segment file path generator
-    std::filesystem::path base_path;
+    // Current segment info
+    std::atomic<size_t> m_currentSegmentIndex;
+    std::atomic<size_t> m_currentOffset;
 
-    // Configuration for segment management
-    SegmentConfig config;
+    // File handling
+    std::unique_ptr<std::ofstream> m_currentFile;
+    std::mutex m_fileMutex; // For file operations that can't be atomic
 
-    // List of completed segments
-    std::vector<SegmentMetadata> completed_segments;
+    // Creates a new segment file and updates internal state. Not thread-safe, should be called with lock held.
+    void createNewSegment();
 
-    // Mutex to protect segment metadata
-    std::mutex segments_mutex;
-
-    // Timestamp of the current segment's creation
-    std::chrono::system_clock::time_point segment_start_time;
-
-    // Generate a unique segment filename
-    std::filesystem::path generate_segment_filename();
-
-    // Compute SHA-256 hash of the segment
-    std::string compute_segment_hash(const std::filesystem::path &segment_path);
-
-    // Rotate to a new segment if conditions are met
-    void check_segment_rotation();
-
-    // Rotate to a new segment file
-    void rotate_segment();
-
-    // Open a new segment file
-    void open_new_segment();
+    /**
+     * Generates the file path for a given segment index.
+     *
+     * @param segmentIndex The segment index
+     * @return Full path to the segment file
+     */
+    std::string generateSegmentPath(size_t segmentIndex) const;
 };
 
 #endif

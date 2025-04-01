@@ -1,145 +1,161 @@
 #include "SegmentedStorage.hpp"
+#include <iostream>
+#include <iomanip>
+#include <sstream>
+#include <chrono>
 
-SegmentedStorage::SegmentedStorage(
-    const std::filesystem::path &base_directory,
-    const SegmentConfig &config) : base_path(base_directory), config(config)
+SegmentedStorage::SegmentedStorage(const std::string &basePath,
+                                   const std::string &baseFilename,
+                                   size_t maxSegmentSize,
+                                   size_t bufferSize)
+    : m_basePath(basePath), m_baseFilename(baseFilename), m_maxSegmentSize(maxSegmentSize), m_bufferSize(bufferSize), m_currentSegmentIndex(0), m_currentOffset(0)
 {
-    // Ensure base directory exists
-    std::filesystem::create_directories(base_path);
+    // Ensure the directory exists
+    std::filesystem::create_directories(m_basePath);
 
-    // Open initial segment
-    open_new_segment();
+    // Create the initial segment
+    createNewSegment();
 }
 
-std::filesystem::path SegmentedStorage::generate_segment_filename()
+SegmentedStorage::~SegmentedStorage()
 {
+    // Make sure any buffered data is flushed and file is properly closed
+    if (m_currentFile && m_currentFile->is_open())
+    {
+        m_currentFile->flush();
+        m_currentFile->close();
+    }
+}
+
+size_t SegmentedStorage::write(const uint8_t *data, size_t size)
+{
+    if (size == 0)
+        return 0;
+
+    // Calculate the new offset after this write
+    size_t writeOffset = m_currentOffset.fetch_add(size, std::memory_order_acq_rel);
+
+    // Check if we need to rotate the segment
+    if (writeOffset + size > m_maxSegmentSize)
+    {
+        std::lock_guard<std::mutex> lock(m_fileMutex);
+
+        // Check again after acquiring the lock (another thread might have already rotated)
+        if (writeOffset >= m_currentOffset.load(std::memory_order_acquire))
+        {
+            // This thread will handle rotation
+            rotateSegment();
+
+            // Reset our write offset to the beginning of the new segment
+            writeOffset = 0;
+            m_currentOffset.store(size, std::memory_order_release);
+        }
+        else
+        {
+            // Another thread rotated the segment, recalculate our offset
+            writeOffset = m_currentOffset.fetch_add(size, std::memory_order_acq_rel) - size;
+        }
+    }
+
+    // Acquire lock for the actual file I/O
+    std::lock_guard<std::mutex> lock(m_fileMutex);
+
+    // Seek to the correct position
+    m_currentFile->seekp(writeOffset, std::ios::beg);
+
+    // Write the data
+    m_currentFile->write(reinterpret_cast<const char *>(data), size);
+
+    // We could flush after every write, but for performance reasons,
+    // we rely on either periodic flush calls or the buffer size threshold
+    if (m_currentFile->tellp() % m_bufferSize == 0)
+    {
+        m_currentFile->flush();
+    }
+
+    return size;
+}
+
+size_t SegmentedStorage::write(const std::vector<uint8_t> &data)
+{
+    // Delegate to the raw pointer version
+    return write(data.data(), data.size());
+}
+
+void SegmentedStorage::flush()
+{
+    std::lock_guard<std::mutex> lock(m_fileMutex);
+    if (m_currentFile && m_currentFile->is_open())
+    {
+        m_currentFile->flush();
+    }
+}
+
+size_t SegmentedStorage::getCurrentSegmentIndex() const
+{
+    return m_currentSegmentIndex.load(std::memory_order_acquire);
+}
+
+size_t SegmentedStorage::getCurrentSegmentSize() const
+{
+    return m_currentOffset.load(std::memory_order_acquire);
+}
+
+std::string SegmentedStorage::getCurrentSegmentPath() const
+{
+    return generateSegmentPath(m_currentSegmentIndex.load(std::memory_order_acquire));
+}
+
+std::string SegmentedStorage::rotateSegment()
+{
+    std::lock_guard<std::mutex> lock(m_fileMutex);
+
+    // Flush and close the current segment
+    if (m_currentFile && m_currentFile->is_open())
+    {
+        m_currentFile->flush();
+        m_currentFile->close();
+    }
+
+    // Increment segment index and reset offset
+    m_currentSegmentIndex.fetch_add(1, std::memory_order_acq_rel);
+    m_currentOffset.store(0, std::memory_order_release);
+
+    // Create a new segment
+    createNewSegment();
+
+    return getCurrentSegmentPath();
+}
+
+void SegmentedStorage::createNewSegment()
+{
+    std::string segmentPath = generateSegmentPath(m_currentSegmentIndex.load(std::memory_order_acquire));
+
+    // Create a new file stream
+    m_currentFile = std::make_unique<std::ofstream>(
+        segmentPath,
+        std::ios::binary | std::ios::trunc);
+
+    if (!m_currentFile->is_open())
+    {
+        throw std::runtime_error("Failed to open segment file: " + segmentPath);
+    }
+
+    // Disable internal buffering for direct I/O
+    m_currentFile->rdbuf()->pubsetbuf(nullptr, 0);
+}
+
+std::string SegmentedStorage::generateSegmentPath(size_t segmentIndex) const
+{
+    // Generate a timestamp for the filename
     auto now = std::chrono::system_clock::now();
-    auto timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                         now.time_since_epoch())
-                         .count();
+    auto now_time_t = std::chrono::system_clock::to_time_t(now);
 
-    return base_path /
-           ("segment_" + std::to_string(timestamp) + ".log");
-}
-
-std::string SegmentedStorage::compute_segment_hash(const std::filesystem::path &segment_path)
-{
-    std::ifstream file(segment_path, std::ios::binary);
-    SHA256_CTX sha256;
-    SHA256_Init(&sha256);
-
-    std::vector<char> buffer(4096);
-    while (file.read(buffer.data(), buffer.size()))
-    {
-        SHA256_Update(&sha256, buffer.data(), file.gcount());
-    }
-
-    if (file.gcount() > 0)
-    {
-        SHA256_Update(&sha256, buffer.data(), file.gcount());
-    }
-
-    unsigned char hash[SHA256_DIGEST_LENGTH];
-    SHA256_Final(hash, &sha256);
-
-    // Convert hash to hex string
     std::stringstream ss;
-    for (int i = 0; i < SHA256_DIGEST_LENGTH; i++)
-    {
-        ss << std::hex << std::setw(2) << std::setfill('0')
-           << static_cast<int>(hash[i]);
-    }
+    ss << m_basePath << "/";
+    ss << m_baseFilename << "_";
+    ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S") << "_";
+    ss << std::setw(6) << std::setfill('0') << segmentIndex << ".log";
 
     return ss.str();
-}
-
-void SegmentedStorage::check_segment_rotation()
-{
-    auto now = std::chrono::system_clock::now();
-    bool should_rotate = false;
-
-    // Check size threshold
-    if (current_segment &&
-        current_segment.tellp() >= config.max_segment_size_bytes)
-    {
-        should_rotate = true;
-    }
-
-    // Check time threshold
-    if (now - segment_start_time >= config.max_segment_duration)
-    {
-        should_rotate = true;
-    }
-
-    if (should_rotate)
-    {
-        rotate_segment();
-    }
-}
-
-void SegmentedStorage::rotate_segment()
-{
-    if (current_segment)
-    {
-        // Close current segment
-        current_segment.close();
-
-        // Compute and store segment hash
-        auto last_segment_path = generate_segment_filename();
-        std::string segment_hash = compute_segment_hash(last_segment_path);
-
-        // Store segment metadata
-        {
-            std::lock_guard<std::mutex> lock(segments_mutex);
-            completed_segments.push_back({last_segment_path,
-                                          segment_start_time,
-                                          static_cast<size_t>(current_segment.tellp()),
-                                          segment_hash});
-        }
-
-        // Open new segment
-        open_new_segment();
-    }
-}
-
-void SegmentedStorage::open_new_segment()
-{
-    auto new_segment_path = generate_segment_filename();
-    current_segment.open(new_segment_path, std::ios::binary | std::ios::app);
-
-    if (!current_segment)
-    {
-        throw std::runtime_error("Failed to create new segment file");
-    }
-
-    segment_start_time = std::chrono::system_clock::now();
-}
-
-void SegmentedStorage::write_entry(const std::string &log_entry)
-{
-    // Ensure thread-safety for writing
-    std::lock_guard<std::mutex> lock(segments_mutex);
-
-    // Write entry
-    current_segment << log_entry << std::endl;
-    current_segment.flush();
-
-    // Check if segment needs rotation
-    check_segment_rotation();
-}
-
-std::vector<SegmentedStorage::SegmentMetadata>
-SegmentedStorage::get_completed_segments()
-{
-    std::lock_guard<std::mutex> lock(segments_mutex);
-    return completed_segments;
-}
-
-void SegmentedStorage::export_segment(
-    const std::filesystem::path &segment_path,
-    const std::filesystem::path &export_path)
-{
-    // In a real implementation, this would include decryption,
-    // hash verification, etc.
-    std::filesystem::copy(segment_path, export_path);
 }

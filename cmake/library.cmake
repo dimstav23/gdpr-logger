@@ -5,6 +5,7 @@ set(LIBRARY_SOURCES
     src/Compression.cpp
     src/Crypto.cpp
     src/Writer.cpp
+    src/SegmentedStorage.cpp
 )
 
 add_library(GDPR_Logging_lib ${LIBRARY_SOURCES})
