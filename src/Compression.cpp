@@ -7,10 +7,7 @@
 // Compress a single log entry
 std::vector<uint8_t> Compression::compressEntry(const LogEntry &entry)
 {
-    // Serialize the log entry to binary data
     std::vector<uint8_t> serializedData = entry.serialize();
-
-    // Compress the serialized data
     return compress(serializedData);
 }
 
@@ -42,7 +39,6 @@ std::vector<uint8_t> Compression::compressBatch(const std::vector<LogEntry> &ent
         std::memcpy(batchData.data() + currentSize, entryData.data(), entryData.size());
     }
 
-    // Compress the entire batch
     return compress(batchData);
 }
 
@@ -51,10 +47,7 @@ std::unique_ptr<LogEntry> Compression::decompressEntry(const std::vector<uint8_t
 {
     try
     {
-        // Decompress the data
         std::vector<uint8_t> decompressedData = decompress(compressedData);
-
-        // Create a new log entry and deserialize the data into it
         auto entry = std::make_unique<LogEntry>();
         if (entry->deserialize(decompressedData))
         {
@@ -79,7 +72,6 @@ std::vector<LogEntry> Compression::decompressBatch(const std::vector<uint8_t> &c
 
     try
     {
-        // Decompress the batch data
         std::vector<uint8_t> decompressedData = decompress(compressedData);
 
         // Read the number of entries

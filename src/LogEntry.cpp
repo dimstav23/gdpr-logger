@@ -136,7 +136,6 @@ bool LogEntry::deserialize(const std::vector<uint8_t> &data)
     }
 }
 
-// Calculate the hash of the log entry
 std::vector<uint8_t> LogEntry::calculateHash() const
 {
     std::string data = toString();
@@ -151,11 +150,10 @@ std::vector<uint8_t> LogEntry::calculateHash() const
     EVP_DigestFinal_ex(ctx, hash.data(), &hash_len);
     EVP_MD_CTX_free(ctx);
 
-    hash.resize(hash_len); // Adjust to actual hash size
+    hash.resize(hash_len);
     return hash;
 }
 
-// Convert the log entry to a human-readable string
 std::string LogEntry::toString() const
 {
     std::ostringstream oss;

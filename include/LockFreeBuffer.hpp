@@ -13,19 +13,16 @@ class ILogQueue
 public:
     virtual ~ILogQueue() = default;
 
-    // Add a log entry to the queue
     virtual bool enqueue(const LogEntry &entry) = 0;
 
-    // Dequeue a log entry from the queue
     virtual bool dequeue(LogEntry &entry) = 0;
 
-    // Dequeue multiple log entries at once (batch operation), returns number of entries actually dequeued
+    // returns number of entries actually dequeued
     virtual size_t dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries) = 0;
 
     // Waits until all queued entries are processed
     virtual bool flush() = 0;
 
-    // returns the current number of entries in the queue
     virtual size_t size() const = 0;
 
     virtual bool isEmpty() const { return size() == 0; }
@@ -43,8 +40,6 @@ private:
 
     // Circular buffer of nodes
     std::unique_ptr<Node[]> m_buffer;
-
-    // Buffer size (must be power of 2 for efficient modulo operation)
     const size_t m_capacity;
     const size_t m_mask;
 
@@ -63,7 +58,6 @@ public:
 
     ~LockFreeQueue() override;
 
-    // Implementation of ILogQueue interface
     bool enqueue(const LogEntry &entry) override;
     bool dequeue(LogEntry &entry) override;
     size_t dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries) override;

@@ -44,7 +44,7 @@ void Writer::processLogEntries()
     batch.reserve(m_batchSize);
 
     Crypto crypto;
-    std::vector<uint8_t> encryptionKey(32, 0x42); // Example dummy key
+    std::vector<uint8_t> encryptionKey(32, 0x42); // dummy key
 
     while (m_running)
     {

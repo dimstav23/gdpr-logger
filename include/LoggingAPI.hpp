@@ -9,20 +9,15 @@
 #include <mutex>
 #include <functional>
 
-// Forward declaration of the ILogQueue interface
-// The full definition is in Buffer.hpp
 class ILogQueue;
 
-// Main Logging API class that provides the interface for logging
 class LoggingAPI
 {
     friend class LoggingAPITest;
 
 public:
-    // Get the singleton instance of the LoggingAPI
     static LoggingAPI &getInstance();
 
-    // Initialize the logging system with a queue implementation
     bool initialize(std::shared_ptr<ILogQueue> queue);
 
     // Append a log entry to the logging system
@@ -40,17 +35,13 @@ public:
 
     // Export logs for auditing purposes
     // outputPath: path where exported logs should be written
-    // fromTimestamp: optional start timestamp for exported logs
-    // param toTimestamp Optional end timestamp for exported logs
     bool exportLogs(const std::string &outputPath,
                     std::chrono::system_clock::time_point fromTimestamp = std::chrono::system_clock::time_point(),
                     std::chrono::system_clock::time_point toTimestamp = std::chrono::system_clock::time_point());
 
-    // Destructor
     ~LoggingAPI();
 
 private:
-    // Private constructor for singleton pattern
     LoggingAPI();
 
     // Disallow copying and assignment

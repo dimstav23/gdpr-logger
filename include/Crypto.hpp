@@ -12,10 +12,8 @@ public:
     Crypto();
     ~Crypto();
 
-    // Encrypt data (either a single entry or a batch)
     std::vector<uint8_t> encrypt(const std::vector<uint8_t> &compressedData, const std::vector<uint8_t> &key);
 
-    // Decrypt data (either a single entry or a batch)
     std::vector<uint8_t> decrypt(const std::vector<uint8_t> &encryptedData, const std::vector<uint8_t> &key);
 
     // Helper method to convert a single entry to batch format

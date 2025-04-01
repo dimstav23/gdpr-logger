@@ -26,18 +26,10 @@ public:
         const std::string &userId,
         const std::string &dataSubjectId);
 
-    /**
-     * @brief Set the previous entry's hash to maintain the chain
-     *
-     * @param previousHash Hash of the previous log entry
-     */
+    // set the previous entry's hash to maintain the chain
     void setPreviousHash(const std::vector<uint8_t> &previousHash);
 
-    /**
-     * @brief Calculate the hash of this entry
-     *
-     * @return Vector of bytes representing the hash
-     */
+    // Calculate the hash of this entry, returns vector of bytes representing the hash
     std::vector<uint8_t> calculateHash() const;
 
     std::vector<uint8_t> serialize() const;
@@ -46,7 +38,6 @@ public:
 
     std::string toString() const;
 
-    // Getters and setters
     ActionType getActionType() const { return m_actionType; }
     void setActionType(ActionType actionType) { m_actionType = actionType; }
 

@@ -73,7 +73,7 @@ bool LockFreeQueue::dequeue(LogEntry &entry)
         // Check if the queue is empty
         if (currentTail == m_head.load(std::memory_order_acquire))
         {
-            return false; // Queue is empty
+            return false;
         }
 
         // Check if the node at currentTail is ready to be consumed
