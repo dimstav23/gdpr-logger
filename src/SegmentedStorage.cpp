@@ -32,33 +32,17 @@ size_t SegmentedStorage::write(const uint8_t *data, size_t size)
     if (size == 0)
         return 0;
 
-    // Calculate the new offset after this write
-    size_t writeOffset = m_currentOffset.fetch_add(size, std::memory_order_acq_rel);
+    std::unique_lock<std::mutex> lock(m_fileMutex);
 
-    // Check if we need to rotate the segment
-    if (writeOffset + size > m_maxSegmentSize)
+    // Check if this write would exceed the max segment size
+    if (m_currentOffset.load(std::memory_order_acquire) + size > m_maxSegmentSize)
     {
-        std::lock_guard<std::mutex> lock(m_fileMutex);
-
-        // Check again after acquiring the lock (another thread might have already rotated)
-        if (writeOffset >= m_currentOffset.load(std::memory_order_acquire))
-        {
-            // This thread will handle rotation
-            rotateSegment();
-
-            // Reset our write offset to the beginning of the new segment
-            writeOffset = 0;
-            m_currentOffset.store(size, std::memory_order_release);
-        }
-        else
-        {
-            // Another thread rotated the segment, recalculate our offset
-            writeOffset = m_currentOffset.fetch_add(size, std::memory_order_acq_rel) - size;
-        }
+        // We need to rotate the segment
+        rotateSegment();
     }
 
-    // Acquire lock for the actual file I/O
-    std::lock_guard<std::mutex> lock(m_fileMutex);
+    // Reserve space for our write by updating the atomic offset
+    size_t writeOffset = m_currentOffset.fetch_add(size, std::memory_order_acq_rel);
 
     // Seek to the correct position
     m_currentFile->seekp(writeOffset, std::ios::beg);
@@ -66,13 +50,14 @@ size_t SegmentedStorage::write(const uint8_t *data, size_t size)
     // Write the data
     m_currentFile->write(reinterpret_cast<const char *>(data), size);
 
-    // We could flush after every write, but for performance reasons,
-    // we rely on either periodic flush calls or the buffer size threshold
-    if (m_currentFile->tellp() % m_bufferSize == 0)
+    // Flush if we hit the buffer threshold or we're close to max segment size
+    if ((writeOffset + size) % m_bufferSize == 0 ||
+        (writeOffset + size > m_maxSegmentSize - m_bufferSize))
     {
         m_currentFile->flush();
     }
 
+    lock.unlock();
     return size;
 }
 
@@ -108,8 +93,6 @@ std::string SegmentedStorage::getCurrentSegmentPath() const
 
 std::string SegmentedStorage::rotateSegment()
 {
-    std::lock_guard<std::mutex> lock(m_fileMutex);
-
     // Flush and close the current segment
     if (m_currentFile && m_currentFile->is_open())
     {
