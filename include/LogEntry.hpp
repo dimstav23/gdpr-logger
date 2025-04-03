@@ -55,9 +55,6 @@ public:
 
     const std::vector<uint8_t> &getPreviousHash() const { return m_previousHash; }
 
-    uint64_t getSequenceNumber() const { return m_sequenceNumber; }
-    void setSequenceNumber(uint64_t sequenceNumber) { m_sequenceNumber = sequenceNumber; }
-
 private:
     ActionType m_actionType;                           // Type of GDPR operation
     std::string m_dataLocation;                        // Location of the data being operated on
@@ -65,7 +62,6 @@ private:
     std::string m_dataSubjectId;                       // ID of the data subject
     std::chrono::system_clock::time_point m_timestamp; // When the operation occurred
     std::vector<uint8_t> m_previousHash;               // Hash of the previous log entry (for chaining)
-    uint64_t m_sequenceNumber;                         // Sequence number for this log entry
 };
 
 // Helper functions

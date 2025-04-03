@@ -13,7 +13,6 @@ TEST(LogEntryTest1, DefaultConstructor_InitializesCorrectly)
     EXPECT_EQ(entry.getDataLocation(), "");
     EXPECT_EQ(entry.getUserId(), "");
     EXPECT_EQ(entry.getDataSubjectId(), "");
-    EXPECT_EQ(entry.getSequenceNumber(), 0);
 
     auto now = std::chrono::system_clock::now();
     EXPECT_NEAR(std::chrono::system_clock::to_time_t(entry.getTimestamp()),
@@ -44,20 +43,17 @@ TEST(LogEntryTest3, Setters_UpdateFieldsCorrectly)
     entry.setDataLocation("server/logs");
     entry.setUserId("admin");
     entry.setDataSubjectId("subject789");
-    entry.setSequenceNumber(100);
 
     EXPECT_EQ(entry.getActionType(), LogEntry::ActionType::DELETE);
     EXPECT_EQ(entry.getDataLocation(), "server/logs");
     EXPECT_EQ(entry.getUserId(), "admin");
     EXPECT_EQ(entry.getDataSubjectId(), "subject789");
-    EXPECT_EQ(entry.getSequenceNumber(), 100);
 }
 
 // Test serialization and deserialization
 TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
 {
     LogEntry entry(LogEntry::ActionType::READ, "storage/files", "userABC", "subjectXYZ");
-    entry.setSequenceNumber(42);
 
     std::vector<uint8_t> serializedData = entry.serialize();
     LogEntry newEntry;
@@ -68,9 +64,7 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_EQ(newEntry.getDataLocation(), "storage/files");
     EXPECT_EQ(newEntry.getUserId(), "userABC");
     EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
-    EXPECT_EQ(newEntry.getSequenceNumber(), 42);
 
-    entry.setSequenceNumber(42);
     std::vector<uint8_t> prevHash = {0x12, 0x34, 0x56, 0x78};
     entry.setPreviousHash(prevHash);
 
@@ -83,7 +77,6 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_EQ(newEntry.getDataLocation(), "storage/files");
     EXPECT_EQ(newEntry.getUserId(), "userABC");
     EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
-    EXPECT_EQ(newEntry.getSequenceNumber(), 42);
     EXPECT_EQ(newEntry.getPreviousHash(), prevHash);
     EXPECT_NEAR(std::chrono::system_clock::to_time_t(newEntry.getTimestamp()),
                 std::chrono::system_clock::to_time_t(entry.getTimestamp()), 1);

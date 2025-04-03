@@ -28,8 +28,7 @@ LogEntry::LogEntry()
       m_dataLocation(""),
       m_userId(""),
       m_dataSubjectId(""),
-      m_timestamp(std::chrono::system_clock::now()),
-      m_sequenceNumber(0) {}
+      m_timestamp(std::chrono::system_clock::now()) {}
 
 LogEntry::LogEntry(ActionType actionType, const std::string &dataLocation,
                    const std::string &userId, const std::string &dataSubjectId)
@@ -37,8 +36,7 @@ LogEntry::LogEntry(ActionType actionType, const std::string &dataLocation,
       m_dataLocation(dataLocation),
       m_userId(userId),
       m_dataSubjectId(dataSubjectId),
-      m_timestamp(std::chrono::system_clock::now()),
-      m_sequenceNumber(0) {}
+      m_timestamp(std::chrono::system_clock::now()) {}
 
 // Set the previous log entry's hash (for tamper-evident chaining)
 void LogEntry::setPreviousHash(const std::vector<uint8_t> &previousHash)
@@ -75,10 +73,6 @@ std::vector<uint8_t> LogEntry::serialize() const
     {
         oss << "0000000000000000";
     }
-
-    // Sequence number
-    oss << "|";
-    oss << std::dec << m_sequenceNumber;
 
     // Convert to string and then to a byte vector
     std::string logData = oss.str();
@@ -123,9 +117,6 @@ bool LogEntry::deserialize(const std::vector<uint8_t> &data)
                 m_previousHash.push_back(static_cast<uint8_t>(byte));
             }
         }
-
-        // Deserialize sequence number
-        iss >> m_sequenceNumber;
 
         return true;
     }
@@ -176,6 +167,5 @@ std::string LogEntry::toString() const
         oss << "None";
     }
 
-    oss << "\nSequenceNumber: " << m_sequenceNumber;
     return oss.str();
 }

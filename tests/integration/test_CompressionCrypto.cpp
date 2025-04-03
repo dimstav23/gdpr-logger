@@ -18,11 +18,6 @@ protected:
         entry2 = LogEntry(LogEntry::ActionType::READ, "/data/records/2", "admin789", "subject456");
         entry3 = LogEntry(LogEntry::ActionType::UPDATE, "/data/records/3", "user123", "subject789");
 
-        // Set up sequence numbers
-        entry1.setSequenceNumber(1);
-        entry2.setSequenceNumber(2);
-        entry3.setSequenceNumber(3);
-
         // Chain the hashes
         std::vector<uint8_t> hash1 = entry1.calculateHash();
         entry2.setPreviousHash(hash1);
@@ -74,7 +69,6 @@ TEST_F(CompressionCryptoTest, SingleEntryFullCycle)
     EXPECT_EQ(entry1.getDataLocation(), recovered->getDataLocation());
     EXPECT_EQ(entry1.getUserId(), recovered->getUserId());
     EXPECT_EQ(entry1.getDataSubjectId(), recovered->getDataSubjectId());
-    EXPECT_EQ(entry1.getSequenceNumber(), recovered->getSequenceNumber());
     EXPECT_EQ(entry1.getPreviousHash(), recovered->getPreviousHash());
 }
 

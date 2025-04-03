@@ -16,12 +16,6 @@ protected:
         entry3 = LogEntry(LogEntry::ActionType::UPDATE, "/data/records/3", "user123", "subject789");
         entry4 = LogEntry(LogEntry::ActionType::DELETE, "/data/records/4", "admin789", "subject123");
 
-        // Set up sequence numbers and create a chain
-        entry1.setSequenceNumber(1);
-        entry2.setSequenceNumber(2);
-        entry3.setSequenceNumber(3);
-        entry4.setSequenceNumber(4);
-
         // Create a chain of hashes
         std::vector<uint8_t> hash1 = entry1.calculateHash();
         entry2.setPreviousHash(hash1);
