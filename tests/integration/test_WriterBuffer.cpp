@@ -94,37 +94,3 @@ TEST_F(WriterIntegrationTest, ConcurrentWriteAndProcess)
 
     EXPECT_EQ(logQueue->size(), 0) << "Not all entries were processed";
 }
-/*
-// Test writer behavior with a full queue
-TEST_F(WriterIntegrationTest, FullQueueHandling)
-{
-    const int QUEUE_CAPACITY = 1024;
-    const int NUM_ENTRIES = QUEUE_CAPACITY * 2;
-
-    // Attempt to enqueue more entries than queue capacity
-    int successfulEntries = 0;
-    for (int i = 0; i < NUM_ENTRIES; ++i)
-    {
-        if (logQueue->enqueue(createTestLogEntry(i)))
-        {
-            successfulEntries++;
-        }
-    }
-
-    // Start the writer
-    writer->start();
-
-    // Wait for entries to be processed
-    std::this_thread::sleep_for(std::chrono::seconds(2));
-
-    // Stop the writer
-    writer->stop();
-
-    // Verify all entries were processed
-    EXPECT_EQ(logQueue->size(), 0) << "Not all entries were processed";
-
-    // Ensure we didn't completely block on a full queue
-    EXPECT_GT(successfulEntries, QUEUE_CAPACITY)
-        << "Queue should handle more entries than its initial capacity";
-}
-*/
