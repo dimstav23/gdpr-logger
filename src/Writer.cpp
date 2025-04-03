@@ -4,7 +4,7 @@
 #include "Crypto.hpp"
 #include "Compression.hpp"
 
-Writer::Writer(ILogQueue &logQueue, size_t batchSize)
+Writer::Writer(LockFreeQueue &logQueue, size_t batchSize)
     : m_logQueue(logQueue), m_batchSize(batchSize) {}
 
 Writer::~Writer()

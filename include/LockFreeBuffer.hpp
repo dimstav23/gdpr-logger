@@ -8,28 +8,7 @@
 #include <mutex>
 #include <condition_variable>
 
-class ILogQueue
-{
-public:
-    virtual ~ILogQueue() = default;
-
-    virtual bool enqueue(const LogEntry &entry) = 0;
-
-    virtual bool dequeue(LogEntry &entry) = 0;
-
-    // returns number of entries actually dequeued
-    virtual size_t dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries) = 0;
-
-    // Waits until all queued entries are processed
-    virtual bool flush() = 0;
-
-    virtual size_t size() const = 0;
-
-    virtual bool isEmpty() const { return size() == 0; }
-};
-
-// Lock-free implementation of ILogQueue using a circular buffer
-class LockFreeQueue : public ILogQueue
+class LockFreeQueue
 {
 private:
     struct Node
@@ -55,14 +34,14 @@ private:
 public:
     // Construct a lock-free queue with specified capacity rounded up to power of 2
     explicit LockFreeQueue(size_t capacity = 8192);
+    ~LockFreeQueue();
 
-    ~LockFreeQueue() override;
-
-    bool enqueue(const LogEntry &entry) override;
-    bool dequeue(LogEntry &entry) override;
-    size_t dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries) override;
-    bool flush() override;
-    size_t size() const override;
+    bool enqueue(const LogEntry &entry);
+    bool dequeue(LogEntry &entry);
+    size_t dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries);
+    bool flush();
+    size_t size() const;
+    bool isEmpty() const { return size() == 0; }
 
     // Delete copy/move constructors and assignment operators
     LockFreeQueue(const LockFreeQueue &) = delete;

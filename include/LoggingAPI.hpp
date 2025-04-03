@@ -2,14 +2,13 @@
 #define LOGGING_API_HPP
 
 #include "LogEntry.hpp"
+#include "LockFreeBuffer.hpp"
 #include <string>
 #include <chrono>
 #include <memory>
 #include <vector>
 #include <mutex>
 #include <functional>
-
-class ILogQueue;
 
 class LoggingAPI
 {
@@ -18,7 +17,7 @@ class LoggingAPI
 public:
     static LoggingAPI &getInstance();
 
-    bool initialize(std::shared_ptr<ILogQueue> queue);
+    bool initialize(std::shared_ptr<LockFreeQueue> queue);
 
     // Append a log entry to the logging system
     bool append(const LogEntry &entry);
@@ -53,7 +52,7 @@ private:
     static std::mutex s_instanceMutex;
 
     // The queue where log entries will be placed
-    std::shared_ptr<ILogQueue> m_logQueue;
+    std::shared_ptr<LockFreeQueue> m_logQueue;
 
     // State tracking
     bool m_initialized;

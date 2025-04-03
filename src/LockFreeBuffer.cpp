@@ -18,7 +18,7 @@ static size_t nextPowerOf2(size_t n)
 }
 
 LockFreeQueue::LockFreeQueue(size_t capacity)
-    : m_capacity(nextPowerOf2(capacity)), m_mask(m_capacity - 1)
+    : m_capacity(nextPowerOf2(std::max(size_t(2), capacity))), m_mask(m_capacity - 1)
 {
     m_buffer = std::make_unique<Node[]>(m_capacity);
 }

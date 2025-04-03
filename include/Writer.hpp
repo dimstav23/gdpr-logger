@@ -11,7 +11,7 @@
 class Writer
 {
 public:
-    explicit Writer(ILogQueue &logQueue, size_t batchSize = 100);
+    explicit Writer(LockFreeQueue &logQueue, size_t batchSize = 100);
 
     ~Writer();
 
@@ -24,7 +24,7 @@ public:
 private:
     void processLogEntries();
 
-    ILogQueue &m_logQueue;
+    LockFreeQueue &m_logQueue;
 
     std::unique_ptr<std::thread> m_writerThread;
 

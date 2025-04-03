@@ -29,7 +29,7 @@ LoggingAPI::~LoggingAPI()
     }
 }
 
-bool LoggingAPI::initialize(std::shared_ptr<ILogQueue> queue)
+bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue)
 {
     std::lock_guard<std::mutex> lock(m_apiMutex);
 
