@@ -22,10 +22,7 @@ macro(add_test_suite TEST_NAME TEST_SOURCE)
         PRIVATE
         GDPR_Logging_lib
         GTest::GTest 
-        GTest::Main 
-        GTest::gmock 
-        GTest::gmock_main 
-        pthread 
+        GTest::Main
         OpenSSL::SSL 
         OpenSSL::Crypto 
         ZLIB::ZLIB
