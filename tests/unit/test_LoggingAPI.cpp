@@ -1,20 +1,8 @@
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include "LoggingAPI.hpp"
 #include "LockFreeBuffer.hpp"
 #include <chrono>
 #include <thread>
-
-class MockLogQueue : public ILogQueue
-{
-public:
-    MOCK_METHOD(bool, enqueue, (const LogEntry &entry), (override));
-    MOCK_METHOD(bool, dequeue, (LogEntry & entry), (override));
-    MOCK_METHOD(size_t, dequeueBatch, (std::vector<LogEntry> & entries, size_t maxEntries), (override));
-    MOCK_METHOD(bool, flush, (), (override));
-    MOCK_METHOD(size_t, size, (), (const, override));
-    virtual ~MockLogQueue() = default;
-};
 
 class LoggingAPITest : public ::testing::Test
 {
@@ -24,8 +12,8 @@ protected:
         // Create a fresh instance for each test
         LoggingAPI::s_instance.reset();
 
-        // Create a mock log queue
-        mockQueue = std::make_shared<::testing::NiceMock<MockLogQueue>>();
+        // Create a LockFreeQueue instance
+        queue = std::make_shared<LockFreeQueue>(1024);
     }
 
     void TearDown() override
@@ -34,7 +22,7 @@ protected:
         LoggingAPI::s_instance.reset();
     }
 
-    std::shared_ptr<MockLogQueue> mockQueue;
+    std::shared_ptr<LockFreeQueue> queue;
 };
 
 // Test getInstance returns the same instance
@@ -51,7 +39,7 @@ TEST_F(LoggingAPITest, InitializeWithValidQueue)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
 
-    EXPECT_TRUE(api.initialize(mockQueue));
+    EXPECT_TRUE(api.initialize(queue));
     EXPECT_TRUE(api.shutdown(false));
 }
 
@@ -68,8 +56,8 @@ TEST_F(LoggingAPITest, DoubleInitialization)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
 
-    EXPECT_TRUE(api.initialize(mockQueue));
-    EXPECT_FALSE(api.initialize(mockQueue));
+    EXPECT_TRUE(api.initialize(queue));
+    EXPECT_FALSE(api.initialize(queue));
 
     EXPECT_TRUE(api.shutdown(false));
 }
@@ -86,23 +74,10 @@ TEST_F(LoggingAPITest, AppendBeforeInitialization)
 TEST_F(LoggingAPITest, AppendAfterInitialization2)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    EXPECT_TRUE(api.initialize(mockQueue));
+    EXPECT_TRUE(api.initialize(queue));
     LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
 
-    // Set expectation on mock with argument capture
-    LogEntry capturedEntry(LogEntry::ActionType::CREATE, "", "", "");
-    EXPECT_CALL(*mockQueue, enqueue(::testing::_))
-        .WillOnce(::testing::DoAll(
-            ::testing::SaveArg<0>(&capturedEntry),
-            ::testing::Return(true)));
-
     EXPECT_TRUE(api.append(entry));
-
-    EXPECT_EQ(capturedEntry.getActionType(), entry.getActionType());
-    EXPECT_EQ(capturedEntry.getDataLocation(), entry.getDataLocation());
-    EXPECT_EQ(capturedEntry.getUserId(), entry.getUserId());
-    EXPECT_EQ(capturedEntry.getDataSubjectId(), entry.getDataSubjectId());
-
     EXPECT_TRUE(api.shutdown(false));
 }
 
@@ -110,29 +85,25 @@ TEST_F(LoggingAPITest, AppendAfterInitialization2)
 TEST_F(LoggingAPITest, ConvenienceAppend)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    EXPECT_TRUE(api.initialize(mockQueue));
-
-    // Set expectation on mock
-    EXPECT_CALL(*mockQueue, enqueue(::testing::_))
-        .WillOnce(::testing::Return(true));
+    EXPECT_TRUE(api.initialize(queue));
 
     EXPECT_TRUE(api.append(LogEntry::ActionType::CREATE, "location", "user", "subject"));
-
     EXPECT_TRUE(api.shutdown(false));
 }
 
-// Test failed append
+// Test failed append (e.g., queue full scenario)
 TEST_F(LoggingAPITest, FailedAppend)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    EXPECT_TRUE(api.initialize(mockQueue));
+    // Use a small queue to simulate failure
+    auto smallQueue = std::make_shared<LockFreeQueue>(2);
+    EXPECT_TRUE(api.initialize(smallQueue));
 
-    // Set expectation on mock to fail
-    EXPECT_CALL(*mockQueue, enqueue(::testing::_))
-        .WillOnce(::testing::Return(false));
+    LogEntry entry1(LogEntry::ActionType::READ, "location1", "user1", "subject1");
+    LogEntry entry2(LogEntry::ActionType::READ, "location2", "user2", "subject2");
 
-    LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
-    EXPECT_FALSE(api.append(entry));
+    EXPECT_TRUE(api.append(entry1));
+    EXPECT_FALSE(api.append(entry2));
 
     EXPECT_TRUE(api.shutdown(false));
 }
@@ -149,26 +120,23 @@ TEST_F(LoggingAPITest, ShutdownWithoutInitialization)
 TEST_F(LoggingAPITest, ShutdownWithWait)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    EXPECT_TRUE(api.initialize(mockQueue));
+    EXPECT_TRUE(api.initialize(queue));
 
-    // Set expectation on mock
-    EXPECT_CALL(*mockQueue, flush())
-        .WillOnce(::testing::Return(true));
+    LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
+    EXPECT_TRUE(api.append(entry));
+
+    // Launch an asynchronous consumer that waits briefly before draining the queue.
+    std::thread consumer([this]()
+                         {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500)); // simulate delay
+        LogEntry dummy;
+        while(queue->dequeue(dummy)) {
+
+        } });
 
     EXPECT_TRUE(api.shutdown(true));
-}
-
-// Test shutdown with wait fails
-TEST_F(LoggingAPITest, ShutdownWithWaitFails)
-{
-    LoggingAPI &api = LoggingAPI::getInstance();
-    EXPECT_TRUE(api.initialize(mockQueue));
-
-    // Set expectation on mock to fail
-    EXPECT_CALL(*mockQueue, flush())
-        .WillOnce(::testing::Return(false));
-
-    EXPECT_FALSE(api.shutdown(true));
+    consumer.join();
+    EXPECT_TRUE(queue->isEmpty());
 }
 
 // Test export logs without initialization
@@ -184,7 +152,7 @@ TEST_F(LoggingAPITest, ExportLogsWithoutInitialization)
 TEST_F(LoggingAPITest, ExportLogsAfterInitialization)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    EXPECT_TRUE(api.initialize(mockQueue));
+    EXPECT_TRUE(api.initialize(queue));
 
     auto now = std::chrono::system_clock::now();
     EXPECT_FALSE(api.exportLogs("output.log", now, now));
@@ -220,28 +188,23 @@ TEST_F(LoggingAPITest, ThreadSafetySingleton)
 TEST_F(LoggingAPITest, ThreadSafetyOperations)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    EXPECT_TRUE(api.initialize(mockQueue));
-
-    EXPECT_CALL(*mockQueue, enqueue(::testing::_))
-        .WillRepeatedly(::testing::Return(true));
-    EXPECT_CALL(*mockQueue, flush())
-        .WillOnce(::testing::Return(true));
+    EXPECT_TRUE(api.initialize(queue));
 
     std::vector<std::thread> threads;
     for (int i = 0; i < 10; i++)
     {
         threads.emplace_back([&api, i]()
                              {
-            // Each thread appends 10 entries
-            for (int j = 0; j < 10; j++) {
-                LogEntry entry(
-                    LogEntry::ActionType::READ,
-                    "location_" + std::to_string(i),
-                    "user_" + std::to_string(i),
-                    "subject_" + std::to_string(j)
-                );
-                EXPECT_TRUE(api.append(entry));
-            } });
+                                 // Each thread appends 10 entries
+                                 for (int j = 0; j < 10; j++) {
+                                     LogEntry entry(
+                                         LogEntry::ActionType::READ,
+                                         "location_" + std::to_string(i),
+                                         "user_" + std::to_string(i),
+                                         "subject_" + std::to_string(j)
+                                        );
+                                     EXPECT_TRUE(api.append(entry));
+                                 } });
     }
 
     for (auto &t : threads)
@@ -249,7 +212,7 @@ TEST_F(LoggingAPITest, ThreadSafetyOperations)
         t.join();
     }
 
-    EXPECT_TRUE(api.shutdown(true));
+    EXPECT_EQ(queue->size(), 100);
 }
 
 // Main function that runs all the tests

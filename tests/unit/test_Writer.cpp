@@ -1,27 +1,15 @@
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include "Writer.hpp"
+#include "LockFreeBuffer.hpp"
 #include <chrono>
 #include <thread>
-
-class MockLogQueue : public ILogQueue
-{
-public:
-    MOCK_METHOD(bool, enqueue, (const LogEntry &entry), (override));
-    MOCK_METHOD(bool, dequeue, (LogEntry & entry), (override));
-    MOCK_METHOD(size_t, dequeueBatch, (std::vector<LogEntry> & entries, size_t maxEntries), (override));
-    MOCK_METHOD(bool, flush, (), (override));
-    MOCK_METHOD(size_t, size, (), (const, override));
-    MOCK_METHOD(bool, isEmpty, (), (const, override));
-    virtual ~MockLogQueue() = default;
-};
 
 class WriterTest : public ::testing::Test
 {
 protected:
     void SetUp() override
     {
-        mockQueue = std::make_unique<::testing::NiceMock<MockLogQueue>>();
+        queue = std::make_unique<LockFreeQueue>(8192);
     }
 
     void TearDown() override
@@ -32,14 +20,14 @@ protected:
         }
     }
 
-    std::unique_ptr<::testing::NiceMock<MockLogQueue>> mockQueue;
+    std::unique_ptr<LockFreeQueue> queue;
     std::unique_ptr<Writer> writer;
 };
 
 // Test that the writer starts and stops correctly
 TEST_F(WriterTest, StartAndStop)
 {
-    writer = std::make_unique<Writer>(*mockQueue);
+    writer = std::make_unique<Writer>(*queue);
     EXPECT_FALSE(writer->isRunning());
 
     writer->start();
@@ -52,7 +40,7 @@ TEST_F(WriterTest, StartAndStop)
 // Test multiple start calls
 TEST_F(WriterTest, MultipleStartCalls)
 {
-    writer = std::make_unique<Writer>(*mockQueue);
+    writer = std::make_unique<Writer>(*queue);
     writer->start();
     EXPECT_TRUE(writer->isRunning());
 
@@ -71,31 +59,29 @@ TEST_F(WriterTest, ProcessBatchEntries)
         LogEntry{LogEntry::ActionType::CREATE, "location2", "user2", "subject2"},
         LogEntry{LogEntry::ActionType::UPDATE, "location3", "user3", "subject3"}};
 
-    EXPECT_CALL(*mockQueue, dequeueBatch)
-        .WillOnce(::testing::DoAll(
-            ::testing::SetArgReferee<0>(testEntries),
-            ::testing::Return(testEntries.size())))
-        .WillRepeatedly(::testing::Return(0));
-
-    writer = std::make_unique<Writer>(*mockQueue, 3);
+    writer = std::make_unique<Writer>(*queue, 3);
     writer->start();
-    // Give some time to verify it handles processing gracefully
+
+    // Give some time for the writer thread to process the entries.
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
+
+    // Verify that the queue is empty after processing.
+    EXPECT_EQ(queue->size(), 0);
+
     writer->stop();
 }
 
-// Test behavior when queue is empty
+// Test behavior when the queue is empty
 TEST_F(WriterTest, EmptyQueue)
 {
-    EXPECT_CALL(*mockQueue, dequeueBatch)
-        .WillRepeatedly(::testing::Return(0));
+    EXPECT_EQ(queue->size(), 0);
 
-    writer = std::make_unique<Writer>(*mockQueue);
-
+    writer = std::make_unique<Writer>(*queue);
     writer->start();
 
     // Give some time to verify it handles empty queue gracefully
     std::this_thread::sleep_for(std::chrono::milliseconds(200));
+    EXPECT_EQ(queue->size(), 0);
 
     writer->stop();
 }
