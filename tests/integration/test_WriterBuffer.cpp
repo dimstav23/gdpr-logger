@@ -1,17 +1,31 @@
 #include <gtest/gtest.h>
 #include "Writer.hpp"
 #include "LockFreeBuffer.hpp"
+#include "SegmentedStorage.hpp"
 #include <chrono>
 #include <thread>
 #include <vector>
+#include <filesystem>
 
 class WriterIntegrationTest : public ::testing::Test
 {
 protected:
     void SetUp() override
     {
+        // Create a temporary directory for test log segments
+        testDir = "test_logs";
+        std::filesystem::create_directories(testDir);
         logQueue = std::make_unique<LockFreeQueue>(1024);
-        writer = std::make_unique<Writer>(*logQueue);
+
+        // Create a SegmentedStorage instance with reduced sizes for testing
+        storage = std::make_shared<SegmentedStorage>(
+            testDir,
+            "test_logsegment",
+            1024 * 1024, // Maximum segment size (1 MB for testing)
+            1024         // Buffer size (1 KB for testing)
+        );
+
+        writer = std::make_unique<Writer>(*logQueue, storage);
     }
 
     void TearDown() override
@@ -20,10 +34,13 @@ protected:
         {
             writer->stop();
         }
+        std::filesystem::remove_all(testDir);
     }
 
     std::unique_ptr<LockFreeQueue> logQueue;
     std::unique_ptr<Writer> writer;
+    std::shared_ptr<SegmentedStorage> storage;
+    std::string testDir;
 
     LogEntry createTestLogEntry(int index)
     {
@@ -66,7 +83,7 @@ TEST_F(WriterIntegrationTest, ConcurrentWriteAndProcess)
     {
         for (int i = start; i < start + count; ++i)
         {
-            // Add some randomness to simulate real-world scenario
+            // Introduce a small delay to simulate variability
             std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 10));
             logQueue->enqueue(createTestLogEntry(i));
         }
@@ -81,15 +98,14 @@ TEST_F(WriterIntegrationTest, ConcurrentWriteAndProcess)
                                      NUM_ENTRIES / NUM_PRODUCERS);
     }
 
-    // Wait for all producers to finish
+    // Wait for all producer threads to finish
     for (auto &t : producerThreads)
     {
         t.join();
     }
 
-    // Wait for processing
+    // Allow some time for the writer to process the entries
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
-
     writer->stop();
 
     EXPECT_EQ(logQueue->size(), 0) << "Not all entries were processed";

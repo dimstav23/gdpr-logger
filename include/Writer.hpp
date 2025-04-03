@@ -7,11 +7,14 @@
 #include <vector>
 #include "LogEntry.hpp"
 #include "LockFreeBuffer.hpp"
+#include "SegmentedStorage.hpp"
 
 class Writer
 {
 public:
-    explicit Writer(LockFreeQueue &logQueue, size_t batchSize = 100);
+    explicit Writer(LockFreeQueue &logQueue,
+                    std::shared_ptr<SegmentedStorage> storage,
+                    size_t batchSize = 100);
 
     ~Writer();
 
@@ -25,6 +28,7 @@ private:
     void processLogEntries();
 
     LockFreeQueue &m_logQueue;
+    std::shared_ptr<SegmentedStorage> m_storage;
 
     std::unique_ptr<std::thread> m_writerThread;
 

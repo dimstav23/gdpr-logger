@@ -4,8 +4,12 @@
 #include "Crypto.hpp"
 #include "Compression.hpp"
 
-Writer::Writer(LockFreeQueue &logQueue, size_t batchSize)
-    : m_logQueue(logQueue), m_batchSize(batchSize) {}
+Writer::Writer(LockFreeQueue &logQueue,
+               std::shared_ptr<SegmentedStorage> storage,
+               size_t batchSize)
+    : m_logQueue(logQueue),
+      m_storage(storage),
+      m_batchSize(batchSize) {}
 
 Writer::~Writer()
 {
@@ -46,6 +50,9 @@ void Writer::processLogEntries()
     Crypto crypto;
     std::vector<uint8_t> encryptionKey(32, 0x42); // dummy key
 
+    // Track the previous hash for tamper-evidence chaining
+    std::vector<uint8_t> previousHash(32, 0); // Start with zeros
+
     while (m_running)
     {
         // Try to dequeue a batch of log entries
@@ -56,9 +63,7 @@ void Writer::processLogEntries()
             std::vector<uint8_t> compressedData = Compression::compressBatch(batch);
             std::vector<uint8_t> encryptedData = crypto.encrypt(compressedData, encryptionKey);
 
-            // Simulate writing to disk by logging to the console
-            std::cout << "Writing encrypted batch of " << encryptedData.size() << " bytes for "
-                      << entriesDequeued << " log entries." << std::endl;
+            size_t bytesWritten = m_storage->write(encryptedData);
 
             // Clear the batch for next iteration
             batch.clear();
@@ -69,4 +74,7 @@ void Writer::processLogEntries()
             std::this_thread::sleep_for(std::chrono::milliseconds(100));
         }
     }
+
+    // Ensure any remaining data is flushed when stopping
+    m_storage->flush();
 }
