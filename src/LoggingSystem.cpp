@@ -5,28 +5,20 @@
 #include "Crypto.hpp"
 #include "Compression.hpp"
 
-LoggingSystem::LoggingSystem(const std::string &basePath,
-                             const std::string &baseFilename,
-                             size_t maxSegmentSize,
-                             size_t bufferSize,
-                             size_t queueCapacity,
-                             size_t batchSize,
-                             size_t numWriterThreads)
-    : m_numWriterThreads(numWriterThreads),
-      m_batchSize(batchSize)
+LoggingSystem::LoggingSystem(const LoggingConfig &config)
+    : m_numWriterThreads(config.numWriterThreads),
+      m_batchSize(config.batchSize)
 {
-    // Create the directory if it doesn't exist
-    std::filesystem::create_directories(basePath);
+    std::filesystem::create_directories(config.basePath);
 
-    // Initialize components
-    m_queue = std::make_shared<LockFreeQueue>(queueCapacity);
-    m_storage = std::make_shared<SegmentedStorage>(basePath, baseFilename, maxSegmentSize, bufferSize);
+    m_queue = std::make_shared<LockFreeQueue>(config.queueCapacity);
+    m_storage = std::make_shared<SegmentedStorage>(
+        config.basePath, config.baseFilename,
+        config.maxSegmentSize, config.bufferSize);
 
-    // Initialize the LoggingAPI with our queue
     LoggingAPI::getInstance().initialize(m_queue);
 
-    // Reserve space for writers
-    m_writers.reserve(numWriterThreads);
+    m_writers.reserve(m_numWriterThreads);
 }
 
 LoggingSystem::~LoggingSystem()

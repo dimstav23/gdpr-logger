@@ -19,10 +19,8 @@ public:
 
     bool initialize(std::shared_ptr<LockFreeQueue> queue);
 
-    // Append a log entry to the logging system
     bool append(const LogEntry &entry);
 
-    // Create and append a log entry with the given parameters
     bool append(LogEntry::ActionType actionType,
                 const std::string &dataLocation,
                 const std::string &userId,
@@ -32,8 +30,6 @@ public:
     // waitForCompletion: Whether to wait for all pending entries to be written
     bool shutdown(bool waitForCompletion = true);
 
-    // Export logs for auditing purposes
-    // outputPath: path where exported logs should be written
     bool exportLogs(const std::string &outputPath,
                     std::chrono::system_clock::time_point fromTimestamp = std::chrono::system_clock::time_point(),
                     std::chrono::system_clock::time_point toTimestamp = std::chrono::system_clock::time_point());
@@ -42,16 +38,12 @@ public:
 
 private:
     LoggingAPI();
-
-    // Disallow copying and assignment
     LoggingAPI(const LoggingAPI &) = delete;
     LoggingAPI &operator=(const LoggingAPI &) = delete;
-
     // Singleton instance
     static std::unique_ptr<LoggingAPI> s_instance;
     static std::mutex s_instanceMutex;
 
-    // The queue where log entries will be placed
     std::shared_ptr<LockFreeQueue> m_logQueue;
 
     // State tracking

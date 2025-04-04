@@ -54,16 +54,16 @@ int main()
 {
     try
     {
-        // Create a LoggingSystem with 4 writer threads
-        LoggingSystem loggingSystem(
-            "./logs",        // Base path for log files
-            "gdpr_audit",    // Base filename
-            1 * 1024 * 1024, // 50 MB max segment size
-            128 * 1024,      // 128 KB buffer size
-            16384,           // Queue capacity
-            250,             // Batch size
-            4                // Number of writer threads
-        );
+        LoggingConfig config;
+        config.basePath = "./logs";
+        config.baseFilename = "gdpr_audit";
+        config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+        config.bufferSize = 128 * 1024;           // 128 KB
+        config.queueCapacity = 16384;
+        config.batchSize = 250;
+        config.numWriterThreads = 4;
+
+        LoggingSystem loggingSystem(config);
 
         // Start the logging system
         if (!loggingSystem.start())
@@ -77,14 +77,14 @@ int main()
         // Create multiple producer threads to generate log entries
         std::vector<std::future<void>> futures;
 
-        for (int i = 0; i < 3; i++)
+        for (int i = 0; i < 5; i++)
         {
             std::string userId = "user" + std::to_string(i);
             futures.push_back(std::async(
                 std::launch::async,
                 generateLogEntries,
                 std::ref(loggingSystem),
-                2000, // Each thread generates 10 entries
+                10000, // Each thread generates 10 entries
                 userId));
         }
 
