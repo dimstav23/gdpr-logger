@@ -62,7 +62,7 @@ bool LoggingAPI::append(const LogEntry &entry)
     }
 
     LogEntry entryCopy = entry;
-    return m_logQueue->enqueue(entryCopy);
+    return m_logQueue->enqueueBlocking(entryCopy);
 }
 
 bool LoggingAPI::append(

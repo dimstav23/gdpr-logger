@@ -63,6 +63,32 @@ bool LockFreeQueue::enqueue(const LogEntry &entry)
     }
 }
 
+bool LockFreeQueue::enqueueBlocking(const LogEntry &entry)
+{
+    int backoffMs = 1;
+    const int maxBackoffMs = 100;
+    const double jitterFactor = 0.2;
+
+    while (true)
+    {
+        if (enqueue(entry))
+        {
+            return true;
+        }
+
+        if (m_shuttingDown.load(std::memory_order_acquire))
+        {
+            return false;
+        }
+
+        // Add some random jitter to prevent synchronized retries (thundering herd problems)
+        int jitter = static_cast<int>(backoffMs * jitterFactor * (static_cast<double>(rand()) / RAND_MAX));
+        int sleepTime = backoffMs + jitter;
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleepTime));
+        backoffMs = std::min(backoffMs * 2, maxBackoffMs);
+    }
+}
+
 bool LockFreeQueue::dequeue(LogEntry &entry)
 {
     while (true)

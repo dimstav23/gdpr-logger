@@ -91,22 +91,65 @@ TEST_F(LoggingAPITest, ConvenienceAppend)
     EXPECT_TRUE(api.shutdown(false));
 }
 
-// Test failed append (e.g., queue full scenario)
-TEST_F(LoggingAPITest, FailedAppend)
+// Test blocking append with queue eventually emptying
+TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    // Use a small queue to simulate failure
     auto smallQueue = std::make_shared<LockFreeQueue>(2);
     EXPECT_TRUE(api.initialize(smallQueue));
 
     LogEntry entry1(LogEntry::ActionType::READ, "location1", "user1", "subject1");
-    LogEntry entry2(LogEntry::ActionType::READ, "location2", "user2", "subject2");
-
     EXPECT_TRUE(api.append(entry1));
-    EXPECT_FALSE(api.append(entry2));
 
+    // Consume the entry with some delay
+    std::thread consumer([&smallQueue]()
+                         {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+        LogEntry dummyEntry;
+        smallQueue->dequeue(dummyEntry); });
+
+    LogEntry entry2(LogEntry::ActionType::READ, "location2", "user2", "subject2");
+    auto start = std::chrono::steady_clock::now();
+    EXPECT_TRUE(api.append(entry2));
+    auto end = std::chrono::steady_clock::now();
+
+    // Ensure it actually blocked for some time
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    EXPECT_GE(duration, 300);
+
+    consumer.join();
     EXPECT_TRUE(api.shutdown(false));
 }
+/*
+// Test that append returns false when shutting down
+TEST_F(LoggingAPITest, AppendDuringShutdown)
+{
+    LoggingAPI &api = LoggingAPI::getInstance();
+    auto smallQueue = std::make_shared<LockFreeQueue>(2);
+    EXPECT_TRUE(api.initialize(smallQueue));
+
+    LogEntry entry1(LogEntry::ActionType::READ, "location1", "user1", "subject1");
+    EXPECT_TRUE(api.append(entry1));
+
+    // Set up a thread to try to append while we shutdown
+    std::atomic<bool> appendFinished(false);
+    std::thread appendThread([&]()
+                             {
+        LogEntry entry2(LogEntry::ActionType::READ, "location2", "user2", "subject2");
+        // This should block initially, then return false after shutdown
+        bool result = api.append(entry2);
+        EXPECT_FALSE(result);
+        appendFinished.store(true); });
+
+    // Give the append thread time to start and block
+    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+
+    // Now shut down while the thread is blocked
+    EXPECT_TRUE(api.shutdown(false));
+
+    appendThread.join();
+    EXPECT_TRUE(appendFinished.load());
+}*/
 
 // Test shutdown without initialization
 TEST_F(LoggingAPITest, ShutdownWithoutInitialization)

@@ -37,6 +37,7 @@ public:
     ~LockFreeQueue();
 
     bool enqueue(const LogEntry &entry);
+    bool enqueueBlocking(const LogEntry &entry);
     bool dequeue(LogEntry &entry);
     size_t dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries);
     bool flush();
