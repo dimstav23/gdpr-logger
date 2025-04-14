@@ -81,16 +81,6 @@ TEST_F(LoggingAPITest, AppendAfterInitialization2)
     EXPECT_TRUE(api.shutdown(false));
 }
 
-// Test convenience append method
-TEST_F(LoggingAPITest, ConvenienceAppend)
-{
-    LoggingAPI &api = LoggingAPI::getInstance();
-    EXPECT_TRUE(api.initialize(queue));
-
-    EXPECT_TRUE(api.append(LogEntry::ActionType::CREATE, "location", "user", "subject"));
-    EXPECT_TRUE(api.shutdown(false));
-}
-
 // Test blocking append with queue eventually emptying
 TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 {

@@ -29,11 +29,6 @@ public:
 
     bool append(const LogEntry &entry);
 
-    bool append(LogEntry::ActionType actionType,
-                const std::string &dataLocation,
-                const std::string &userId,
-                const std::string &dataSubjectId);
-
     bool exportLogs(const std::string &outputPath,
                     std::chrono::system_clock::time_point fromTimestamp = std::chrono::system_clock::time_point(),
                     std::chrono::system_clock::time_point toTimestamp = std::chrono::system_clock::time_point());

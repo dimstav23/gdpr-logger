@@ -65,16 +65,6 @@ bool LoggingAPI::append(const LogEntry &entry)
     return m_logQueue->enqueueBlocking(entryCopy);
 }
 
-bool LoggingAPI::append(
-    LogEntry::ActionType actionType,
-    const std::string &dataLocation,
-    const std::string &userId,
-    const std::string &dataSubjectId)
-{
-    LogEntry entry(actionType, dataLocation, userId, dataSubjectId);
-    return append(entry);
-}
-
 bool LoggingAPI::shutdown(bool waitForCompletion)
 {
     std::lock_guard<std::mutex> lock(m_apiMutex);

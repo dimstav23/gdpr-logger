@@ -33,7 +33,7 @@ void generateLogEntries(LoggingSystem &loggingSystem, int numEntries, const std:
             break;
         }
 
-        if (!loggingSystem.append(action, dataLocation, userId, dataSubjectId))
+        if (!loggingSystem.append(LogEntry(action, dataLocation, userId, dataSubjectId)))
         {
             std::cerr << "Failed to append log entry " << i << std::endl;
         }

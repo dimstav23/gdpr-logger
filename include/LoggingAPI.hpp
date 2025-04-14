@@ -21,11 +21,6 @@ public:
 
     bool append(const LogEntry &entry);
 
-    bool append(LogEntry::ActionType actionType,
-                const std::string &dataLocation,
-                const std::string &userId,
-                const std::string &dataSubjectId);
-
     // Shutdown the logging system gracefully
     // waitForCompletion: Whether to wait for all pending entries to be written
     bool shutdown(bool waitForCompletion = true);
