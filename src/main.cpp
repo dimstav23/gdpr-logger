@@ -60,7 +60,7 @@ int main()
         config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
         config.bufferSize = 128 * 1024;           // 128 KB
         config.queueCapacity = 16384;
-        config.batchSize = 250;
+        config.batchSize = 250; // number of entries a single writer thread can dequeue at once at most
         config.numWriterThreads = 4;
 
         LoggingSystem loggingSystem(config);

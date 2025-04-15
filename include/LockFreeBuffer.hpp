@@ -36,8 +36,7 @@ public:
     explicit LockFreeQueue(size_t capacity = 8192);
     ~LockFreeQueue();
 
-    bool enqueue(const LogEntry &entry);
-    bool enqueueBlocking(const LogEntry &entry);
+    bool enqueueBlocking(const LogEntry &entry, std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
     bool dequeue(LogEntry &entry);
     size_t dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries);
     bool flush();
@@ -49,6 +48,9 @@ public:
     LockFreeQueue &operator=(const LockFreeQueue &) = delete;
     LockFreeQueue(LockFreeQueue &&) = delete;
     LockFreeQueue &operator=(LockFreeQueue &&) = delete;
+
+private:
+    bool enqueue(const LogEntry &entry);
 };
 
 #endif

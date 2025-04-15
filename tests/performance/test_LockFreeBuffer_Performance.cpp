@@ -40,7 +40,7 @@ TEST_F(LockFreeQueuePerformanceTest, PerformanceBenchmark)
 
     for (int i = 0; i < NUM_OPERATIONS; i++)
     {
-        queue->enqueue(createTestEntry(i));
+        queue->enqueueBlocking(createTestEntry(i));
     }
 
     auto enqueueTime = std::chrono::high_resolution_clock::now() - start;

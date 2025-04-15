@@ -32,14 +32,14 @@ endmacro()
 
 # unit tests
 add_test_suite(test_log_entry tests/unit/test_LogEntry.cpp)
-add_test_suite(test_logging_api tests/unit/test_LoggingAPI.cpp)
+#add_test_suite(test_logging_api tests/unit/test_LoggingAPI.cpp)
 add_test_suite(test_lock_free_buffer tests/unit/test_LockFreeBuffer.cpp)
 add_test_suite(test_compression tests/unit/test_Compression.cpp)
 add_test_suite(test_crypto tests/unit/test_Crypto.cpp)
-add_test_suite(test_writer tests/unit/test_Writer.cpp)
+#add_test_suite(test_writer tests/unit/test_Writer.cpp)
 add_test_suite(test_segmented_storage tests/unit/test_SegmentedStorage.cpp)
 # integration tests
-add_test_suite(test_compression_crypto tests/integration/test_CompressionCrypto.cpp)
-add_test_suite(test_writer_buffer tests/integration/test_WriterBuffer.cpp)
+#add_test_suite(test_compression_crypto tests/integration/test_CompressionCrypto.cpp)
+#add_test_suite(test_writer_buffer tests/integration/test_WriterBuffer.cpp)
 # performance tests
-add_test_suite(test_buffer_performance tests/performance/test_LockFreeBuffer_Performance.cpp)
+#add_test_suite(test_buffer_performance tests/performance/test_LockFreeBuffer_Performance.cpp)

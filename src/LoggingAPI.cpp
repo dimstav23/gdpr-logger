@@ -62,7 +62,7 @@ bool LoggingAPI::append(const LogEntry &entry)
     }
 
     LogEntry entryCopy = entry;
-    return m_logQueue->enqueueBlocking(entryCopy);
+    return m_logQueue->enqueueBlocking(entryCopy, std::chrono::milliseconds(100));
 }
 
 bool LoggingAPI::shutdown(bool waitForCompletion)

@@ -57,7 +57,7 @@ TEST_F(WriterIntegrationTest, BasicWriteOperation)
     const int NUM_ENTRIES = 500;
     for (int i = 0; i < NUM_ENTRIES; ++i)
     {
-        ASSERT_TRUE(logQueue->enqueue(createTestLogEntry(i)))
+        ASSERT_TRUE(logQueue->enqueueBlocking(createTestLogEntry(i)))
             << "Failed to enqueue entry " << i;
     }
 
@@ -85,7 +85,7 @@ TEST_F(WriterIntegrationTest, ConcurrentWriteAndProcess)
         {
             // Introduce a small delay to simulate variability
             std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 10));
-            logQueue->enqueue(createTestLogEntry(i));
+            logQueue->enqueueBlocking(createTestLogEntry(i));
         }
     };
 

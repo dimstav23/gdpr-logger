@@ -63,8 +63,9 @@ bool LockFreeQueue::enqueue(const LogEntry &entry)
     }
 }
 
-bool LockFreeQueue::enqueueBlocking(const LogEntry &entry)
+bool LockFreeQueue::enqueueBlocking(const LogEntry &entry, std::chrono::milliseconds timeout)
 {
+    auto start = std::chrono::steady_clock::now();
     int backoffMs = 1;
     const int maxBackoffMs = 100;
     const double jitterFactor = 0.2;
@@ -81,9 +82,26 @@ bool LockFreeQueue::enqueueBlocking(const LogEntry &entry)
             return false;
         }
 
+        auto elapsed = std::chrono::steady_clock::now() - start;
+        if (elapsed >= timeout)
+        {
+            return false;
+        }
+
         // Add some random jitter to prevent synchronized retries (thundering herd problems)
         int jitter = static_cast<int>(backoffMs * jitterFactor * (static_cast<double>(rand()) / RAND_MAX));
         int sleepTime = backoffMs + jitter;
+
+        // Make sure we don't sleep longer than our remaining timeout
+        if (timeout != std::chrono::milliseconds::max())
+        {
+            auto remainingTime = timeout - elapsed;
+            if (remainingTime <= std::chrono::milliseconds(sleepTime))
+            {
+                sleepTime = std::max(1, static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(remainingTime).count()));
+            }
+        }
+
         std::this_thread::sleep_for(std::chrono::milliseconds(sleepTime));
         backoffMs = std::min(backoffMs * 2, maxBackoffMs);
     }
