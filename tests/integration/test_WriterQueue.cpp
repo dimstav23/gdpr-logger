@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "Writer.hpp"
-#include "LockFreeBuffer.hpp"
+#include "LockFreeQueue.hpp"
 #include "SegmentedStorage.hpp"
 #include <chrono>
 #include <thread>

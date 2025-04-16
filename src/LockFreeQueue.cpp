@@ -1,4 +1,4 @@
-#include "LockFreeBuffer.hpp"
+#include "LockFreeQueue.hpp"
 #include <algorithm>
 #include <thread>
 #include <chrono>

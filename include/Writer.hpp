@@ -6,7 +6,7 @@
 #include <memory>
 #include <vector>
 #include "LogEntry.hpp"
-#include "LockFreeBuffer.hpp"
+#include "LockFreeQueue.hpp"
 #include "SegmentedStorage.hpp"
 
 class Writer

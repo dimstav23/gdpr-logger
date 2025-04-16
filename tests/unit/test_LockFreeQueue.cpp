@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
-#include "LockFreeBuffer.hpp"
+#include "LockFreeQueue.hpp"
 #include "LogEntry.hpp"
 #include <thread>
 #include <vector>

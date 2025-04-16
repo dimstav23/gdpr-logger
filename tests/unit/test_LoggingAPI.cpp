@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "LoggingAPI.hpp"
-#include "LockFreeBuffer.hpp"
+#include "LockFreeQueue.hpp"
 #include <chrono>
 #include <thread>
 

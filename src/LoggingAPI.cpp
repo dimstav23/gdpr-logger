@@ -1,5 +1,5 @@
 #include "LoggingAPI.hpp"
-#include "LockFreeBuffer.hpp"
+#include "LockFreeQueue.hpp"
 #include <iostream>
 
 // Initialize static members

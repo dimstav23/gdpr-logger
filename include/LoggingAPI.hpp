@@ -2,7 +2,7 @@
 #define LOGGING_API_HPP
 
 #include "LogEntry.hpp"
-#include "LockFreeBuffer.hpp"
+#include "LockFreeQueue.hpp"
 #include <string>
 #include <chrono>
 #include <memory>

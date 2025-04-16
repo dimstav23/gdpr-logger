@@ -1,5 +1,5 @@
-#ifndef LOCK_FREE_BUFFER_HPP
-#define LOCK_FREE_BUFFER_HPP
+#ifndef LOCK_FREE_QUEUE_HPP
+#define LOCK_FREE_QUEUE_HPP
 
 #include "LogEntry.hpp"
 #include <atomic>

@@ -3,7 +3,7 @@
 
 #include "Config.hpp"
 #include "LoggingAPI.hpp"
-#include "LockFreeBuffer.hpp"
+#include "LockFreeQueue.hpp"
 #include "SegmentedStorage.hpp"
 #include "Writer.hpp"
 #include "LogEntry.hpp"
