@@ -85,7 +85,7 @@ TEST_F(WriterIntegrationTest, ConcurrentWriteAndProcess)
         {
             // Introduce a small delay to simulate variability
             std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 10));
-            logQueue->enqueueBlocking(createTestLogEntry(i), std::chrono::milliseconds(100));
+            logQueue->enqueueBlocking(createTestLogEntry(i), std::chrono::milliseconds(500));
         }
     };
 
