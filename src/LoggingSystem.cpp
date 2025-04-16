@@ -16,7 +16,7 @@ LoggingSystem::LoggingSystem(const LoggingConfig &config)
         config.basePath, config.baseFilename,
         config.maxSegmentSize, config.bufferSize);
 
-    LoggingAPI::getInstance().initialize(m_queue);
+    LoggingAPI::getInstance().initialize(m_queue, config.appendTimeout);
 
     m_writers.reserve(m_numWriterThreads);
 }

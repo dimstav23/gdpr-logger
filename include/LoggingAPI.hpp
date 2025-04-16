@@ -17,7 +17,8 @@ class LoggingAPI
 public:
     static LoggingAPI &getInstance();
 
-    bool initialize(std::shared_ptr<LockFreeQueue> queue);
+    bool initialize(std::shared_ptr<LockFreeQueue> queue,
+                    std::chrono::milliseconds appendTimeout = std::chrono::milliseconds::max());
 
     bool append(const LogEntry &entry);
 
@@ -40,6 +41,7 @@ private:
     static std::mutex s_instanceMutex;
 
     std::shared_ptr<LockFreeQueue> m_logQueue;
+    std::chrono::milliseconds m_appendTimeout;
 
     // State tracking
     bool m_initialized;

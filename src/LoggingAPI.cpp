@@ -16,7 +16,8 @@ LoggingAPI &LoggingAPI::getInstance()
 }
 
 LoggingAPI::LoggingAPI()
-    : m_initialized(false)
+    : m_initialized(false),
+      m_appendTimeout(std::chrono::milliseconds::max())
 {
 }
 
@@ -28,7 +29,7 @@ LoggingAPI::~LoggingAPI()
     }
 }
 
-bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue)
+bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue, std::chrono::milliseconds appendTimeout)
 {
     std::lock_guard<std::mutex> lock(m_apiMutex);
 
@@ -45,6 +46,7 @@ bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue)
     }
 
     m_logQueue = queue;
+    m_appendTimeout = appendTimeout;
     m_initialized = true;
 
     return true;
@@ -61,7 +63,7 @@ bool LoggingAPI::append(const LogEntry &entry)
     }
 
     LogEntry entryCopy = entry;
-    return m_logQueue->enqueueBlocking(entryCopy, std::chrono::milliseconds(100));
+    return m_logQueue->enqueueBlocking(entryCopy, m_appendTimeout);
 }
 
 bool LoggingAPI::shutdown(bool waitForCompletion)

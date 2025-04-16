@@ -62,6 +62,7 @@ int main()
         config.queueCapacity = 16384;
         config.batchSize = 250; // number of entries a single writer thread can dequeue at once at most
         config.numWriterThreads = 4;
+        config.appendTimeout = std::chrono::milliseconds(30000);
 
         LoggingSystem loggingSystem(config);
 

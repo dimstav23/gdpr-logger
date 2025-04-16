@@ -12,7 +12,7 @@ struct LoggingConfig
     size_t queueCapacity = 8192;
     size_t batchSize = 100;
     size_t numWriterThreads = 2;
-    // std::chrono::milliseconds enqueueTimeout = std::chrono::minutes(1);
+    std::chrono::milliseconds appendTimeout = std::chrono::milliseconds(30000);
 };
 
 #endif
