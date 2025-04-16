@@ -32,7 +32,7 @@ endmacro()
 
 # unit tests
 add_test_suite(test_log_entry tests/unit/test_LogEntry.cpp)
-#add_test_suite(test_logging_api tests/unit/test_LoggingAPI.cpp)
+add_test_suite(test_logging_api tests/unit/test_LoggingAPI.cpp)
 add_test_suite(test_lock_free_queue tests/unit/test_LockFreeQueue.cpp)
 add_test_suite(test_compression tests/unit/test_Compression.cpp)
 add_test_suite(test_crypto tests/unit/test_Crypto.cpp)

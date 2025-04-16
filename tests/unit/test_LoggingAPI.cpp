@@ -86,7 +86,7 @@ TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
     auto smallQueue = std::make_shared<LockFreeQueue>(2);
-    EXPECT_TRUE(api.initialize(smallQueue));
+    EXPECT_TRUE(api.initialize(smallQueue, std::chrono::milliseconds(1000)));
 
     LogEntry entry1(LogEntry::ActionType::READ, "location1", "user1", "subject1");
     EXPECT_TRUE(api.append(entry1));
