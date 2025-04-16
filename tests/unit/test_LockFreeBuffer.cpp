@@ -476,7 +476,7 @@ TEST_F(LockFreeQueueThreadTest, CapacityEnforcement)
     // Dequeue one and try again
     LogEntry entry;
     EXPECT_TRUE(smallQueue->dequeue(entry));
-    EXPECT_TRUE(smallQueue->enqueueBlocking(createTestEntry(enqueued)));
+    EXPECT_TRUE(smallQueue->enqueueBlocking(createTestEntry(enqueued), std::chrono::milliseconds(100)));
 }
 
 // Test timed operations

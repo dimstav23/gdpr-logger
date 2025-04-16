@@ -79,7 +79,7 @@ TEST_F(WriterTest, ProcessBatchEntries)
     // Enqueue test entries
     for (const auto &entry : testEntries)
     {
-        queue->enqueueBlocking(entry);
+        queue->enqueueBlocking(entry, std::chrono::milliseconds(100));
     }
 
     // Instantiate writer with a batch size equal to number of test entries
