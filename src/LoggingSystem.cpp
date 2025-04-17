@@ -117,6 +117,17 @@ bool LoggingSystem::append(const LogEntry &entry)
     return LoggingAPI::getInstance().append(entry);
 }
 
+bool LoggingSystem::appendBatch(const std::vector<LogEntry> &entries)
+{
+    if (!m_acceptingEntries.load(std::memory_order_acquire))
+    {
+        std::cerr << "LoggingSystem: Not accepting entries" << std::endl;
+        return false;
+    }
+
+    return LoggingAPI::getInstance().appendBatch(entries);
+}
+
 bool LoggingSystem::exportLogs(const std::string &outputPath,
                                std::chrono::system_clock::time_point fromTimestamp,
                                std::chrono::system_clock::time_point toTimestamp)

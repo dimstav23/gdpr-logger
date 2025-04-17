@@ -167,6 +167,93 @@ TEST_F(LockFreeQueueBasicTest, BatchDequeuePartial)
     EXPECT_EQ(queue->size(), 0);
 }
 
+// Test batch enqueue functionality
+TEST_F(LockFreeQueueBasicTest, BatchEnqueue)
+{
+    const size_t numEntries = 5;
+    std::vector<LogEntry> entriesToEnqueue;
+
+    for (size_t i = 0; i < numEntries; i++)
+    {
+        entriesToEnqueue.push_back(createTestEntry(i));
+    }
+
+    EXPECT_TRUE(queue->enqueueBatchBlocking(entriesToEnqueue));
+    EXPECT_EQ(queue->size(), numEntries);
+
+    std::vector<LogEntry> retrievedEntries;
+    size_t dequeued = queue->dequeueBatch(retrievedEntries, numEntries);
+
+    EXPECT_EQ(dequeued, numEntries);
+    EXPECT_EQ(retrievedEntries.size(), numEntries);
+
+    for (size_t i = 0; i < numEntries; i++)
+    {
+        EXPECT_EQ(retrievedEntries[i].getDataLocation(), entriesToEnqueue[i].getDataLocation());
+        EXPECT_EQ(retrievedEntries[i].getUserId(), entriesToEnqueue[i].getUserId());
+    }
+
+    EXPECT_EQ(queue->size(), 0);
+}
+
+// Test batch enqueue timeouts with full queue
+TEST_F(LockFreeQueueBasicTest, BatchEnqueueWhenAlmostFull)
+{
+    for (size_t i = 0; i < TEST_QUEUE_SIZE - 4; i++)
+    {
+        EXPECT_TRUE(queue->enqueueBlocking(createTestEntry(i), std::chrono::milliseconds(100)));
+    }
+
+    std::vector<LogEntry> smallBatch;
+    for (size_t i = 0; i < 3; i++)
+    {
+        smallBatch.push_back(createTestEntry(100 + i));
+    }
+    EXPECT_TRUE(queue->enqueueBatchBlocking(smallBatch));
+
+    std::vector<LogEntry> largeBatch;
+    for (size_t i = 0; i < 4; i++)
+    {
+        largeBatch.push_back(createTestEntry(200 + i));
+    }
+    EXPECT_FALSE(queue->enqueueBatchBlocking(largeBatch, std::chrono::milliseconds(100)));
+
+    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE - 1);
+}
+
+// Test batch enqueue with blocking behavior
+TEST_F(LockFreeQueueBasicTest, BatchEnqueueBlocking)
+{
+    for (size_t i = 0; i < TEST_QUEUE_SIZE - 1; i++)
+    {
+        EXPECT_TRUE(queue->enqueueBlocking(createTestEntry(i), std::chrono::milliseconds(100)));
+    }
+
+    std::vector<LogEntry> batch;
+    for (size_t i = 0; i < 3; i++)
+    {
+        batch.push_back(createTestEntry(100 + i));
+    }
+
+    std::atomic<bool> producerSucceeded{false};
+    std::thread producerThread([this, &batch, &producerSucceeded]()
+                               {
+        if (queue->enqueueBatchBlocking(batch, std::chrono::seconds(3))) {
+            producerSucceeded.store(true);
+        } });
+
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    EXPECT_FALSE(producerSucceeded.load());
+
+    std::vector<LogEntry> retrievedEntries;
+    queue->dequeueBatch(retrievedEntries, 3);
+
+    producerThread.join();
+
+    EXPECT_TRUE(producerSucceeded.load());
+    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE - 1);
+}
+
 // Test flush method
 TEST_F(LockFreeQueueBasicTest, Flush)
 {
@@ -322,6 +409,142 @@ TEST_F(LockFreeQueueThreadTest, SingleProducerMultipleConsumers)
 
     // Verify counts
     EXPECT_EQ(totalDequeued.load(), TOTAL_ENTRIES);
+    EXPECT_EQ(queue->size(), 0);
+}
+
+// Test multiple producers with batch enqueue
+TEST_F(LockFreeQueueThreadTest, MultipleBatchProducers)
+{
+    const int NUM_PRODUCERS = 4;
+    const int BATCHES_PER_PRODUCER = 50;
+    const int ENTRIES_PER_BATCH = 20;
+    const int TOTAL_ENTRIES = NUM_PRODUCERS * BATCHES_PER_PRODUCER * ENTRIES_PER_BATCH;
+
+    std::atomic<int> totalEnqueued(0);
+    std::atomic<int> totalDequeued(0);
+
+    std::thread consumer([&]()
+                         {
+        std::vector<LogEntry> entries;
+        while (totalDequeued.load() < TOTAL_ENTRIES) {
+            size_t count = queue->dequeueBatch(entries, 50);
+            if (count > 0) {
+                totalDequeued += count;
+            } else {
+                std::this_thread::yield();
+            }
+        } });
+
+    std::vector<std::thread> producers;
+    for (int i = 0; i < NUM_PRODUCERS; i++)
+    {
+        producers.emplace_back([&, i]()
+                               {
+            std::vector<LogEntry> batchToEnqueue;
+
+            for (int b = 0; b < BATCHES_PER_PRODUCER; b++) {
+                batchToEnqueue.clear();
+                for (int j = 0; j < ENTRIES_PER_BATCH; j++) {
+                    int id = (i * BATCHES_PER_PRODUCER * ENTRIES_PER_BATCH) +
+                             (b * ENTRIES_PER_BATCH) + j;
+                    batchToEnqueue.push_back(createTestEntry(id));
+                }
+
+                queue->enqueueBatchBlocking(batchToEnqueue, std::chrono::milliseconds(500));
+
+                totalEnqueued += ENTRIES_PER_BATCH;
+            } });
+    }
+
+    for (auto &t : producers)
+    {
+        t.join();
+    }
+
+    consumer.join();
+
+    EXPECT_EQ(totalEnqueued.load(), TOTAL_ENTRIES);
+    EXPECT_EQ(totalDequeued.load(), TOTAL_ENTRIES);
+    EXPECT_EQ(queue->size(), 0);
+}
+
+// Test mixed batch and single item operations
+TEST_F(LockFreeQueueThreadTest, MixedBatchOperations)
+{
+    const int NUM_THREADS = 6;
+    const int OPS_PER_THREAD = 200;
+    const int MAX_BATCH_SIZE = 10;
+
+    std::atomic<int> totalEnqueued(0);
+    std::atomic<int> totalDequeued(0);
+
+    std::vector<std::thread> threads;
+    for (int i = 0; i < NUM_THREADS; i++)
+    {
+        threads.emplace_back([&, i]()
+                             {
+            std::random_device rd;
+            std::mt19937 gen(rd());
+            std::uniform_int_distribution<> opType(0, 3);  // 0-1: single enqueue, 2: batch enqueue, 3: dequeue
+            std::uniform_int_distribution<> batchSize(2, MAX_BATCH_SIZE);
+
+            for (int j = 0; j < OPS_PER_THREAD; j++) {
+                int id = i * OPS_PER_THREAD + j;
+                int op = opType(gen);
+
+                if (op <= 1 || totalDequeued.load() >= totalEnqueued.load()) {
+                    // Single enqueue
+                    LogEntry entry = createTestEntry(id);
+                    if (queue->enqueueBlocking(entry, std::chrono::milliseconds(50))) {
+                        totalEnqueued++;
+                    }
+                } else if (op == 2) {
+                    // Batch enqueue
+                    int size = batchSize(gen);
+                    std::vector<LogEntry> batch;
+                    for (int k = 0; k < size; k++) {
+                        batch.push_back(createTestEntry(id * 1000 + k));
+                    }
+
+                    if (queue->enqueueBatchBlocking(batch, std::chrono::milliseconds(50))) {
+                        totalEnqueued += size;
+                    }
+                } else {
+                    if (gen() % 2 == 0) {
+                        // Single dequeue
+                        LogEntry entry;
+                        if (queue->dequeue(entry)) {
+                            totalDequeued++;
+                        }
+                    } else {
+                        // Batch dequeue
+                        std::vector<LogEntry> entries;
+                        size_t count = queue->dequeueBatch(entries, batchSize(gen));
+                        if (count > 0) {
+                            totalDequeued += count;
+                        }
+                    }
+                }
+            } });
+    }
+
+    for (auto &t : threads)
+    {
+        t.join();
+    }
+
+    // Verify that enqueued >= dequeued and size matches the difference
+    EXPECT_GE(totalEnqueued.load(), totalDequeued.load());
+    EXPECT_EQ(queue->size(), totalEnqueued.load() - totalDequeued.load());
+
+    // Dequeue remaining entries
+    std::vector<LogEntry> entries;
+    while (queue->dequeueBatch(entries, MAX_BATCH_SIZE) > 0)
+    {
+        totalDequeued += entries.size();
+    }
+
+    EXPECT_EQ(totalEnqueued.load(), totalDequeued.load());
     EXPECT_EQ(queue->size(), 0);
 }
 

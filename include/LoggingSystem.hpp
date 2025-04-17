@@ -28,6 +28,7 @@ public:
     bool isRunning() const;
 
     bool append(const LogEntry &entry);
+    bool appendBatch(const std::vector<LogEntry> &entries);
 
     bool exportLogs(const std::string &outputPath,
                     std::chrono::system_clock::time_point fromTimestamp = std::chrono::system_clock::time_point(),

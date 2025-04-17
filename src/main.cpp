@@ -10,6 +10,9 @@ void generateLogEntries(LoggingSystem &loggingSystem, int numEntries, const std:
 {
     std::cout << "Generating " << numEntries << " log entries for user " << userId << std::endl;
 
+    std::vector<LogEntry> batch;
+    const int MAX_BATCH_SIZE = 20;
+
     for (int i = 0; i < numEntries; i++)
     {
         std::string dataLocation = "database/table/row" + std::to_string(i);
@@ -33,19 +36,49 @@ void generateLogEntries(LoggingSystem &loggingSystem, int numEntries, const std:
             break;
         }
 
-        if (!loggingSystem.append(LogEntry(action, dataLocation, userId, dataSubjectId)))
+        LogEntry entry(action, dataLocation, userId, dataSubjectId);
+
+        // Decide whether to use batch append or single append
+        // Use batch about 30% of the time, but build the batch gradually
+        if (i % 10 < 3) // 30% probability
         {
-            std::cerr << "Failed to append log entry " << i << std::endl;
+            batch.push_back(entry);
+
+            // When batch reaches MAX_BATCH_SIZE or at random intervals, append the batch
+            if (batch.size() >= MAX_BATCH_SIZE || (batch.size() > 0 && rand() % 10 == 0))
+            {
+                if (!loggingSystem.appendBatch(batch))
+                {
+                    std::cerr << "Failed to append batch of " << batch.size() << " entries" << std::endl;
+                }
+                batch.clear();
+
+                // Add a small delay after batch operations to simulate real-world patterns
+                std::this_thread::sleep_for(std::chrono::milliseconds(2));
+            }
         }
         else
         {
-            // std::cout << "Successfully appended log entry " << i << std::endl;
-        }
+            // Use regular append
+            if (!loggingSystem.append(entry))
+            {
+                std::cerr << "Failed to append single log entry " << i << std::endl;
+            }
 
-        // Add a small delay occasionally to simulate real-world usage patterns
-        if (i % 100 == 0)
+            // Add a small delay occasionally to simulate real-world usage patterns
+            if (i % 100 == 0)
+            {
+                std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            }
+        }
+    }
+
+    // Make sure to append any remaining entries in the batch
+    if (!batch.empty())
+    {
+        if (!loggingSystem.appendBatch(batch))
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::cerr << "Failed to append final batch of " << batch.size() << " entries" << std::endl;
         }
     }
 }
@@ -78,14 +111,14 @@ int main()
         // Create multiple producer threads to generate log entries
         std::vector<std::future<void>> futures;
 
-        for (int i = 0; i < 5; i++)
+        for (int i = 0; i < 10; i++)
         {
             std::string userId = "user" + std::to_string(i);
             futures.push_back(std::async(
                 std::launch::async,
                 generateLogEntries,
                 std::ref(loggingSystem),
-                10000, // Each thread generates 10 entries
+                25000,
                 userId));
         }
 

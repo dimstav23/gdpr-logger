@@ -37,6 +37,8 @@ public:
     ~LockFreeQueue();
 
     bool enqueueBlocking(const LogEntry &entry, std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
+    bool enqueueBatchBlocking(const std::vector<LogEntry> &entries,
+                              std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
     bool dequeue(LogEntry &entry);
     size_t dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries);
     bool flush();
@@ -51,6 +53,7 @@ public:
 
 private:
     bool enqueue(const LogEntry &entry);
+    bool enqueueBatch(const std::vector<LogEntry> &entries);
 };
 
 #endif

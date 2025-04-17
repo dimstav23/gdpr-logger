@@ -66,6 +66,25 @@ bool LoggingAPI::append(const LogEntry &entry)
     return m_logQueue->enqueueBlocking(entryCopy, m_appendTimeout);
 }
 
+bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries)
+{
+    std::lock_guard<std::mutex> lock(m_apiMutex);
+
+    if (!m_initialized)
+    {
+        reportError("LoggingAPI not initialized");
+        return false;
+    }
+
+    if (entries.empty())
+    {
+        return true;
+    }
+
+    std::vector<LogEntry> entriesCopy(entries);
+    return m_logQueue->enqueueBatchBlocking(entriesCopy, m_appendTimeout);
+}
+
 bool LoggingAPI::shutdown(bool waitForCompletion)
 {
     std::lock_guard<std::mutex> lock(m_apiMutex);

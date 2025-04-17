@@ -21,6 +21,7 @@ public:
                     std::chrono::milliseconds appendTimeout = std::chrono::milliseconds::max());
 
     bool append(const LogEntry &entry);
+    bool appendBatch(const std::vector<LogEntry> &entries);
 
     // Shutdown the logging system gracefully
     // waitForCompletion: Whether to wait for all pending entries to be written

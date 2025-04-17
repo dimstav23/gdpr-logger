@@ -107,6 +107,97 @@ bool LockFreeQueue::enqueueBlocking(const LogEntry &entry, std::chrono::millisec
     }
 }
 
+bool LockFreeQueue::enqueueBatch(const std::vector<LogEntry> &entries)
+{
+    const size_t entryCount = entries.size();
+
+    size_t currentHead = m_head.load(std::memory_order_relaxed);
+    size_t currentTail = m_tail.load(std::memory_order_acquire);
+
+    size_t availableSpace;
+    if (currentHead >= currentTail)
+    {
+        availableSpace = m_capacity - (currentHead - currentTail) - 1;
+    }
+    else
+    {
+        availableSpace = currentTail - currentHead - 1;
+    }
+
+    if (availableSpace < entryCount)
+    {
+        return false;
+    }
+
+    size_t nextHead = (currentHead + entryCount) & m_mask;
+
+    if (!m_head.compare_exchange_strong(currentHead, nextHead,
+                                        std::memory_order_release,
+                                        std::memory_order_relaxed))
+    {
+        return false; // Someone else modified the head
+    }
+
+    // Successfully reserved slots, now add entries
+    size_t index = currentHead;
+    for (size_t i = 0; i < entryCount; ++i)
+    {
+        m_buffer[index].data = entries[i];
+        m_buffer[index].ready.store(true, std::memory_order_release);
+        index = (index + 1) & m_mask;
+    }
+
+    // Notify any waiting flush() calls
+    m_flushCondition.notify_one();
+
+    return true;
+}
+
+bool LockFreeQueue::enqueueBatchBlocking(const std::vector<LogEntry> &entries,
+                                         std::chrono::milliseconds timeout)
+{
+    auto start = std::chrono::steady_clock::now();
+    int backoffMs = 1;
+    const int maxBackoffMs = 100;
+    const double jitterFactor = 0.2;
+
+    while (true)
+    {
+        if (enqueueBatch(entries))
+        {
+            return true;
+        }
+
+        if (m_shuttingDown.load(std::memory_order_acquire))
+        {
+            return false;
+        }
+
+        auto elapsed = std::chrono::steady_clock::now() - start;
+        if (elapsed >= timeout)
+        {
+            return false;
+        }
+
+        // Add some random jitter to prevent synchronized retries
+        int jitter = static_cast<int>(backoffMs * jitterFactor * (static_cast<double>(rand()) / RAND_MAX));
+        int sleepTime = backoffMs + jitter;
+
+        // Make sure we don't sleep longer than our remaining timeout
+        if (timeout != std::chrono::milliseconds::max())
+        {
+            auto remainingTime = timeout - elapsed;
+            if (remainingTime <= std::chrono::milliseconds(sleepTime))
+            {
+                sleepTime = std::max(1, static_cast<int>(std::chrono::duration_cast<std::chrono::milliseconds>(remainingTime).count()));
+            }
+        }
+
+        std::this_thread::sleep_for(std::chrono::milliseconds(sleepTime));
+        backoffMs = std::min(backoffMs * 2, maxBackoffMs);
+    }
+}
+
 bool LockFreeQueue::dequeue(LogEntry &entry)
 {
     while (true)
