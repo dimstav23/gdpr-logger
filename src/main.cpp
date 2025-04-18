@@ -93,13 +93,12 @@ int main()
         config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
         config.bufferSize = 128 * 1024;           // 128 KB
         config.queueCapacity = 16384;
-        config.batchSize = 250; // number of entries a single writer thread can dequeue at once at most
+        config.batchSize = 750; // number of entries a single writer thread can dequeue at once at most
         config.numWriterThreads = 4;
         config.appendTimeout = std::chrono::milliseconds(30000);
 
         LoggingSystem loggingSystem(config);
 
-        // Start the logging system
         if (!loggingSystem.start())
         {
             std::cerr << "Failed to start logging system" << std::endl;
@@ -107,18 +106,19 @@ int main()
         }
 
         std::cout << "Logging system started" << std::endl;
+        auto startTime = std::chrono::high_resolution_clock::now();
 
         // Create multiple producer threads to generate log entries
         std::vector<std::future<void>> futures;
 
-        for (int i = 0; i < 10; i++)
+        for (int i = 0; i < 25; i++)
         {
             std::string userId = "user" + std::to_string(i);
             futures.push_back(std::async(
                 std::launch::async,
                 generateLogEntries,
                 std::ref(loggingSystem),
-                25000,
+                40000,
                 userId));
         }
 
@@ -129,10 +129,6 @@ int main()
         }
 
         std::cout << "All log entries generated" << std::endl;
-
-        // Allow some time for remaining entries to be processed
-        std::cout << "Waiting for queue to drain..." << std::endl;
-        std::this_thread::sleep_for(std::chrono::seconds(2));
 
         // Export logs
         // std::cout << "Exporting logs..." << std::endl;
@@ -153,7 +149,9 @@ int main()
             return 1;
         }
 
-        std::cout << "Logging system stopped" << std::endl;
+        auto endTime = std::chrono::high_resolution_clock::now();
+        std::chrono::duration<double> elapsed = endTime - startTime;
+        std::cout << "Execution time: " << elapsed.count() << " seconds" << std::endl;
 
         return 0;
     }
