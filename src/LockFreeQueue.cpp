@@ -271,7 +271,7 @@ bool LockFreeQueue::flush()
 
 size_t LockFreeQueue::size() const
 {
-    // Get the head and tail positions (note: this is just an approximation)
+    // Get the head and tail positions (just an approximation)
     size_t head = m_head.load(std::memory_order_relaxed);
     size_t tail = m_tail.load(std::memory_order_relaxed);
 

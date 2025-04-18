@@ -110,13 +110,13 @@ TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
     consumer.join();
     EXPECT_TRUE(api.shutdown(false));
 }
-/*
+
 // Test that append returns false when shutting down
 TEST_F(LoggingAPITest, AppendDuringShutdown)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
     auto smallQueue = std::make_shared<LockFreeQueue>(2);
-    EXPECT_TRUE(api.initialize(smallQueue));
+    EXPECT_TRUE(api.initialize(smallQueue, std::chrono::milliseconds(1000)));
 
     LogEntry entry1(LogEntry::ActionType::READ, "location1", "user1", "subject1");
     EXPECT_TRUE(api.append(entry1));
@@ -139,7 +139,7 @@ TEST_F(LoggingAPITest, AppendDuringShutdown)
 
     appendThread.join();
     EXPECT_TRUE(appendFinished.load());
-}*/
+}
 
 // Test shutdown without initialization
 TEST_F(LoggingAPITest, ShutdownWithoutInitialization)
