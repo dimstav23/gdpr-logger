@@ -7,7 +7,7 @@
 #include <chrono>
 #include <memory>
 #include <vector>
-#include <mutex>
+#include <shared_mutex>
 #include <functional>
 
 class LoggingAPI
@@ -46,7 +46,7 @@ private:
 
     // State tracking
     bool m_initialized;
-    std::mutex m_apiMutex;
+    std::shared_mutex m_apiMutex;
 
     // Helper to report errors
     void reportError(const std::string &message);

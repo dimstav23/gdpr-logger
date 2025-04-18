@@ -31,7 +31,7 @@ LoggingAPI::~LoggingAPI()
 
 bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue, std::chrono::milliseconds appendTimeout)
 {
-    std::lock_guard<std::mutex> lock(m_apiMutex);
+    std::unique_lock<std::shared_mutex> lock(m_apiMutex);
 
     if (m_initialized)
     {
@@ -54,7 +54,7 @@ bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue, std::chrono::m
 
 bool LoggingAPI::append(const LogEntry &entry)
 {
-    std::lock_guard<std::mutex> lock(m_apiMutex);
+    std::shared_lock<std::shared_mutex> lock(m_apiMutex);
 
     if (!m_initialized)
     {
@@ -68,7 +68,7 @@ bool LoggingAPI::append(const LogEntry &entry)
 
 bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries)
 {
-    std::lock_guard<std::mutex> lock(m_apiMutex);
+    std::shared_lock<std::shared_mutex> lock(m_apiMutex);
 
     if (!m_initialized)
     {
@@ -87,7 +87,7 @@ bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries)
 
 bool LoggingAPI::shutdown(bool waitForCompletion)
 {
-    std::lock_guard<std::mutex> lock(m_apiMutex);
+    std::unique_lock<std::shared_mutex> lock(m_apiMutex);
 
     if (!m_initialized)
     {
@@ -114,7 +114,7 @@ bool LoggingAPI::exportLogs(
     std::chrono::system_clock::time_point fromTimestamp,
     std::chrono::system_clock::time_point toTimestamp)
 {
-    std::lock_guard<std::mutex> lock(m_apiMutex);
+    std::shared_lock<std::shared_mutex> lock(m_apiMutex);
 
     if (!m_initialized)
     {
