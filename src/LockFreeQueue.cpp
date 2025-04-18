@@ -55,9 +55,6 @@ bool LockFreeQueue::enqueue(const LogEntry &entry)
             // Mark the node as ready for consumption
             m_buffer[currentHead].ready.store(true, std::memory_order_release);
 
-            // Notify any waiting flush() calls
-            m_flushCondition.notify_one();
-
             return true;
         }
     }
@@ -146,9 +143,6 @@ bool LockFreeQueue::enqueueBatch(const std::vector<LogEntry> &entries)
         m_buffer[index].ready.store(true, std::memory_order_release);
         index = (index + 1) & m_mask;
     }
-
-    // Notify any waiting flush() calls
-    m_flushCondition.notify_one();
 
     return true;
 }
