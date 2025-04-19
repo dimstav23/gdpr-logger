@@ -22,7 +22,7 @@ public:
 
     bool start();
 
-    // Stops the logging system, if waitForCompletion waits until the queue is empty
+    // if waitForCompletion waits until the queue is empty
     bool stop(bool waitForCompletion = true);
 
     bool isRunning() const;

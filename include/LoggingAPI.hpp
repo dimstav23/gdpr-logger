@@ -23,13 +23,11 @@ public:
     bool append(const LogEntry &entry);
     bool appendBatch(const std::vector<LogEntry> &entries);
 
-    // Shutdown the logging system gracefully
-    // waitForCompletion: Whether to wait for all pending entries to be written
-    bool shutdown(bool waitForCompletion = true);
-
     bool exportLogs(const std::string &outputPath,
                     std::chrono::system_clock::time_point fromTimestamp = std::chrono::system_clock::time_point(),
                     std::chrono::system_clock::time_point toTimestamp = std::chrono::system_clock::time_point());
+
+    bool reset();
 
     ~LoggingAPI();
 

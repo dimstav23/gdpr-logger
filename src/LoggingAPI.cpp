@@ -25,7 +25,7 @@ LoggingAPI::~LoggingAPI()
 {
     if (m_initialized)
     {
-        shutdown(false);
+        reset();
     }
 }
 
@@ -85,28 +85,20 @@ bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries)
     return m_logQueue->enqueueBatchBlocking(entriesCopy, m_appendTimeout);
 }
 
-bool LoggingAPI::shutdown(bool waitForCompletion)
+bool LoggingAPI::reset()
 {
     std::unique_lock<std::shared_mutex> lock(m_apiMutex);
 
     if (!m_initialized)
     {
-        reportError("LoggingAPI not initialized");
         return false;
-    }
-
-    bool result = true;
-
-    if (waitForCompletion)
-    {
-        result = m_logQueue->flush();
     }
 
     // Reset state
     m_initialized = false;
     m_logQueue.reset();
 
-    return result;
+    return true;
 }
 
 bool LoggingAPI::exportLogs(

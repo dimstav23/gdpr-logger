@@ -70,17 +70,14 @@ bool LoggingSystem::stop(bool waitForCompletion)
         return false;
     }
 
-    // Stop accepting new entries
     m_acceptingEntries.store(false, std::memory_order_release);
 
-    // If requested, wait for queue to empty
     if (waitForCompletion && m_queue)
     {
         std::cout << "LoggingSystem: Waiting for queue to empty..." << std::endl;
         m_queue->flush();
     }
 
-    // Stop all writers
     for (auto &writer : m_writers)
     {
         if (writer)
@@ -88,8 +85,6 @@ bool LoggingSystem::stop(bool waitForCompletion)
             writer->stop();
         }
     }
-
-    // Clear the writer container
     m_writers.clear();
 
     // Flush storage to ensure all data is written
@@ -98,11 +93,9 @@ bool LoggingSystem::stop(bool waitForCompletion)
         m_storage->flush();
     }
 
-    // Set running flag to false
     m_running.store(false, std::memory_order_release);
 
-    // Reset LoggingAPI
-    LoggingAPI::getInstance().shutdown(false);
+    LoggingAPI::getInstance().reset();
 
     std::cout << "LoggingSystem: Stopped" << std::endl;
     return true;
