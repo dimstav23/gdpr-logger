@@ -15,14 +15,6 @@ protected:
         entry2 = LogEntry(LogEntry::ActionType::READ, "/data/records/2", "admin789", "subject456");
         entry3 = LogEntry(LogEntry::ActionType::UPDATE, "/data/records/3", "user123", "subject789");
         entry4 = LogEntry(LogEntry::ActionType::DELETE, "/data/records/4", "admin789", "subject123");
-
-        // Create a chain of hashes
-        std::vector<uint8_t> hash1 = entry1.calculateHash();
-        entry2.setPreviousHash(hash1);
-        std::vector<uint8_t> hash2 = entry2.calculateHash();
-        entry3.setPreviousHash(hash2);
-        std::vector<uint8_t> hash3 = entry3.calculateHash();
-        entry4.setPreviousHash(hash3);
     }
 
     LogEntry entry1, entry2, entry3, entry4;

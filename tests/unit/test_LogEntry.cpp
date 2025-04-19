@@ -65,9 +65,6 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_EQ(newEntry.getUserId(), "userABC");
     EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
 
-    std::vector<uint8_t> prevHash = {0x12, 0x34, 0x56, 0x78};
-    entry.setPreviousHash(prevHash);
-
     std::vector<uint8_t> serializedData2 = entry.serialize();
     success = newEntry.deserialize(serializedData2);
 
@@ -77,37 +74,8 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_EQ(newEntry.getDataLocation(), "storage/files");
     EXPECT_EQ(newEntry.getUserId(), "userABC");
     EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
-    EXPECT_EQ(newEntry.getPreviousHash(), prevHash);
     EXPECT_NEAR(std::chrono::system_clock::to_time_t(newEntry.getTimestamp()),
                 std::chrono::system_clock::to_time_t(entry.getTimestamp()), 1);
-}
-
-// Test hash calculation
-TEST(LogEntryTest5, HashCalculation_ConsistentAndUnique)
-{
-    LogEntry entry(LogEntry::ActionType::UPDATE, "secure/db", "user567", "subject987");
-    std::vector<uint8_t> hash = entry.calculateHash();
-    EXPECT_FALSE(hash.empty());
-
-    LogEntry entry2(LogEntry::ActionType::UPDATE, "secure/db", "user567", "subject987");
-    EXPECT_EQ(entry.calculateHash(), entry2.calculateHash());
-
-    LogEntry entry3(LogEntry::ActionType::DELETE, "secure/db", "user567", "subject987");
-    EXPECT_NE(entry.calculateHash(), entry3.calculateHash());
-}
-
-// Test previous hash functionality
-TEST(LogEntryTest6, PreviousHash_SetAndRetrieve)
-{
-    LogEntry entry;
-    std::vector<uint8_t> prevHash = {0x12, 0x34, 0x56, 0x78};
-
-    entry.setPreviousHash(prevHash);
-    EXPECT_EQ(entry.getPreviousHash(), prevHash);
-
-    std::vector<uint8_t> emptyHash;
-    entry.setPreviousHash(emptyHash);
-    EXPECT_EQ(entry.getPreviousHash().size(), 0);
 }
 
 // Test action type conversion functions

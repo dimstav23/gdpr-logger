@@ -18,12 +18,6 @@ protected:
         entry2 = LogEntry(LogEntry::ActionType::READ, "/data/records/2", "admin789", "subject456");
         entry3 = LogEntry(LogEntry::ActionType::UPDATE, "/data/records/3", "user123", "subject789");
 
-        // Chain the hashes
-        std::vector<uint8_t> hash1 = entry1.calculateHash();
-        entry2.setPreviousHash(hash1);
-        std::vector<uint8_t> hash2 = entry2.calculateHash();
-        entry3.setPreviousHash(hash2);
-
         // Create encryption key
         key = std::vector<uint8_t>(32, 0x42);      // Fixed key for reproducibility
         wrongKey = std::vector<uint8_t>(32, 0x24); // Different key for testing
@@ -69,7 +63,6 @@ TEST_F(CompressionCryptoTest, SingleEntryFullCycle)
     EXPECT_EQ(entry1.getDataLocation(), recovered->getDataLocation());
     EXPECT_EQ(entry1.getUserId(), recovered->getUserId());
     EXPECT_EQ(entry1.getDataSubjectId(), recovered->getDataSubjectId());
-    EXPECT_EQ(entry1.getPreviousHash(), recovered->getPreviousHash());
 }
 
 // Test 2: Batch processing - riginal -> compress -> encrypt -> decrypt -> decompress -> recovered
@@ -94,14 +87,6 @@ TEST_F(CompressionCryptoTest, BatchProcessing)
     {
         EXPECT_TRUE(LogEntriesEqual(batch[i], recovered[i]))
             << "Entries at index " << i << " don't match";
-
-        // Verify hash chain integrity
-        if (i > 0)
-        {
-            std::vector<uint8_t> expectedHash = batch[i - 1].calculateHash();
-            EXPECT_EQ(expectedHash, recovered[i].getPreviousHash())
-                << "Hash chain broken at index " << i;
-        }
     }
 
     // Test with empty batch

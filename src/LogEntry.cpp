@@ -38,12 +38,6 @@ LogEntry::LogEntry(ActionType actionType, const std::string &dataLocation,
       m_dataSubjectId(dataSubjectId),
       m_timestamp(std::chrono::system_clock::now()) {}
 
-// Set the previous log entry's hash (for tamper-evident chaining)
-void LogEntry::setPreviousHash(const std::vector<uint8_t> &previousHash)
-{
-    m_previousHash = previousHash;
-}
-
 // Serialize the log entry into a byte vector
 std::vector<uint8_t> LogEntry::serialize() const
 {
@@ -60,19 +54,6 @@ std::vector<uint8_t> LogEntry::serialize() const
     // Timestamp (convert to string)
     auto time_since_epoch = std::chrono::duration_cast<std::chrono::milliseconds>(m_timestamp.time_since_epoch()).count();
     oss << time_since_epoch << "|";
-
-    // Previous hash (if any)
-    if (!m_previousHash.empty())
-    {
-        for (auto &byte : m_previousHash)
-        {
-            oss << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(byte);
-        }
-    }
-    else
-    {
-        oss << "0000000000000000";
-    }
 
     // Convert to string and then to a byte vector
     std::string logData = oss.str();
@@ -104,20 +85,6 @@ bool LogEntry::deserialize(const std::vector<uint8_t> &data)
         iss >> timestampMillis >> separator;
         m_timestamp = std::chrono::system_clock::time_point(std::chrono::milliseconds(timestampMillis));
 
-        // Deserialize previous hash (if any)
-        std::string prevHashStr;
-        std::getline(iss, prevHashStr, '|');
-        m_previousHash.clear();
-        if (prevHashStr != "0000000000000000")
-        {
-            for (size_t i = 0; i < prevHashStr.size(); i += 2)
-            {
-                unsigned int byte;
-                std::istringstream(prevHashStr.substr(i, 2)) >> std::hex >> byte;
-                m_previousHash.push_back(static_cast<uint8_t>(byte));
-            }
-        }
-
         return true;
     }
     catch (const std::exception &e)
@@ -127,24 +94,6 @@ bool LogEntry::deserialize(const std::vector<uint8_t> &data)
     }
 }
 
-std::vector<uint8_t> LogEntry::calculateHash() const
-{
-    std::string data = toString();
-
-    // Use EVP API for SHA-256
-    std::vector<uint8_t> hash(EVP_MAX_MD_SIZE);
-    unsigned int hash_len = 0;
-
-    EVP_MD_CTX *ctx = EVP_MD_CTX_new();
-    EVP_DigestInit_ex(ctx, EVP_sha256(), nullptr);
-    EVP_DigestUpdate(ctx, data.c_str(), data.size());
-    EVP_DigestFinal_ex(ctx, hash.data(), &hash_len);
-    EVP_MD_CTX_free(ctx);
-
-    hash.resize(hash_len);
-    return hash;
-}
-
 std::string LogEntry::toString() const
 {
     std::ostringstream oss;
@@ -152,20 +101,7 @@ std::string LogEntry::toString() const
         << "DataLocation: " << m_dataLocation << "\n"
         << "UserId: " << m_userId << "\n"
         << "DataSubjectId: " << m_dataSubjectId << "\n"
-        << "Timestamp: " << std::chrono::system_clock::to_time_t(m_timestamp) << "\n"
-        << "PreviousHash: ";
-
-    if (!m_previousHash.empty())
-    {
-        for (auto byte : m_previousHash)
-        {
-            oss << std::setw(2) << std::setfill('0') << std::hex << static_cast<int>(byte);
-        }
-    }
-    else
-    {
-        oss << "None";
-    }
+        << "Timestamp: " << std::chrono::system_clock::to_time_t(m_timestamp);
 
     return oss.str();
 }

@@ -26,12 +26,6 @@ public:
         const std::string &userId,
         const std::string &dataSubjectId);
 
-    // set the previous entry's hash to maintain the chain
-    void setPreviousHash(const std::vector<uint8_t> &previousHash);
-
-    // Calculate the hash of this entry, returns vector of bytes representing the hash
-    std::vector<uint8_t> calculateHash() const;
-
     std::vector<uint8_t> serialize() const;
 
     bool deserialize(const std::vector<uint8_t> &data);
@@ -53,15 +47,12 @@ public:
     std::chrono::system_clock::time_point getTimestamp() const { return m_timestamp; }
     void setTimestamp(const std::chrono::system_clock::time_point &timestamp) { m_timestamp = timestamp; }
 
-    const std::vector<uint8_t> &getPreviousHash() const { return m_previousHash; }
-
 private:
     ActionType m_actionType;                           // Type of GDPR operation
     std::string m_dataLocation;                        // Location of the data being operated on
     std::string m_userId;                              // ID of the user performing the operation
     std::string m_dataSubjectId;                       // ID of the data subject
     std::chrono::system_clock::time_point m_timestamp; // When the operation occurred
-    std::vector<uint8_t> m_previousHash;               // Hash of the previous log entry (for chaining)
 };
 
 // Helper functions

@@ -50,9 +50,6 @@ void Writer::processLogEntries()
     Crypto crypto;
     std::vector<uint8_t> encryptionKey(32, 0x42); // dummy key
 
-    // Track the previous hash for tamper-evidence chaining
-    std::vector<uint8_t> previousHash(32, 0); // Start with zeros
-
     while (m_running)
     {
         // Try to dequeue a batch of log entries
