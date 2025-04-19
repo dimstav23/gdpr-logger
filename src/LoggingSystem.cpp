@@ -9,7 +9,14 @@ LoggingSystem::LoggingSystem(const LoggingConfig &config)
     : m_numWriterThreads(config.numWriterThreads),
       m_batchSize(config.batchSize)
 {
-    std::filesystem::create_directories(config.basePath);
+    if (!std::filesystem::create_directories(config.basePath))
+    {
+        if (!std::filesystem::exists(config.basePath))
+        {
+            throw std::runtime_error("Failed to create log directory: " + config.basePath);
+        }
+        // If directory exists, no error; proceed silently
+    }
 
     m_queue = std::make_shared<LockFreeQueue>(config.queueCapacity);
     m_storage = std::make_shared<SegmentedStorage>(
@@ -24,7 +31,7 @@ LoggingSystem::LoggingSystem(const LoggingConfig &config)
 LoggingSystem::~LoggingSystem()
 {
     // Ensure system is stopped before destroying
-    stop(false);
+    stop(true);
 }
 
 bool LoggingSystem::start()
