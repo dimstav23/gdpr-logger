@@ -40,7 +40,7 @@ TEST_F(LoggingAPITest, InitializeWithValidQueue)
     LoggingAPI &api = LoggingAPI::getInstance();
 
     EXPECT_TRUE(api.initialize(queue));
-    EXPECT_TRUE(api.shutdown(false));
+    EXPECT_TRUE(api.reset());
 }
 
 // Test initialization with null queue
@@ -59,7 +59,7 @@ TEST_F(LoggingAPITest, DoubleInitialization)
     EXPECT_TRUE(api.initialize(queue));
     EXPECT_FALSE(api.initialize(queue));
 
-    EXPECT_TRUE(api.shutdown(false));
+    EXPECT_TRUE(api.reset());
 }
 
 // Test appending log entry before initialization
@@ -78,7 +78,7 @@ TEST_F(LoggingAPITest, AppendAfterInitialization2)
     LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
 
     EXPECT_TRUE(api.append(entry));
-    EXPECT_TRUE(api.shutdown(false));
+    EXPECT_TRUE(api.reset());
 }
 
 // Test blocking append with queue eventually emptying
@@ -108,7 +108,7 @@ TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
     EXPECT_GE(duration, 300);
 
     consumer.join();
-    EXPECT_TRUE(api.shutdown(false));
+    EXPECT_TRUE(api.reset());
 }
 
 // Test that append returns false when shutting down
@@ -135,7 +135,7 @@ TEST_F(LoggingAPITest, AppendDuringShutdown)
     std::this_thread::sleep_for(std::chrono::milliseconds(400));
 
     // Now shut down while the thread is blocked
-    EXPECT_TRUE(api.shutdown(false));
+    EXPECT_TRUE(api.reset());
 
     appendThread.join();
     EXPECT_TRUE(appendFinished.load());
@@ -146,7 +146,7 @@ TEST_F(LoggingAPITest, ShutdownWithoutInitialization)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
 
-    EXPECT_FALSE(api.shutdown(false));
+    EXPECT_FALSE(api.reset());
 }
 
 // Test shutdown with wait for completion
@@ -167,7 +167,7 @@ TEST_F(LoggingAPITest, ShutdownWithWait)
 
         } });
 
-    EXPECT_TRUE(api.shutdown(true));
+    EXPECT_TRUE(api.reset());
     consumer.join();
     EXPECT_TRUE(queue->isEmpty());
 }
@@ -190,7 +190,7 @@ TEST_F(LoggingAPITest, ExportLogsAfterInitialization)
     auto now = std::chrono::system_clock::now();
     EXPECT_FALSE(api.exportLogs("output.log", now, now));
 
-    EXPECT_TRUE(api.shutdown(false));
+    EXPECT_TRUE(api.reset());
 }
 
 // Test thread safety of singleton
