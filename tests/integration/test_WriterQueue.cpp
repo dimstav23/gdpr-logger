@@ -42,12 +42,15 @@ protected:
     std::shared_ptr<SegmentedStorage> storage;
     std::string testDir;
 
-    LogEntry createTestLogEntry(int index)
+    QueueItem createTestItem(int id)
     {
-        return LogEntry{LogEntry::ActionType::UPDATE,
-                        "location" + std::to_string(index),
-                        "user123" + std::to_string(index),
-                        "subject456" + std::to_string(index)};
+        QueueItem item;
+        item.entry = LogEntry(
+            LogEntry::ActionType::UPDATE,
+            "location" + std::to_string(id),
+            "user" + std::to_string(id),
+            "subject" + std::to_string(id % 10));
+        return item;
     }
 };
 
@@ -57,7 +60,7 @@ TEST_F(WriterIntegrationTest, BasicWriteOperation)
     const int NUM_ENTRIES = 500;
     for (int i = 0; i < NUM_ENTRIES; ++i)
     {
-        ASSERT_TRUE(logQueue->enqueueBlocking(createTestLogEntry(i), std::chrono::milliseconds(100)))
+        ASSERT_TRUE(logQueue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)))
             << "Failed to enqueue entry " << i;
     }
 
@@ -85,7 +88,7 @@ TEST_F(WriterIntegrationTest, ConcurrentWriteAndProcess)
         {
             // Introduce a small delay to simulate variability
             std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 10));
-            logQueue->enqueueBlocking(createTestLogEntry(i), std::chrono::milliseconds(500));
+            logQueue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(500));
         }
     };
 

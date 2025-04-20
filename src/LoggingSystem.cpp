@@ -1,21 +1,17 @@
 #include "LoggingSystem.hpp"
-#include <iostream>
-#include <fstream>
-#include <filesystem>
 #include "Crypto.hpp"
 #include "Compression.hpp"
+#include <iostream>
+#include <filesystem>
 
 LoggingSystem::LoggingSystem(const LoggingConfig &config)
     : m_numWriterThreads(config.numWriterThreads),
       m_batchSize(config.batchSize)
 {
-    if (!std::filesystem::create_directories(config.basePath))
+    if (!std::filesystem::create_directories(config.basePath) &&
+        !std::filesystem::exists(config.basePath))
     {
-        if (!std::filesystem::exists(config.basePath))
-        {
-            throw std::runtime_error("Failed to create log directory: " + config.basePath);
-        }
-        // If directory exists, no error; proceed silently
+        throw std::runtime_error("Failed to create log directory: " + config.basePath);
     }
 
     m_queue = std::make_shared<LockFreeQueue>(config.queueCapacity);
@@ -44,12 +40,10 @@ bool LoggingSystem::start()
         return false;
     }
 
-    // Set flags
     m_running.store(true, std::memory_order_release);
     m_acceptingEntries.store(true, std::memory_order_release);
 
-    // Create and start writer threads
-    for (size_t i = 0; i < m_numWriterThreads; i++)
+    for (size_t i = 0; i < m_numWriterThreads; ++i)
     {
         auto writer = std::make_unique<Writer>(*m_queue, m_storage, m_batchSize);
         writer->start();
@@ -80,10 +74,7 @@ bool LoggingSystem::stop(bool waitForCompletion)
 
     for (auto &writer : m_writers)
     {
-        if (writer)
-        {
-            writer->stop();
-        }
+        writer->stop();
     }
     m_writers.clear();
 
@@ -106,7 +97,8 @@ bool LoggingSystem::isRunning() const
     return m_running.load(std::memory_order_acquire);
 }
 
-bool LoggingSystem::append(const LogEntry &entry)
+bool LoggingSystem::append(const LogEntry &entry,
+                           const std::optional<std::string> &filename)
 {
     if (!m_acceptingEntries.load(std::memory_order_acquire))
     {
@@ -114,10 +106,11 @@ bool LoggingSystem::append(const LogEntry &entry)
         return false;
     }
 
-    return LoggingAPI::getInstance().append(entry);
+    return LoggingAPI::getInstance().append(entry, filename);
 }
 
-bool LoggingSystem::appendBatch(const std::vector<LogEntry> &entries)
+bool LoggingSystem::appendBatch(const std::vector<LogEntry> &entries,
+                                const std::optional<std::string> &filename)
 {
     if (!m_acceptingEntries.load(std::memory_order_acquire))
     {
@@ -125,12 +118,13 @@ bool LoggingSystem::appendBatch(const std::vector<LogEntry> &entries)
         return false;
     }
 
-    return LoggingAPI::getInstance().appendBatch(entries);
+    return LoggingAPI::getInstance().appendBatch(entries, filename);
 }
 
-bool LoggingSystem::exportLogs(const std::string &outputPath,
-                               std::chrono::system_clock::time_point fromTimestamp,
-                               std::chrono::system_clock::time_point toTimestamp)
+bool LoggingSystem::exportLogs(
+    const std::string &outputPath,
+    std::chrono::system_clock::time_point fromTimestamp,
+    std::chrono::system_clock::time_point toTimestamp)
 {
     // This is a placeholder implementation for log export
     // A complete solution would:
@@ -140,4 +134,5 @@ bool LoggingSystem::exportLogs(const std::string &outputPath,
     // 4. Write to the output path
 
     std::cerr << "LoggingSystem: Export logs not fully implemented" << std::endl;
+    return false;
 }

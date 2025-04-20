@@ -1,4 +1,5 @@
 #include "LoggingAPI.hpp"
+#include "QueueItem.hpp"
 #include <iostream>
 
 // Initialize static members
@@ -29,7 +30,8 @@ LoggingAPI::~LoggingAPI()
     }
 }
 
-bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue, std::chrono::milliseconds appendTimeout)
+bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue,
+                            std::chrono::milliseconds appendTimeout)
 {
     std::unique_lock<std::shared_mutex> lock(m_apiMutex);
 
@@ -45,14 +47,15 @@ bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue, std::chrono::m
         return false;
     }
 
-    m_logQueue = queue;
+    m_logQueue = std::move(queue);
     m_appendTimeout = appendTimeout;
     m_initialized = true;
 
     return true;
 }
 
-bool LoggingAPI::append(const LogEntry &entry)
+bool LoggingAPI::append(const LogEntry &entry,
+                        const std::optional<std::string> &filename)
 {
     std::shared_lock<std::shared_mutex> lock(m_apiMutex);
 
@@ -62,11 +65,13 @@ bool LoggingAPI::append(const LogEntry &entry)
         return false;
     }
 
-    LogEntry entryCopy = entry;
-    return m_logQueue->enqueueBlocking(entryCopy, m_appendTimeout);
+    QueueItem item{entry, filename};
+    return m_logQueue->enqueueBlocking(item, m_appendTimeout);
 }
 
-bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries)
+bool LoggingAPI::appendBatch(
+    const std::vector<LogEntry> &entries,
+    const std::optional<std::string> &filename)
 {
     std::shared_lock<std::shared_mutex> lock(m_apiMutex);
 
@@ -81,8 +86,13 @@ bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries)
         return true;
     }
 
-    std::vector<LogEntry> entriesCopy(entries);
-    return m_logQueue->enqueueBatchBlocking(entriesCopy, m_appendTimeout);
+    std::vector<QueueItem> batch;
+    batch.reserve(entries.size());
+    for (auto const &e : entries)
+    {
+        batch.push_back({e, filename});
+    }
+    return m_logQueue->enqueueBatchBlocking(batch, m_appendTimeout);
 }
 
 bool LoggingAPI::reset()

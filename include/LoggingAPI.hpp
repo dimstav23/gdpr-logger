@@ -3,12 +3,14 @@
 
 #include "LogEntry.hpp"
 #include "LockFreeQueue.hpp"
+#include "QueueItem.hpp"
 #include <string>
 #include <chrono>
 #include <memory>
 #include <vector>
 #include <shared_mutex>
 #include <functional>
+#include <optional>
 
 class LoggingAPI
 {
@@ -20,8 +22,10 @@ public:
     bool initialize(std::shared_ptr<LockFreeQueue> queue,
                     std::chrono::milliseconds appendTimeout = std::chrono::milliseconds::max());
 
-    bool append(const LogEntry &entry);
-    bool appendBatch(const std::vector<LogEntry> &entries);
+    bool append(const LogEntry &entry,
+                const std::optional<std::string> &filename = std::nullopt);
+    bool appendBatch(const std::vector<LogEntry> &entries,
+                     const std::optional<std::string> &filename = std::nullopt);
 
     bool exportLogs(const std::string &outputPath,
                     std::chrono::system_clock::time_point fromTimestamp = std::chrono::system_clock::time_point(),

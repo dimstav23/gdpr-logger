@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include "LockFreeQueue.hpp"
-#include "LogEntry.hpp"
 #include <thread>
 #include <vector>
 #include <atomic>
@@ -24,14 +22,24 @@ protected:
         queue.reset();
     }
 
-    // Helper to create a test log entry
-    LogEntry createTestEntry(int id)
+    // Helper to create a test queue item with log entry
+    QueueItem createTestItem(int id)
     {
-        return LogEntry(
+        QueueItem item;
+        item.entry = LogEntry(
             LogEntry::ActionType::READ,
             "data/location/" + std::to_string(id),
             "user" + std::to_string(id),
             "subject" + std::to_string(id % 10));
+        return item;
+    }
+
+    // Helper to create a test queue item with log entry and target filename
+    QueueItem createTestItemWithTarget(int id, const std::string &filename)
+    {
+        QueueItem item = createTestItem(id);
+        item.targetFilename = filename;
+        return item;
     }
 
     const size_t TEST_QUEUE_SIZE = 16; // Small size for testing
@@ -41,25 +49,26 @@ protected:
 // Test enqueue and dequeue operations
 TEST_F(LockFreeQueueBasicTest, EnqueueDequeue)
 {
-    LogEntry entry = createTestEntry(1);
-    LogEntry retrievedEntry;
+    QueueItem item = createTestItem(1);
+    QueueItem retrievedItem;
 
     // Queue should be empty initially
     EXPECT_EQ(queue->size(), 0);
 
     // Enqueue one item
-    EXPECT_TRUE(queue->enqueueBlocking(entry, std::chrono::milliseconds(100)));
+    EXPECT_TRUE(queue->enqueueBlocking(item, std::chrono::milliseconds(100)));
     EXPECT_EQ(queue->size(), 1);
 
     // Dequeue the item
-    EXPECT_TRUE(queue->dequeue(retrievedEntry));
+    EXPECT_TRUE(queue->dequeue(retrievedItem));
     EXPECT_EQ(queue->size(), 0);
 
     // Verify the item matches
-    EXPECT_EQ(retrievedEntry.getUserId(), entry.getUserId());
-    EXPECT_EQ(retrievedEntry.getDataLocation(), entry.getDataLocation());
-    EXPECT_EQ(retrievedEntry.getDataSubjectId(), entry.getDataSubjectId());
-    EXPECT_EQ(retrievedEntry.getActionType(), entry.getActionType());
+    EXPECT_EQ(retrievedItem.entry.getUserId(), item.entry.getUserId());
+    EXPECT_EQ(retrievedItem.entry.getDataLocation(), item.entry.getDataLocation());
+    EXPECT_EQ(retrievedItem.entry.getDataSubjectId(), item.entry.getDataSubjectId());
+    EXPECT_EQ(retrievedItem.entry.getActionType(), item.entry.getActionType());
+    EXPECT_EQ(retrievedItem.targetFilename, item.targetFilename);
 }
 
 // Test enqueue until full
@@ -68,11 +77,11 @@ TEST_F(LockFreeQueueBasicTest, EnqueueUntilFull)
     // Fill the queue (capacity - 1 items)
     for (size_t i = 0; i < TEST_QUEUE_SIZE - 1; i++)
     {
-        EXPECT_TRUE(queue->enqueueBlocking(createTestEntry(i), std::chrono::milliseconds(100)));
+        EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
 
     // One more should fail because head would be equal to tail (using a short timeout)
-    EXPECT_FALSE(queue->enqueueBlocking(createTestEntry(TEST_QUEUE_SIZE - 1), std::chrono::milliseconds(100)));
+    EXPECT_FALSE(queue->enqueueBlocking(createTestItem(TEST_QUEUE_SIZE - 1), std::chrono::milliseconds(100)));
 }
 
 // Test enqueue with consumer thread
@@ -81,7 +90,7 @@ TEST_F(LockFreeQueueBasicTest, EnqueueWithConsumer)
     // Fill the queue (capacity - 1 items)
     for (size_t i = 0; i < TEST_QUEUE_SIZE - 1; i++)
     {
-        EXPECT_TRUE(queue->enqueueBlocking(createTestEntry(i), std::chrono::milliseconds(100)));
+        EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
 
     EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE - 1);
@@ -90,16 +99,16 @@ TEST_F(LockFreeQueueBasicTest, EnqueueWithConsumer)
     std::thread producerThread([this, &producerSucceeded]()
                                {
         // will block until space is available
-        if (queue->enqueueBlocking(createTestEntry(TEST_QUEUE_SIZE - 1), std::chrono::seconds(3))) {
+        if (queue->enqueueBlocking(createTestItem(TEST_QUEUE_SIZE - 1), std::chrono::seconds(3))) {
             producerSucceeded.store(true);
         } });
 
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     EXPECT_FALSE(producerSucceeded.load());
 
-    LogEntry retrievedEntry;
-    std::thread consumerThread([this, &retrievedEntry]()
-                               { EXPECT_TRUE(queue->dequeue(retrievedEntry)); });
+    QueueItem retrievedItem;
+    std::thread consumerThread([this, &retrievedItem]()
+                               { EXPECT_TRUE(queue->dequeue(retrievedItem)); });
 
     consumerThread.join();
     producerThread.join();
@@ -107,15 +116,15 @@ TEST_F(LockFreeQueueBasicTest, EnqueueWithConsumer)
     EXPECT_TRUE(producerSucceeded.load());
     EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE - 1);
 
-    EXPECT_EQ(retrievedEntry.getActionType(), LogEntry::ActionType::READ);
-    EXPECT_EQ(retrievedEntry.getDataLocation(), "data/location/0");
+    EXPECT_EQ(retrievedItem.entry.getActionType(), LogEntry::ActionType::READ);
+    EXPECT_EQ(retrievedItem.entry.getDataLocation(), "data/location/0");
 }
 
 // Test dequeue from empty queue
 TEST_F(LockFreeQueueBasicTest, DequeueFromEmpty)
 {
-    LogEntry entry;
-    EXPECT_FALSE(queue->dequeue(entry));
+    QueueItem item;
+    EXPECT_FALSE(queue->dequeue(item));
 }
 
 // Test batch dequeue
@@ -126,22 +135,22 @@ TEST_F(LockFreeQueueBasicTest, BatchDequeue)
     // Enqueue several items
     for (size_t i = 0; i < numEntries; i++)
     {
-        EXPECT_TRUE(queue->enqueueBlocking(createTestEntry(i), std::chrono::milliseconds(100)));
+        EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
 
     // Batch dequeue
-    std::vector<LogEntry> entries;
-    size_t count = queue->dequeueBatch(entries, numEntries);
+    std::vector<QueueItem> items;
+    size_t count = queue->dequeueBatch(items, numEntries);
 
     // Verify we got all items
     EXPECT_EQ(count, numEntries);
-    EXPECT_EQ(entries.size(), numEntries);
+    EXPECT_EQ(items.size(), numEntries);
     EXPECT_EQ(queue->size(), 0);
 
     // Verify entries match what we enqueued
     for (size_t i = 0; i < numEntries; i++)
     {
-        EXPECT_EQ(entries[i].getDataLocation(), "data/location/" + std::to_string(i));
+        EXPECT_EQ(items[i].entry.getDataLocation(), "data/location/" + std::to_string(i));
     }
 }
 
@@ -154,16 +163,16 @@ TEST_F(LockFreeQueueBasicTest, BatchDequeuePartial)
     // Enqueue a few items
     for (size_t i = 0; i < numEntries; i++)
     {
-        EXPECT_TRUE(queue->enqueueBlocking(createTestEntry(i), std::chrono::milliseconds(100)));
+        EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
 
     // Try to dequeue more than available
-    std::vector<LogEntry> entries;
-    size_t count = queue->dequeueBatch(entries, requestSize);
+    std::vector<QueueItem> items;
+    size_t count = queue->dequeueBatch(items, requestSize);
 
     // Verify we got what was available
     EXPECT_EQ(count, numEntries);
-    EXPECT_EQ(entries.size(), numEntries);
+    EXPECT_EQ(items.size(), numEntries);
     EXPECT_EQ(queue->size(), 0);
 }
 
@@ -171,26 +180,26 @@ TEST_F(LockFreeQueueBasicTest, BatchDequeuePartial)
 TEST_F(LockFreeQueueBasicTest, BatchEnqueue)
 {
     const size_t numEntries = 5;
-    std::vector<LogEntry> entriesToEnqueue;
+    std::vector<QueueItem> itemsToEnqueue;
 
     for (size_t i = 0; i < numEntries; i++)
     {
-        entriesToEnqueue.push_back(createTestEntry(i));
+        itemsToEnqueue.push_back(createTestItem(i));
     }
 
-    EXPECT_TRUE(queue->enqueueBatchBlocking(entriesToEnqueue));
+    EXPECT_TRUE(queue->enqueueBatchBlocking(itemsToEnqueue));
     EXPECT_EQ(queue->size(), numEntries);
 
-    std::vector<LogEntry> retrievedEntries;
-    size_t dequeued = queue->dequeueBatch(retrievedEntries, numEntries);
+    std::vector<QueueItem> retrievedItems;
+    size_t dequeued = queue->dequeueBatch(retrievedItems, numEntries);
 
     EXPECT_EQ(dequeued, numEntries);
-    EXPECT_EQ(retrievedEntries.size(), numEntries);
+    EXPECT_EQ(retrievedItems.size(), numEntries);
 
     for (size_t i = 0; i < numEntries; i++)
     {
-        EXPECT_EQ(retrievedEntries[i].getDataLocation(), entriesToEnqueue[i].getDataLocation());
-        EXPECT_EQ(retrievedEntries[i].getUserId(), entriesToEnqueue[i].getUserId());
+        EXPECT_EQ(retrievedItems[i].entry.getDataLocation(), itemsToEnqueue[i].entry.getDataLocation());
+        EXPECT_EQ(retrievedItems[i].entry.getUserId(), itemsToEnqueue[i].entry.getUserId());
     }
 
     EXPECT_EQ(queue->size(), 0);
@@ -201,20 +210,20 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueueWhenAlmostFull)
 {
     for (size_t i = 0; i < TEST_QUEUE_SIZE - 4; i++)
     {
-        EXPECT_TRUE(queue->enqueueBlocking(createTestEntry(i), std::chrono::milliseconds(100)));
+        EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
 
-    std::vector<LogEntry> smallBatch;
+    std::vector<QueueItem> smallBatch;
     for (size_t i = 0; i < 3; i++)
     {
-        smallBatch.push_back(createTestEntry(100 + i));
+        smallBatch.push_back(createTestItem(100 + i));
     }
     EXPECT_TRUE(queue->enqueueBatchBlocking(smallBatch));
 
-    std::vector<LogEntry> largeBatch;
+    std::vector<QueueItem> largeBatch;
     for (size_t i = 0; i < 4; i++)
     {
-        largeBatch.push_back(createTestEntry(200 + i));
+        largeBatch.push_back(createTestItem(200 + i));
     }
     EXPECT_FALSE(queue->enqueueBatchBlocking(largeBatch, std::chrono::milliseconds(100)));
 
@@ -226,13 +235,13 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueueBlocking)
 {
     for (size_t i = 0; i < TEST_QUEUE_SIZE - 1; i++)
     {
-        EXPECT_TRUE(queue->enqueueBlocking(createTestEntry(i), std::chrono::milliseconds(100)));
+        EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
 
-    std::vector<LogEntry> batch;
+    std::vector<QueueItem> batch;
     for (size_t i = 0; i < 3; i++)
     {
-        batch.push_back(createTestEntry(100 + i));
+        batch.push_back(createTestItem(100 + i));
     }
 
     std::atomic<bool> producerSucceeded{false};
@@ -245,8 +254,8 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueueBlocking)
     std::this_thread::sleep_for(std::chrono::milliseconds(500));
     EXPECT_FALSE(producerSucceeded.load());
 
-    std::vector<LogEntry> retrievedEntries;
-    queue->dequeueBatch(retrievedEntries, 3);
+    std::vector<QueueItem> retrievedItems;
+    queue->dequeueBatch(retrievedItems, 3);
 
     producerThread.join();
 
@@ -262,21 +271,51 @@ TEST_F(LockFreeQueueBasicTest, Flush)
     // Enqueue several items
     for (size_t i = 0; i < numEntries; i++)
     {
-        EXPECT_TRUE(queue->enqueueBlocking(createTestEntry(i), std::chrono::milliseconds(100)));
+        EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
 
     // Start a thread to dequeue all items
     std::thread consumer([&]
                          {
-        std::vector<LogEntry> entries;
+        std::vector<QueueItem> items;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        queue->dequeueBatch(entries, numEntries); });
+        queue->dequeueBatch(items, numEntries); });
 
     // Flush should wait until queue is empty
     EXPECT_TRUE(queue->flush());
     EXPECT_EQ(queue->size(), 0);
 
     consumer.join();
+}
+
+// Test for QueueItem with targetFilename
+TEST_F(LockFreeQueueBasicTest, QueueItemWithTargetFilename)
+{
+    // Create items with target filenames
+    QueueItem item1 = createTestItemWithTarget(1, "file1.log");
+    QueueItem item2 = createTestItemWithTarget(2, "file2.log");
+    QueueItem item3 = createTestItem(3); // No target filename
+
+    // Enqueue items
+    EXPECT_TRUE(queue->enqueueBlocking(item1, std::chrono::milliseconds(100)));
+    EXPECT_TRUE(queue->enqueueBlocking(item2, std::chrono::milliseconds(100)));
+    EXPECT_TRUE(queue->enqueueBlocking(item3, std::chrono::milliseconds(100)));
+
+    // Dequeue and verify
+    QueueItem retrievedItem1, retrievedItem2, retrievedItem3;
+
+    EXPECT_TRUE(queue->dequeue(retrievedItem1));
+    EXPECT_TRUE(queue->dequeue(retrievedItem2));
+    EXPECT_TRUE(queue->dequeue(retrievedItem3));
+
+    // Check targetFilename is preserved correctly
+    EXPECT_TRUE(retrievedItem1.targetFilename.has_value());
+    EXPECT_EQ(*retrievedItem1.targetFilename, "file1.log");
+
+    EXPECT_TRUE(retrievedItem2.targetFilename.has_value());
+    EXPECT_EQ(*retrievedItem2.targetFilename, "file2.log");
+
+    EXPECT_FALSE(retrievedItem3.targetFilename.has_value());
 }
 
 // Thread safety tests
@@ -294,14 +333,16 @@ protected:
         queue.reset();
     }
 
-    // Helper to create a test log entry
-    LogEntry createTestEntry(int id)
+    // Helper to create a test queue item with log entry
+    QueueItem createTestItem(int id)
     {
-        return LogEntry(
+        QueueItem item;
+        item.entry = LogEntry(
             LogEntry::ActionType::READ,
             "data/location/" + std::to_string(id),
             "user" + std::to_string(id),
             "subject" + std::to_string(id % 10));
+        return item;
     }
 
     const size_t QUEUE_CAPACITY = 4096;
@@ -321,9 +362,9 @@ TEST_F(LockFreeQueueThreadTest, MultipleProducersSingleConsumer)
     // Start consumer thread
     std::thread consumer([&]
                          {
-        LogEntry entry;
+        QueueItem item;
         while (totalDequeued.load() < TOTAL_ENTRIES) {
-            if (queue->dequeue(entry)) {
+            if (queue->dequeue(item)) {
                 totalDequeued++;
             } else {
                 std::this_thread::yield();
@@ -338,10 +379,10 @@ TEST_F(LockFreeQueueThreadTest, MultipleProducersSingleConsumer)
                                {
             for (int j = 0; j < ENTRIES_PER_PRODUCER; j++) {
                 int id = i * ENTRIES_PER_PRODUCER + j;
-                LogEntry entry = createTestEntry(id);
+                QueueItem item = createTestItem(id);
 
                 // Try until enqueue succeeds
-                while (!queue->enqueueBlocking(entry, std::chrono::milliseconds(100)))
+                while (!queue->enqueueBlocking(item, std::chrono::milliseconds(100)))
                 {
                     std::this_thread::yield();
                 }
@@ -379,9 +420,9 @@ TEST_F(LockFreeQueueThreadTest, SingleProducerMultipleConsumers)
     {
         consumers.emplace_back([&]
                                {
-            LogEntry entry;
+            QueueItem item;
             while (totalDequeued.load() < TOTAL_ENTRIES) {
-                if (queue->dequeue(entry)) {
+                if (queue->dequeue(item)) {
                     totalDequeued++;
                 } else {
                     std::this_thread::yield();
@@ -392,10 +433,10 @@ TEST_F(LockFreeQueueThreadTest, SingleProducerMultipleConsumers)
     // Producer thread
     for (int i = 0; i < TOTAL_ENTRIES; i++)
     {
-        LogEntry entry = createTestEntry(i);
+        QueueItem item = createTestItem(i);
 
         // Try until enqueue succeeds
-        while (!queue->enqueueBlocking(entry, std::chrono::milliseconds(100)))
+        while (!queue->enqueueBlocking(item, std::chrono::milliseconds(100)))
         {
             std::this_thread::yield();
         }
@@ -425,9 +466,9 @@ TEST_F(LockFreeQueueThreadTest, MultipleBatchProducers)
 
     std::thread consumer([&]()
                          {
-        std::vector<LogEntry> entries;
+        std::vector<QueueItem> items;
         while (totalDequeued.load() < TOTAL_ENTRIES) {
-            size_t count = queue->dequeueBatch(entries, 50);
+            size_t count = queue->dequeueBatch(items, 50);
             if (count > 0) {
                 totalDequeued += count;
             } else {
@@ -440,14 +481,14 @@ TEST_F(LockFreeQueueThreadTest, MultipleBatchProducers)
     {
         producers.emplace_back([&, i]()
                                {
-            std::vector<LogEntry> batchToEnqueue;
+            std::vector<QueueItem> batchToEnqueue;
 
             for (int b = 0; b < BATCHES_PER_PRODUCER; b++) {
                 batchToEnqueue.clear();
                 for (int j = 0; j < ENTRIES_PER_BATCH; j++) {
                     int id = (i * BATCHES_PER_PRODUCER * ENTRIES_PER_BATCH) +
                              (b * ENTRIES_PER_BATCH) + j;
-                    batchToEnqueue.push_back(createTestEntry(id));
+                    batchToEnqueue.push_back(createTestItem(id));
                 }
 
                 queue->enqueueBatchBlocking(batchToEnqueue, std::chrono::milliseconds(500));
@@ -494,16 +535,16 @@ TEST_F(LockFreeQueueThreadTest, MixedBatchOperations)
 
                 if (op <= 1 || totalDequeued.load() >= totalEnqueued.load()) {
                     // Single enqueue
-                    LogEntry entry = createTestEntry(id);
-                    if (queue->enqueueBlocking(entry, std::chrono::milliseconds(50))) {
+                    QueueItem item = createTestItem(id);
+                    if (queue->enqueueBlocking(item, std::chrono::milliseconds(50))) {
                         totalEnqueued++;
                     }
                 } else if (op == 2) {
                     // Batch enqueue
                     int size = batchSize(gen);
-                    std::vector<LogEntry> batch;
+                    std::vector<QueueItem> batch;
                     for (int k = 0; k < size; k++) {
-                        batch.push_back(createTestEntry(id * 1000 + k));
+                        batch.push_back(createTestItem(id * 1000 + k));
                     }
 
                     if (queue->enqueueBatchBlocking(batch, std::chrono::milliseconds(50))) {
@@ -512,14 +553,14 @@ TEST_F(LockFreeQueueThreadTest, MixedBatchOperations)
                 } else {
                     if (gen() % 2 == 0) {
                         // Single dequeue
-                        LogEntry entry;
-                        if (queue->dequeue(entry)) {
+                        QueueItem item;
+                        if (queue->dequeue(item)) {
                             totalDequeued++;
                         }
                     } else {
                         // Batch dequeue
-                        std::vector<LogEntry> entries;
-                        size_t count = queue->dequeueBatch(entries, batchSize(gen));
+                        std::vector<QueueItem> items;
+                        size_t count = queue->dequeueBatch(items, batchSize(gen));
                         if (count > 0) {
                             totalDequeued += count;
                         }
@@ -538,10 +579,10 @@ TEST_F(LockFreeQueueThreadTest, MixedBatchOperations)
     EXPECT_EQ(queue->size(), totalEnqueued.load() - totalDequeued.load());
 
     // Dequeue remaining entries
-    std::vector<LogEntry> entries;
-    while (queue->dequeueBatch(entries, MAX_BATCH_SIZE) > 0)
+    std::vector<QueueItem> items;
+    while (queue->dequeueBatch(items, MAX_BATCH_SIZE) > 0)
     {
-        totalDequeued += entries.size();
+        totalDequeued += items.size();
     }
 
     EXPECT_EQ(totalEnqueued.load(), totalDequeued.load());
@@ -566,9 +607,9 @@ TEST_F(LockFreeQueueThreadTest, BatchDequeueMultipleThreads)
     {
         consumers.emplace_back([&]
                                {
-            std::vector<LogEntry> entries;
+            std::vector<QueueItem> items;
             while (totalDequeued.load() < TOTAL_ENTRIES) {
-                size_t count = queue->dequeueBatch(entries, BATCH_SIZE);
+                size_t count = queue->dequeueBatch(items, BATCH_SIZE);
                 if (count > 0) {
                     totalDequeued += count;
                 } else {
@@ -585,10 +626,10 @@ TEST_F(LockFreeQueueThreadTest, BatchDequeueMultipleThreads)
                                {
             for (int j = 0; j < ENTRIES_PER_PRODUCER; j++) {
                 int id = i * ENTRIES_PER_PRODUCER + j;
-                LogEntry entry = createTestEntry(id);
+                QueueItem item = createTestItem(id);
 
                 // Try until enqueue succeeds
-                while (!queue->enqueueBlocking(entry, std::chrono::milliseconds(100)))
+                while (!queue->enqueueBlocking(item, std::chrono::milliseconds(100)))
                 {
                     std::this_thread::yield();
                 }
@@ -639,15 +680,15 @@ TEST_F(LockFreeQueueThreadTest, RandomizedStressTest)
 
                 if (dis(gen) == 0 || totalDequeued.load() >= totalEnqueued.load()) {
                     // Enqueue
-                    LogEntry entry = createTestEntry(id);
-                    if (queue->enqueueBlocking(entry, std::chrono::milliseconds(100)))
+                    QueueItem item = createTestItem(id);
+                    if (queue->enqueueBlocking(item, std::chrono::milliseconds(100)))
                     {
                         totalEnqueued++;
                     }
                 } else {
                     // Dequeue
-                    LogEntry entry;
-                    if (queue->dequeue(entry)) {
+                    QueueItem item;
+                    if (queue->dequeue(item)) {
                         totalDequeued++;
                     }
                 }
@@ -665,8 +706,8 @@ TEST_F(LockFreeQueueThreadTest, RandomizedStressTest)
     EXPECT_EQ(queue->size(), totalEnqueued.load() - totalDequeued.load());
 
     // Dequeue remaining entries
-    LogEntry entry;
-    while (queue->dequeue(entry))
+    QueueItem item;
+    while (queue->dequeue(item))
     {
         totalDequeued++;
     }
@@ -686,20 +727,20 @@ TEST_F(LockFreeQueueThreadTest, CapacityEnforcement)
     size_t enqueued = 0;
     while (enqueued < SMALL_CAPACITY - 1)
     {
-        if (smallQueue->enqueueBlocking(createTestEntry(enqueued), std::chrono::milliseconds(100)))
+        if (smallQueue->enqueueBlocking(createTestItem(enqueued), std::chrono::milliseconds(100)))
         {
             enqueued++;
         }
     }
 
     // One more should fail
-    EXPECT_FALSE(smallQueue->enqueueBlocking(createTestEntry(enqueued), std::chrono::milliseconds(100)));
+    EXPECT_FALSE(smallQueue->enqueueBlocking(createTestItem(enqueued), std::chrono::milliseconds(100)));
     enqueued++;
 
     // Dequeue one and try again
-    LogEntry entry;
-    EXPECT_TRUE(smallQueue->dequeue(entry));
-    EXPECT_TRUE(smallQueue->enqueueBlocking(createTestEntry(enqueued), std::chrono::milliseconds(100)));
+    QueueItem item;
+    EXPECT_TRUE(smallQueue->dequeue(item));
+    EXPECT_TRUE(smallQueue->enqueueBlocking(createTestItem(enqueued), std::chrono::milliseconds(100)));
 }
 
 // Test timed operations
@@ -717,6 +758,18 @@ protected:
         queue.reset();
     }
 
+    // Helper to create a test queue item with log entry
+    QueueItem createTestItem(int id)
+    {
+        QueueItem item;
+        item.entry = LogEntry(
+            LogEntry::ActionType::READ,
+            "data/location/" + std::to_string(id),
+            "user" + std::to_string(id),
+            "subject" + std::to_string(id % 10));
+        return item;
+    }
+
     const size_t QUEUE_CAPACITY = 1024;
     std::unique_ptr<LockFreeQueue> queue;
 };
@@ -727,12 +780,13 @@ TEST_F(LockFreeQueueTimingTest, FlushWithTimeout)
     // Enqueue some items
     for (int i = 0; i < 10; i++)
     {
-        queue->enqueueBlocking(LogEntry(
-                                   LogEntry::ActionType::READ,
-                                   "data/location/" + std::to_string(i),
-                                   "user",
-                                   "subject"),
-                               std::chrono::milliseconds(100));
+        QueueItem item;
+        item.entry = LogEntry(
+            LogEntry::ActionType::READ,
+            "data/location/" + std::to_string(i),
+            "user",
+            "subject");
+        queue->enqueueBlocking(item, std::chrono::milliseconds(100));
     }
 
     // Start a future to call flush
@@ -744,8 +798,8 @@ TEST_F(LockFreeQueueTimingTest, FlushWithTimeout)
                          {
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-        std::vector<LogEntry> entries;
-        queue->dequeueBatch(entries, 10); });
+        std::vector<QueueItem> items;
+        queue->dequeueBatch(items, 10); });
 
     // Flush should complete when queue is emptied
     auto status = future.wait_for(std::chrono::milliseconds(500));

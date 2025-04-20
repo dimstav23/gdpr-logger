@@ -1,5 +1,4 @@
 #include <gtest/gtest.h>
-#include <gmock/gmock.h>
 #include "SegmentedStorage.hpp"
 #include <filesystem>
 #include <fstream>

@@ -70,20 +70,16 @@ TEST_F(WriterTest, MultipleStartCalls)
 // Test batch processing with some entries
 TEST_F(WriterTest, ProcessBatchEntries)
 {
-    // Create test log entries (assuming LogEntry has an appropriate constructor)
-    std::vector<LogEntry> testEntries = {
-        LogEntry{LogEntry::ActionType::READ, "location1", "user1", "subject1"},
-        LogEntry{LogEntry::ActionType::CREATE, "location2", "user2", "subject2"},
-        LogEntry{LogEntry::ActionType::UPDATE, "location3", "user3", "subject3"}};
+    std::vector<QueueItem> testItems = {
+        QueueItem{LogEntry{LogEntry::ActionType::READ, "location1", "user1", "subject1"}},
+        QueueItem{LogEntry{LogEntry::ActionType::CREATE, "location2", "user2", "subject2"}},
+        QueueItem{LogEntry{LogEntry::ActionType::UPDATE, "location3", "user3", "subject3"}}};
 
     // Enqueue test entries
-    for (const auto &entry : testEntries)
-    {
-        queue->enqueueBlocking(entry, std::chrono::milliseconds(100));
-    }
+    queue->enqueueBatchBlocking(testItems, std::chrono::milliseconds(100));
 
-    // Instantiate writer with a batch size equal to number of test entries
-    writer = std::make_unique<Writer>(*queue, storage, testEntries.size());
+    // Instantiate writer with a batch size equal to number of test items
+    writer = std::make_unique<Writer>(*queue, storage, testItems.size());
     writer->start();
 
     // Give some time for the writer thread to process the entries.

@@ -29,7 +29,7 @@ LockFreeQueue::~LockFreeQueue()
     m_flushCondition.notify_all();
 }
 
-bool LockFreeQueue::enqueue(const LogEntry &entry)
+bool LockFreeQueue::enqueue(const QueueItem &item)
 {
     size_t currentHead = m_head.load(std::memory_order_relaxed);
 
@@ -50,7 +50,7 @@ bool LockFreeQueue::enqueue(const LogEntry &entry)
                                          std::memory_order_relaxed))
         {
             // Successfully reserved the slot, now write the data
-            m_buffer[currentHead].data = entry;
+            m_buffer[currentHead].data = item;
 
             // Mark the node as ready for consumption
             m_buffer[currentHead].ready.store(true, std::memory_order_release);
@@ -60,7 +60,7 @@ bool LockFreeQueue::enqueue(const LogEntry &entry)
     }
 }
 
-bool LockFreeQueue::enqueueBlocking(const LogEntry &entry, std::chrono::milliseconds timeout)
+bool LockFreeQueue::enqueueBlocking(const QueueItem &item, std::chrono::milliseconds timeout)
 {
     auto start = std::chrono::steady_clock::now();
     int backoffMs = 1;
@@ -69,7 +69,7 @@ bool LockFreeQueue::enqueueBlocking(const LogEntry &entry, std::chrono::millisec
 
     while (true)
     {
-        if (enqueue(entry))
+        if (enqueue(item))
         {
             return true;
         }
@@ -104,9 +104,9 @@ bool LockFreeQueue::enqueueBlocking(const LogEntry &entry, std::chrono::millisec
     }
 }
 
-bool LockFreeQueue::enqueueBatch(const std::vector<LogEntry> &entries)
+bool LockFreeQueue::enqueueBatch(const std::vector<QueueItem> &items)
 {
-    const size_t entryCount = entries.size();
+    const size_t itemCount = items.size();
 
     size_t currentHead = m_head.load(std::memory_order_relaxed);
     size_t currentTail = m_tail.load(std::memory_order_acquire);
@@ -121,12 +121,12 @@ bool LockFreeQueue::enqueueBatch(const std::vector<LogEntry> &entries)
         availableSpace = currentTail - currentHead - 1;
     }
 
-    if (availableSpace < entryCount)
+    if (availableSpace < itemCount)
     {
         return false;
     }
 
-    size_t nextHead = (currentHead + entryCount) & m_mask;
+    size_t nextHead = (currentHead + itemCount) & m_mask;
 
     if (!m_head.compare_exchange_strong(currentHead, nextHead,
                                         std::memory_order_release,
@@ -135,11 +135,11 @@ bool LockFreeQueue::enqueueBatch(const std::vector<LogEntry> &entries)
         return false; // Someone else modified the head
     }
 
-    // Successfully reserved slots, now add entries
+    // Successfully reserved slots, now add items
     size_t index = currentHead;
-    for (size_t i = 0; i < entryCount; ++i)
+    for (size_t i = 0; i < itemCount; ++i)
     {
-        m_buffer[index].data = entries[i];
+        m_buffer[index].data = items[i];
         m_buffer[index].ready.store(true, std::memory_order_release);
         index = (index + 1) & m_mask;
     }
@@ -147,7 +147,7 @@ bool LockFreeQueue::enqueueBatch(const std::vector<LogEntry> &entries)
     return true;
 }
 
-bool LockFreeQueue::enqueueBatchBlocking(const std::vector<LogEntry> &entries,
+bool LockFreeQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items,
                                          std::chrono::milliseconds timeout)
 {
     auto start = std::chrono::steady_clock::now();
@@ -157,7 +157,7 @@ bool LockFreeQueue::enqueueBatchBlocking(const std::vector<LogEntry> &entries,
 
     while (true)
     {
-        if (enqueueBatch(entries))
+        if (enqueueBatch(items))
         {
             return true;
         }
@@ -192,7 +192,7 @@ bool LockFreeQueue::enqueueBatchBlocking(const std::vector<LogEntry> &entries,
     }
 }
 
-bool LockFreeQueue::dequeue(LogEntry &entry)
+bool LockFreeQueue::dequeue(QueueItem &item)
 {
     while (true)
     {
@@ -223,7 +223,7 @@ bool LockFreeQueue::dequeue(LogEntry &entry)
                                          std::memory_order_relaxed))
         {
             // Successfully dequeued, now read the data
-            entry = m_buffer[currentTail].data;
+            item = m_buffer[currentTail].data;
 
             // Mark the node as not ready
             m_buffer[currentTail].ready.store(false, std::memory_order_release);
@@ -233,17 +233,17 @@ bool LockFreeQueue::dequeue(LogEntry &entry)
     }
 }
 
-size_t LockFreeQueue::dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries)
+size_t LockFreeQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItems)
 {
-    entries.clear();
-    entries.reserve(maxEntries);
+    items.clear();
+    items.reserve(maxItems);
 
     size_t dequeued = 0;
-    LogEntry entry;
+    QueueItem item;
 
-    while (dequeued < maxEntries && dequeue(entry))
+    while (dequeued < maxItems && dequeue(item))
     {
-        entries.push_back(std::move(entry));
+        items.push_back(std::move(item));
         dequeued++;
     }
 

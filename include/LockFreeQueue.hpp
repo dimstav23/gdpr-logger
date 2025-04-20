@@ -1,7 +1,7 @@
 #ifndef LOCK_FREE_QUEUE_HPP
 #define LOCK_FREE_QUEUE_HPP
 
-#include "LogEntry.hpp"
+#include "QueueItem.hpp"
 #include <atomic>
 #include <vector>
 #include <memory>
@@ -14,7 +14,7 @@ private:
     struct Node
     {
         std::atomic<bool> ready{false};
-        LogEntry data;
+        QueueItem data;
     };
 
     // Circular buffer of nodes
@@ -23,8 +23,8 @@ private:
     const size_t m_mask;
 
     // Head and tail indices
-    std::atomic<size_t> m_head{0}; // Points to where producers can enqueue
-    std::atomic<size_t> m_tail{0}; // Points to where consumers can dequeue
+    std::atomic<size_t> m_head{0}; // enqueue position
+    std::atomic<size_t> m_tail{0}; // dequeue position
 
     // Used for flush() operation
     mutable std::mutex m_flushMutex;
@@ -36,24 +36,24 @@ public:
     explicit LockFreeQueue(size_t capacity = 8192);
     ~LockFreeQueue();
 
-    bool enqueueBlocking(const LogEntry &entry, std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
-    bool enqueueBatchBlocking(const std::vector<LogEntry> &entries,
+    bool enqueueBlocking(const QueueItem &item, std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
+    bool enqueueBatchBlocking(const std::vector<QueueItem> &items,
                               std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
-    bool dequeue(LogEntry &entry);
-    size_t dequeueBatch(std::vector<LogEntry> &entries, size_t maxEntries);
+    bool dequeue(QueueItem &item);
+    size_t dequeueBatch(std::vector<QueueItem> &items, size_t maxItems);
     bool flush();
     size_t size() const;
     bool isEmpty() const { return size() == 0; }
 
-    // Delete copy/move constructors and assignment operators
+    // delete copy/move
     LockFreeQueue(const LockFreeQueue &) = delete;
     LockFreeQueue &operator=(const LockFreeQueue &) = delete;
     LockFreeQueue(LockFreeQueue &&) = delete;
     LockFreeQueue &operator=(LockFreeQueue &&) = delete;
 
 private:
-    bool enqueue(const LogEntry &entry);
-    bool enqueueBatch(const std::vector<LogEntry> &entries);
+    bool enqueue(const QueueItem &item);
+    bool enqueueBatch(const std::vector<QueueItem> &items);
 };
 
 #endif

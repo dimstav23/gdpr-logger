@@ -13,29 +13,32 @@
 #include <mutex>
 #include <chrono>
 #include <string>
+#include <optional>
 
 class LoggingSystem
 {
 public:
-    LoggingSystem(const LoggingConfig &config);
+    explicit LoggingSystem(const LoggingConfig &config);
     ~LoggingSystem();
 
     bool start();
 
-    // if waitForCompletion waits until the queue is empty
+    // Stop, optionally waiting for queue drainage
     bool stop(bool waitForCompletion = true);
 
     bool isRunning() const;
 
-    bool append(const LogEntry &entry);
-    bool appendBatch(const std::vector<LogEntry> &entries);
+    bool append(const LogEntry &entry,
+                const std::optional<std::string> &filename = std::nullopt);
+    bool appendBatch(const std::vector<LogEntry> &entries,
+                     const std::optional<std::string> &filename = std::nullopt);
 
     bool exportLogs(const std::string &outputPath,
                     std::chrono::system_clock::time_point fromTimestamp = std::chrono::system_clock::time_point(),
                     std::chrono::system_clock::time_point toTimestamp = std::chrono::system_clock::time_point());
 
 private:
-    std::shared_ptr<LockFreeQueue> m_queue;         // Thread-safe queue for log entries
+    std::shared_ptr<LockFreeQueue> m_queue;         // Thread-safe queue for queue items
     std::shared_ptr<SegmentedStorage> m_storage;    // Manages append-only log segments
     std::vector<std::unique_ptr<Writer>> m_writers; // Multiple writer threads
     std::atomic<bool> m_running{false};             // System running state

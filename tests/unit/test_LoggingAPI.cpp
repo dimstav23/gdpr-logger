@@ -95,8 +95,8 @@ TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
     std::thread consumer([&smallQueue]()
                          {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        LogEntry dummyEntry;
-        smallQueue->dequeue(dummyEntry); });
+        QueueItem dummyItem;
+        smallQueue->dequeue(dummyItem); });
 
     LogEntry entry2(LogEntry::ActionType::READ, "location2", "user2", "subject2");
     auto start = std::chrono::steady_clock::now();
@@ -162,9 +162,9 @@ TEST_F(LoggingAPITest, ShutdownWithWait)
     std::thread consumer([this]()
                          {
         std::this_thread::sleep_for(std::chrono::milliseconds(500)); // simulate delay
-        LogEntry dummy;
-        while(queue->dequeue(dummy)) {
-
+        QueueItem dummyItem;
+        while (queue->dequeue(dummyItem))
+        {
         } });
 
     EXPECT_TRUE(api.reset());

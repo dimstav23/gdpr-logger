@@ -3,7 +3,6 @@
 #include <sstream>
 #include <iomanip>
 #include <chrono>
-#include <openssl/evp.h>
 #include <stdexcept>
 
 std::string actionTypeToString(LogEntry::ActionType actionType)
