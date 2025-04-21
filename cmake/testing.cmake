@@ -41,5 +41,3 @@ add_test_suite(test_segmented_storage tests/unit/test_SegmentedStorage.cpp)
 # integration tests
 add_test_suite(test_compression_crypto tests/integration/test_CompressionCrypto.cpp)
 add_test_suite(test_writer_queue tests/integration/test_WriterQueue.cpp)
-# performance tests
-#add_test_suite(test_queue_performance tests/performance/test_LockFreeQueue_Performance.cpp)
