@@ -288,6 +288,216 @@ TEST_F(SegmentedStorageTest, DestructorCleanup)
     EXPECT_EQ(testRead.gcount(), 100);
 }
 
+// Test writing to a client-specified file
+TEST_F(SegmentedStorageTest, WriteToSpecificFile)
+{
+    SegmentedStorage storage(m_testDir.string(), "test_log", m_maxSegmentSize, m_bufferSize);
+
+    const std::string customFilename = "custom_log";
+    std::vector<uint8_t> testData = generateRandomData(256);
+
+    // Write to the custom file
+    size_t bytesWritten = storage.writeToFile(customFilename, testData);
+    EXPECT_EQ(bytesWritten, testData.size());
+    EXPECT_EQ(storage.getCurrentSegmentSize(customFilename), testData.size());
+
+    // Ensure the custom file exists
+    std::string customPath = storage.getCurrentSegmentPath(customFilename);
+    EXPECT_TRUE(std::filesystem::exists(customPath));
+
+    // Flush to make sure it's written to disk
+    storage.flushFile(customFilename);
+
+    // Read back data for verification
+    std::vector<uint8_t> fileContent = readFileContent(customPath);
+    EXPECT_EQ(fileContent.size(), testData.size());
+    EXPECT_TRUE(std::equal(testData.begin(), testData.end(), fileContent.begin()));
+
+    // Verify that default file is still empty and separate
+    EXPECT_EQ(storage.getCurrentSegmentSize(), 0);
+}
+
+// Test rotating a client-specified file
+TEST_F(SegmentedStorageTest, RotateSpecificFile)
+{
+    SegmentedStorage storage(m_testDir.string(), "test_log", m_maxSegmentSize, m_bufferSize);
+
+    const std::string customFilename = "custom_log";
+    std::vector<uint8_t> testData = generateRandomData(m_maxSegmentSize / 2);
+
+    // First write to custom file
+    storage.writeToFile(customFilename, testData);
+    std::string firstSegmentPath = storage.getCurrentSegmentPath(customFilename);
+
+    // Second write to custom file
+    storage.writeToFile(customFilename, testData);
+
+    // Third write should trigger rotation
+    storage.writeToFile(customFilename, testData);
+
+    // Verify segment rotation
+    EXPECT_EQ(storage.getCurrentSegmentIndex(customFilename), 1);
+    EXPECT_NE(storage.getCurrentSegmentPath(customFilename), firstSegmentPath);
+
+    // Verify both segments exist
+    EXPECT_TRUE(std::filesystem::exists(firstSegmentPath));
+    EXPECT_TRUE(std::filesystem::exists(storage.getCurrentSegmentPath(customFilename)));
+
+    // Read content from both files
+    std::vector<uint8_t> firstContent = readFileContent(firstSegmentPath);
+    std::vector<uint8_t> secondContent = readFileContent(storage.getCurrentSegmentPath(customFilename));
+
+    // First file should be approximately maxSegmentSize
+    EXPECT_GE(firstContent.size(), m_maxSegmentSize);
+
+    // Second file should have the remainder
+    EXPECT_EQ(secondContent.size(), testData.size());
+
+    // Default file should remain untouched
+    EXPECT_EQ(storage.getCurrentSegmentIndex(), 0);
+    EXPECT_EQ(storage.getCurrentSegmentSize(), 0);
+}
+
+// Test manual rotation of a client-specified file
+TEST_F(SegmentedStorageTest, ManualRotateSpecificFile)
+{
+    SegmentedStorage storage(m_testDir.string(), "test_log", m_maxSegmentSize, m_bufferSize);
+
+    const std::string customFilename = "custom_log";
+    std::vector<uint8_t> testData = generateRandomData(100);
+
+    // Write to custom file
+    storage.writeToFile(customFilename, testData);
+
+    // Get current state
+    size_t initialIndex = storage.getCurrentSegmentIndex(customFilename);
+    std::string initialPath = storage.getCurrentSegmentPath(customFilename);
+
+    // Manually rotate
+    std::string newPath = storage.rotateSegment(customFilename);
+
+    // Verify rotation
+    EXPECT_EQ(storage.getCurrentSegmentIndex(customFilename), initialIndex + 1);
+    EXPECT_NE(newPath, initialPath);
+    EXPECT_TRUE(std::filesystem::exists(newPath));
+
+    // Write to the new segment
+    storage.writeToFile(customFilename, testData);
+    storage.flushFile(customFilename);
+
+    // Verify content in both segments
+    std::vector<uint8_t> firstContent = readFileContent(initialPath);
+    std::vector<uint8_t> secondContent = readFileContent(newPath);
+    EXPECT_EQ(firstContent.size(), testData.size());
+    EXPECT_EQ(secondContent.size(), testData.size());
+}
+
+// Test concurrent writing to multiple files
+TEST_F(SegmentedStorageTest, ConcurrentMultipleFiles)
+{
+    SegmentedStorage storage(m_testDir.string(), "test_log", m_maxSegmentSize * 10, m_bufferSize);
+
+    // Number of files and threads
+    const int numFiles = 4;
+    const int numThreadsPerFile = 4;
+    const int writesPerThread = 50;
+    const size_t writeSize = 128;
+
+    // Vector of file names
+    std::vector<std::string> filenames;
+    for (int i = 0; i < numFiles; i++)
+    {
+        filenames.push_back("custom_log_" + std::to_string(i));
+    }
+
+    // Launch threads for each file
+    std::vector<std::thread> threads;
+
+    for (int fileIdx = 0; fileIdx < numFiles; fileIdx++)
+    {
+        for (int threadIdx = 0; threadIdx < numThreadsPerFile; threadIdx++)
+        {
+            threads.emplace_back([fileIdx, threadIdx, &filenames, writesPerThread, writeSize, &storage]()
+                                 {
+                for (int i = 0; i < writesPerThread; i++) {
+                    // Generate data
+                    std::vector<uint8_t> data(writeSize);
+                    std::fill(data.begin(), data.end(), static_cast<uint8_t>(threadIdx));
+                    data[0] = static_cast<uint8_t>(i);
+
+                    // Write to file
+                    size_t bytesWritten = storage.writeToFile(filenames[fileIdx], data);
+                    EXPECT_EQ(bytesWritten, writeSize);
+
+                    // Small delay
+                    std::this_thread::sleep_for(std::chrono::milliseconds(1));
+                } });
+        }
+    }
+
+    // Wait for all threads
+    for (auto &thread : threads)
+    {
+        if (thread.joinable())
+        {
+            thread.join();
+        }
+    }
+
+    // Flush all files
+    storage.flush();
+
+    // Calculate expected size per file
+    size_t expectedSizePerFile = numThreadsPerFile * writesPerThread * writeSize;
+
+    // Verify sizes for each file (across all segments)
+    for (const std::string &filename : filenames)
+    {
+        // Get all segments for this file
+        size_t totalSize = 0;
+        for (const auto &entry : std::filesystem::directory_iterator(m_testDir))
+        {
+            if (entry.is_regular_file() &&
+                entry.path().filename().string().find(filename) != std::string::npos)
+            {
+                totalSize += std::filesystem::file_size(entry.path());
+            }
+        }
+
+        EXPECT_EQ(totalSize, expectedSizePerFile)
+            << "File " << filename << " has incorrect size";
+    }
+
+    // Default file should still be empty
+    EXPECT_EQ(storage.getCurrentSegmentSize(), 0);
+}
+
+// Test error handling for non-existent files
+TEST_F(SegmentedStorageTest, NonExistentFileHandling)
+{
+    SegmentedStorage storage(m_testDir.string(), "test_log", m_maxSegmentSize, m_bufferSize);
+
+    // This should succeed because getOrCreateSegment will create the file
+    storage.writeToFile("new_file", generateRandomData(10));
+
+    // These should also succeed
+    EXPECT_NO_THROW(storage.getCurrentSegmentIndex("new_file"));
+    EXPECT_NO_THROW(storage.getCurrentSegmentSize("new_file"));
+    EXPECT_NO_THROW(storage.getCurrentSegmentPath("new_file"));
+    EXPECT_NO_THROW(storage.flushFile("new_file"));
+    EXPECT_NO_THROW(storage.rotateSegment("new_file"));
+
+    // Test a non-existent file - these should throw exceptions per your implementation
+    EXPECT_THROW(storage.getCurrentSegmentIndex("nonexistent_file"), std::runtime_error);
+    EXPECT_THROW(storage.getCurrentSegmentSize("nonexistent_file"), std::runtime_error);
+    EXPECT_THROW(storage.getCurrentSegmentPath("nonexistent_file"), std::runtime_error);
+
+    // These should create the file if it doesn't exist
+    EXPECT_NO_THROW(storage.writeToFile("nonexistent_file", generateRandomData(10)));
+    EXPECT_NO_THROW(storage.flushFile("nonexistent_file"));
+    EXPECT_NO_THROW(storage.rotateSegment("nonexistent_file"));
+}
+
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);
