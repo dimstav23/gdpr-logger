@@ -39,9 +39,6 @@ public:
     std::string getCurrentSegmentPath() const;
     std::string getCurrentSegmentPath(const std::string &filename) const;
 
-    std::string rotateSegment();
-    std::string rotateSegment(const std::string &filename);
-
 private:
     std::string m_basePath;
     std::string m_baseFilename;
@@ -60,7 +57,7 @@ private:
     mutable std::shared_mutex m_mapMutex;
 
     SegmentInfo *getOrCreateSegment(const std::string &filename);
-
+    std::string rotateSegment(const std::string &filename);
     std::string generateSegmentPath(const std::string &filename, size_t segmentIndex) const;
 };
 

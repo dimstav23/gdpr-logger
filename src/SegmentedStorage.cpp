@@ -54,22 +54,7 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
         // Double-check if rotation is still needed after acquiring the lock
         if (segment->currentOffset.load(std::memory_order_acquire) + size > m_maxSegmentSize)
         {
-            if (segment->fileStream && segment->fileStream->is_open())
-            {
-                segment->fileStream->flush();
-                segment->fileStream->close();
-            }
-
-            size_t newIndex = segment->segmentIndex.fetch_add(1, std::memory_order_acq_rel) + 1;
-            segment->currentOffset.store(0, std::memory_order_release);
-            std::string newPath = generateSegmentPath(filename, newIndex);
-
-            segment->fileStream = std::make_unique<std::ofstream>(newPath, std::ios::binary | std::ios::trunc);
-            if (!segment->fileStream->is_open())
-            {
-                throw std::runtime_error("Failed to open new segment file for " + filename);
-            }
-            segment->fileStream->rdbuf()->pubsetbuf(nullptr, 0);
+            rotateSegment(filename);
         }
     }
 
@@ -79,22 +64,7 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
     // Check again if rotation is needed (another thread might have written data)
     if (segment->currentOffset.load(std::memory_order_acquire) + size > m_maxSegmentSize)
     {
-        if (segment->fileStream && segment->fileStream->is_open())
-        {
-            segment->fileStream->flush();
-            segment->fileStream->close();
-        }
-
-        size_t newIndex = segment->segmentIndex.fetch_add(1, std::memory_order_acq_rel) + 1;
-        segment->currentOffset.store(0, std::memory_order_release);
-        std::string newPath = generateSegmentPath(filename, newIndex);
-
-        segment->fileStream = std::make_unique<std::ofstream>(newPath, std::ios::binary | std::ios::trunc);
-        if (!segment->fileStream->is_open())
-        {
-            throw std::runtime_error("Failed to open new segment file for " + filename);
-        }
-        segment->fileStream->rdbuf()->pubsetbuf(nullptr, 0);
+        rotateSegment(filename);
     }
 
     // Write the data
@@ -184,15 +154,10 @@ std::string SegmentedStorage::getCurrentSegmentPath(const std::string &filename)
     throw std::runtime_error("Segment not found for filename: " + filename);
 }
 
-std::string SegmentedStorage::rotateSegment()
-{
-    return rotateSegment(m_baseFilename);
-}
-
 std::string SegmentedStorage::rotateSegment(const std::string &filename)
 {
+    // Important: This method assumes that segment->fileMutex is already locked by the caller
     SegmentInfo *segment = getOrCreateSegment(filename);
-    std::unique_lock<std::mutex> lock(segment->fileMutex);
 
     // Perform rotation
     if (segment->fileStream && segment->fileStream->is_open())
