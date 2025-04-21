@@ -29,14 +29,6 @@ public:
 
     /**
      * Write data to current segment, thread-safe, allowing concurrent writes.
-     * @param data Pointer to the data to write
-     * @param size Size of the data in bytes
-     * @return Actual number of bytes written
-     */
-    size_t write(const uint8_t *data, size_t size);
-
-    /**
-     * Write data to current segment, thread-safe, allowing concurrent writes.
      * @param data Vector containing the data to write
      * @return Actual number of bytes written
      */

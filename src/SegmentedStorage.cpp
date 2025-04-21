@@ -27,8 +27,9 @@ SegmentedStorage::~SegmentedStorage()
     }
 }
 
-size_t SegmentedStorage::write(const uint8_t *data, size_t size)
+size_t SegmentedStorage::write(const std::vector<uint8_t> &data)
 {
+    size_t size = data.size();
     if (size == 0)
         return 0;
 
@@ -48,7 +49,7 @@ size_t SegmentedStorage::write(const uint8_t *data, size_t size)
     m_currentFile->seekp(writeOffset, std::ios::beg);
 
     // Write the data
-    m_currentFile->write(reinterpret_cast<const char *>(data), size);
+    m_currentFile->write(reinterpret_cast<const char *>(data.data()), size);
 
     // Flush if we hit the buffer threshold or we're close to max segment size
     if ((writeOffset + size) % m_bufferSize == 0 ||
@@ -59,12 +60,6 @@ size_t SegmentedStorage::write(const uint8_t *data, size_t size)
 
     lock.unlock();
     return size;
-}
-
-size_t SegmentedStorage::write(const std::vector<uint8_t> &data)
-{
-    // Delegate to the raw pointer version
-    return write(data.data(), data.size());
 }
 
 void SegmentedStorage::flush()
