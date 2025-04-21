@@ -2,12 +2,16 @@
 #include <chrono>
 #include <iomanip>
 #include <sstream>
+#include <stdexcept>
 
 SegmentedStorage::SegmentedStorage(const std::string &basePath,
                                    const std::string &baseFilename,
                                    size_t maxSegmentSize,
                                    size_t bufferSize)
-    : m_basePath(basePath), m_baseFilename(baseFilename), m_maxSegmentSize(maxSegmentSize), m_bufferSize(bufferSize)
+    : m_basePath(basePath),
+      m_baseFilename(baseFilename),
+      m_maxSegmentSize(maxSegmentSize),
+      m_bufferSize(bufferSize)
 {
     std::filesystem::create_directories(m_basePath);
     getOrCreateSegment(m_baseFilename);
@@ -15,14 +19,15 @@ SegmentedStorage::SegmentedStorage(const std::string &basePath,
 
 SegmentedStorage::~SegmentedStorage()
 {
-    flush();
-    std::unique_lock<std::shared_mutex> lock(m_mapMutex);
+    std::unique_lock<std::shared_mutex> mapLock(m_mapMutex);
     for (auto &pair : m_fileSegments)
     {
-        if (pair.second->fileStream && pair.second->fileStream->is_open())
+        // exclusive lock to prevent concurrent writes
+        std::unique_lock<std::shared_mutex> lock(pair.second->fileMutex);
+        if (pair.second->fd >= 0)
         {
-            pair.second->fileStream->flush();
-            pair.second->fileStream->close();
+            ::fsync(pair.second->fd);
+            ::close(pair.second->fd);
         }
     }
 }
@@ -40,43 +45,41 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
 
     SegmentInfo *segment = getOrCreateSegment(filename);
 
-    // First, check if we need to rotate without holding the mutex
-    bool needRotation = false;
-    {
-        size_t currentOffset = segment->currentOffset.load(std::memory_order_acquire);
-        needRotation = (currentOffset + size > m_maxSegmentSize);
-    }
+    // Reserve byte range atomically
+    size_t writeOffset = segment->currentOffset.fetch_add(size, std::memory_order_acq_rel);
 
-    // If rotation is needed, handle it separately
-    if (needRotation)
+    // Handle rotation if this write exceeds segment size
+    if (writeOffset + size > m_maxSegmentSize)
     {
-        std::lock_guard<std::mutex> rotLock(segment->fileMutex);
-        // Double-check if rotation is still needed after acquiring the lock
+        std::unique_lock<std::shared_mutex> rotLock(segment->fileMutex);
+        // double-check against currentOffset
         if (segment->currentOffset.load(std::memory_order_acquire) + size > m_maxSegmentSize)
         {
             rotateSegment(filename);
+            // reserve on new segment
+            writeOffset = segment->currentOffset.fetch_add(size, std::memory_order_acq_rel);
         }
     }
 
-    // Now proceed with writing
-    std::lock_guard<std::mutex> writeLock(segment->fileMutex);
-
-    // Check again if rotation is needed (another thread might have written data)
-    if (segment->currentOffset.load(std::memory_order_acquire) + size > m_maxSegmentSize)
+    // Write under shared lock to prevent racing rotate/close
     {
-        rotateSegment(filename);
+        std::shared_lock<std::shared_mutex> writeLock(segment->fileMutex);
+        ssize_t written = ::pwrite(segment->fd,
+                                   reinterpret_cast<const void *>(data.data()),
+                                   size,
+                                   static_cast<off_t>(writeOffset));
+        if (written < 0 || static_cast<size_t>(written) != size)
+        {
+            throw std::runtime_error("pwrite failed or partial write");
+        }
     }
 
-    // Write the data
-    size_t writeOffset = segment->currentOffset.fetch_add(size, std::memory_order_acq_rel);
-    segment->fileStream->seekp(writeOffset, std::ios::beg);
-    segment->fileStream->write(reinterpret_cast<const char *>(data.data()), size);
-
-    // Flush if needed
+    // Optionally fsync at buffer or near-rotation boundaries
     if ((writeOffset + size) % m_bufferSize == 0 ||
         (writeOffset + size > m_maxSegmentSize - m_bufferSize))
     {
-        segment->fileStream->flush();
+        std::shared_lock<std::shared_mutex> syncLock(segment->fileMutex);
+        ::fsync(segment->fd);
     }
 
     return size;
@@ -87,73 +90,60 @@ void SegmentedStorage::flush()
     std::shared_lock<std::shared_mutex> mapLock(m_mapMutex);
     for (auto &pair : m_fileSegments)
     {
-        std::unique_lock<std::mutex> fileLock(pair.second->fileMutex);
-        if (pair.second->fileStream && pair.second->fileStream->is_open())
+        std::unique_lock<std::shared_mutex> lock(pair.second->fileMutex);
+        if (pair.second->fd >= 0)
         {
-            pair.second->fileStream->flush();
+            ::fsync(pair.second->fd);
         }
     }
 }
 
 std::string SegmentedStorage::rotateSegment(const std::string &filename)
 {
-    // Important: This method assumes that segment->fileMutex is already locked by the caller
     SegmentInfo *segment = getOrCreateSegment(filename);
 
-    // Perform rotation
-    if (segment->fileStream && segment->fileStream->is_open())
+    // exclusive lock assumed
+    if (segment->fd >= 0)
     {
-        segment->fileStream->flush();
-        segment->fileStream->close();
+        ::fsync(segment->fd);
+        ::close(segment->fd);
     }
 
     size_t newIndex = segment->segmentIndex.fetch_add(1, std::memory_order_acq_rel) + 1;
     segment->currentOffset.store(0, std::memory_order_release);
     std::string newPath = generateSegmentPath(filename, newIndex);
 
-    segment->fileStream = std::make_unique<std::ofstream>(newPath, std::ios::binary | std::ios::trunc);
-    if (!segment->fileStream->is_open())
+    int fd = ::open(newPath.c_str(), O_CREAT | O_RDWR, 0644);
+    if (fd < 0)
     {
-        throw std::runtime_error("Failed to open new segment file for " + filename);
+        throw std::runtime_error("Failed to open new segment file: " + newPath);
     }
-    segment->fileStream->rdbuf()->pubsetbuf(nullptr, 0);
+    segment->fd = fd;
 
     return newPath;
 }
 
 SegmentedStorage::SegmentInfo *SegmentedStorage::getOrCreateSegment(const std::string &filename)
 {
-    // Try read lock first for better performance
     {
         std::shared_lock<std::shared_mutex> readLock(m_mapMutex);
         auto it = m_fileSegments.find(filename);
         if (it != m_fileSegments.end())
-        {
             return it->second.get();
-        }
     }
 
-    // If not found, acquire write lock and create
     std::unique_lock<std::shared_mutex> writeLock(m_mapMutex);
-
-    // Double-check in case another thread created it
     auto it = m_fileSegments.find(filename);
     if (it != m_fileSegments.end())
-    {
         return it->second.get();
-    }
 
-    // Create new segment
     auto segmentInfo = std::make_unique<SegmentInfo>();
     std::string segmentPath = generateSegmentPath(filename, 0);
-
-    segmentInfo->fileStream = std::make_unique<std::ofstream>(segmentPath, std::ios::binary | std::ios::trunc);
-    if (!segmentInfo->fileStream->is_open())
-    {
+    int fd = ::open(segmentPath.c_str(), O_CREAT | O_RDWR, 0644);
+    if (fd < 0)
         throw std::runtime_error("Failed to open segment file: " + segmentPath);
-    }
-    segmentInfo->fileStream->rdbuf()->pubsetbuf(nullptr, 0);
 
+    segmentInfo->fd = fd;
     m_fileSegments[filename] = std::move(segmentInfo);
     return m_fileSegments[filename].get();
 }

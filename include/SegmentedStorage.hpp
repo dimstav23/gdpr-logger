@@ -5,12 +5,12 @@
 #include <vector>
 #include <atomic>
 #include <mutex>
+#include <shared_mutex>
 #include <filesystem>
 #include <cstdint>
-#include <memory>
-#include <fstream>
 #include <unordered_map>
-#include <shared_mutex>
+#include <fcntl.h>  // for open flags
+#include <unistd.h> // for close, pwrite, fsync
 
 class SegmentedStorage
 {
@@ -23,9 +23,7 @@ public:
     ~SegmentedStorage();
 
     size_t write(const std::vector<uint8_t> &data);
-
     size_t writeToFile(const std::string &filename, const std::vector<uint8_t> &data);
-
     void flush();
 
 private:
@@ -38,8 +36,8 @@ private:
     {
         std::atomic<size_t> segmentIndex{0};
         std::atomic<size_t> currentOffset{0};
-        std::unique_ptr<std::ofstream> fileStream;
-        std::mutex fileMutex;
+        int fd{-1};
+        mutable std::shared_mutex fileMutex; // shared for writes, exclusive for rotate/flush
     };
 
     std::unordered_map<std::string, std::unique_ptr<SegmentInfo>> m_fileSegments;
