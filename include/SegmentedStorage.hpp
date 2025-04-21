@@ -14,8 +14,7 @@ class SegmentedStorage
 {
 public:
     /**
-     * Constructor for SegmentedStorage.
-     *
+     * Constructor
      * @param basePath Base directory for storing log segments
      * @param baseFilename Base filename for log segments
      * @param maxSegmentSize Maximum size for each segment in bytes before rolling to a new segment
@@ -29,9 +28,7 @@ public:
     ~SegmentedStorage();
 
     /**
-     * Write data to the current segment.
-     * Thread-safe method allowing concurrent writes.
-     *
+     * Write data to current segment, thread-safe, allowing concurrent writes.
      * @param data Pointer to the data to write
      * @param size Size of the data in bytes
      * @return Actual number of bytes written
@@ -39,9 +36,7 @@ public:
     size_t write(const uint8_t *data, size_t size);
 
     /**
-     * Write vector data to the current segment.
-     * Thread-safe method allowing concurrent writes.
-     *
+     * Write data to current segment, thread-safe, allowing concurrent writes.
      * @param data Vector containing the data to write
      * @return Actual number of bytes written
      */
@@ -50,25 +45,13 @@ public:
     // Flush any buffered data to disk.
     void flush();
 
-    /**
-     * Get the current segment index.
-     *
-     * @return Current segment index
-     */
+    // returns the current segment index
     size_t getCurrentSegmentIndex() const;
 
-    /**
-     * Get the current size of the active segment.
-     *
-     * @return Current segment size in bytes
-     */
+    // returns current segment size in bytes
     size_t getCurrentSegmentSize() const;
 
-    /**
-     * Get the path to the current segment file.
-     *
-     * @return Path to the current segment file
-     */
+    // returns path to the current segment file
     std::string getCurrentSegmentPath() const;
 
     // Force creation of a new segment file, returns Path to the newly created segment file
@@ -93,7 +76,6 @@ private:
 
     /**
      * Generates the file path for a given segment index.
-     *
      * @param segmentIndex The segment index
      * @return Full path to the segment file
      */
