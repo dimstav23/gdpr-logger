@@ -10,14 +10,7 @@ SegmentedStorage::SegmentedStorage(const std::string &basePath,
     : m_basePath(basePath), m_baseFilename(baseFilename), m_maxSegmentSize(maxSegmentSize), m_bufferSize(bufferSize)
 {
     std::filesystem::create_directories(m_basePath);
-    m_currentFile = std::make_unique<std::ofstream>(
-        generateSegmentPath(m_baseFilename, 0),
-        std::ios::binary | std::ios::trunc);
-    if (!m_currentFile->is_open())
-    {
-        throw std::runtime_error("Failed to open default segment file.");
-    }
-    m_currentFile->rdbuf()->pubsetbuf(nullptr, 0);
+    getOrCreateSegment(m_baseFilename);
 }
 
 SegmentedStorage::~SegmentedStorage()
@@ -36,24 +29,7 @@ SegmentedStorage::~SegmentedStorage()
 
 size_t SegmentedStorage::write(const std::vector<uint8_t> &data)
 {
-    size_t size = data.size();
-    if (size == 0)
-        return 0;
-
-    std::unique_lock<std::mutex> lock(m_defaultFileMutex);
-    if (m_currentOffset.load(std::memory_order_acquire) + size > m_maxSegmentSize)
-    {
-        rotateSegment();
-    }
-    size_t writeOffset = m_currentOffset.fetch_add(size, std::memory_order_acq_rel);
-    m_currentFile->seekp(writeOffset, std::ios::beg);
-    m_currentFile->write(reinterpret_cast<const char *>(data.data()), size);
-    if ((writeOffset + size) % m_bufferSize == 0 ||
-        (writeOffset + size > m_maxSegmentSize - m_bufferSize))
-    {
-        m_currentFile->flush();
-    }
-    return size;
+    return writeToFile(m_baseFilename, data);
 }
 
 size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vector<uint8_t> &data)
@@ -81,13 +57,6 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
 
 void SegmentedStorage::flush()
 {
-    std::unique_lock<std::mutex> lock(m_defaultFileMutex);
-    if (m_currentFile && m_currentFile->is_open())
-    {
-        m_currentFile->flush();
-    }
-    lock.unlock();
-
     std::shared_lock<std::shared_mutex> mapLock(m_mapMutex);
     for (auto &pair : m_fileSegments)
     {
@@ -111,37 +80,56 @@ void SegmentedStorage::flushFile(const std::string &filename)
 
 size_t SegmentedStorage::getCurrentSegmentIndex() const
 {
-    return m_currentSegmentIndex.load(std::memory_order_acquire);
+    return getCurrentSegmentIndex(m_baseFilename);
+}
+
+size_t SegmentedStorage::getCurrentSegmentIndex(const std::string &filename) const
+{
+    std::shared_lock<std::shared_mutex> lock(m_mapMutex);
+    auto it = m_fileSegments.find(filename);
+    if (it != m_fileSegments.end())
+    {
+        return it->second->segmentIndex.load(std::memory_order_acquire);
+    }
+    throw std::runtime_error("Segment not found for filename: " + filename);
 }
 
 size_t SegmentedStorage::getCurrentSegmentSize() const
 {
-    return m_currentOffset.load(std::memory_order_acquire);
+    return getCurrentSegmentSize(m_baseFilename);
+}
+
+size_t SegmentedStorage::getCurrentSegmentSize(const std::string &filename) const
+{
+    std::shared_lock<std::shared_mutex> lock(m_mapMutex);
+    auto it = m_fileSegments.find(filename);
+    if (it != m_fileSegments.end())
+    {
+        return it->second->currentOffset.load(std::memory_order_acquire);
+    }
+    throw std::runtime_error("Segment not found for filename: " + filename);
 }
 
 std::string SegmentedStorage::getCurrentSegmentPath() const
 {
-    return generateSegmentPath(m_baseFilename, m_currentSegmentIndex.load(std::memory_order_acquire));
+    return getCurrentSegmentPath(m_baseFilename);
+}
+
+std::string SegmentedStorage::getCurrentSegmentPath(const std::string &filename) const
+{
+    std::shared_lock<std::shared_mutex> lock(m_mapMutex);
+    auto it = m_fileSegments.find(filename);
+    if (it != m_fileSegments.end())
+    {
+        size_t index = it->second->segmentIndex.load(std::memory_order_acquire);
+        return generateSegmentPath(filename, index);
+    }
+    throw std::runtime_error("Segment not found for filename: " + filename);
 }
 
 std::string SegmentedStorage::rotateSegment()
 {
-    std::unique_lock<std::mutex> lock(m_defaultFileMutex);
-    if (m_currentFile && m_currentFile->is_open())
-    {
-        m_currentFile->flush();
-        m_currentFile->close();
-    }
-    size_t newIndex = m_currentSegmentIndex.fetch_add(1, std::memory_order_acq_rel) + 1;
-    m_currentOffset.store(0, std::memory_order_release);
-    std::string newPath = generateSegmentPath(m_baseFilename, newIndex);
-    m_currentFile = std::make_unique<std::ofstream>(newPath, std::ios::binary | std::ios::trunc);
-    if (!m_currentFile->is_open())
-    {
-        throw std::runtime_error("Failed to open new default segment file.");
-    }
-    m_currentFile->rdbuf()->pubsetbuf(nullptr, 0);
-    return newPath;
+    return rotateSegment(m_baseFilename);
 }
 
 std::string SegmentedStorage::rotateSegment(const std::string &filename)
@@ -199,7 +187,7 @@ std::string SegmentedStorage::generateSegmentPath(const std::string &filename, s
     auto now_time_t = std::chrono::system_clock::to_time_t(now);
     std::stringstream ss;
     ss << m_basePath << "/";
-    ss << filename << "_";
+    ss << filename << "_"; // Use filename directly—no check needed
     ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S") << "_";
     ss << std::setw(6) << std::setfill('0') << segmentIndex << ".log";
     return ss.str();
