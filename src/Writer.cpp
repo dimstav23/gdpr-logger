@@ -79,7 +79,7 @@ void Writer::processLogEntries()
             if (targetFilename)
             {
                 // Write to the specified file
-                // m_storage->writeToFile(*targetFilename, encryptedData);
+                m_storage->writeToFile(*targetFilename, encryptedData);
             }
             else
             {
