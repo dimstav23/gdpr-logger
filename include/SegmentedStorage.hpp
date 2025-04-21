@@ -9,6 +9,8 @@
 #include <cstdint>
 #include <memory>
 #include <fstream>
+#include <unordered_map>
+#include <shared_mutex>
 
 class SegmentedStorage
 {
@@ -16,7 +18,7 @@ public:
     /**
      * Constructor
      * @param basePath Base directory for storing log segments
-     * @param baseFilename Base filename for log segments
+     * @param baseFilename Base filename for default log segments
      * @param maxSegmentSize Maximum size for each segment in bytes before rolling to a new segment
      * @param bufferSize Size of the write buffer in bytes
      */
@@ -28,26 +30,38 @@ public:
     ~SegmentedStorage();
 
     /**
-     * Write data to current segment, thread-safe, allowing concurrent writes.
+     * Write data to the default segment, thread-safe, allowing concurrent writes.
      * @param data Vector containing the data to write
      * @return Actual number of bytes written
      */
     size_t write(const std::vector<uint8_t> &data);
 
-    // Flush any buffered data to disk.
+    /**
+     * Write data to a specified file, thread-safe, allowing concurrent writes.
+     * @param filename Client-specified filename (without path or extension)
+     * @param data Vector containing the data to write
+     * @return Actual number of bytes written
+     */
+    size_t writeToFile(const std::string &filename, const std::vector<uint8_t> &data);
+
+    // Flush any buffered data to disk for all active segments
     void flush();
 
-    // returns the current segment index
+    // Flush data for a specific file segment
+    void flushFile(const std::string &filename);
+
+    // Returns the current segment index for the default file
     size_t getCurrentSegmentIndex() const;
-
-    // returns current segment size in bytes
+    // Returns current segment size in bytes for the default file
     size_t getCurrentSegmentSize() const;
-
-    // returns path to the current segment file
+    // Returns path to the current default segment file
     std::string getCurrentSegmentPath() const;
 
-    // Force creation of a new segment file, returns Path to the newly created segment file
+    // Force creation of a new segment file for the default file
+    // Returns path to the newly created segment file
     std::string rotateSegment();
+    // Force creation of a new segment file for a specific file
+    std::string rotateSegment(const std::string &filename);
 
 private:
     std::string m_basePath;
@@ -55,23 +69,26 @@ private:
     size_t m_maxSegmentSize;
     size_t m_bufferSize;
 
-    // Current segment info
-    std::atomic<size_t> m_currentSegmentIndex;
-    std::atomic<size_t> m_currentOffset;
-
-    // File handling
+    // Default segment info
+    std::atomic<size_t> m_currentSegmentIndex{0};
+    std::atomic<size_t> m_currentOffset{0};
     std::unique_ptr<std::ofstream> m_currentFile;
-    std::mutex m_fileMutex; // For file operations that can't be atomic
+    std::mutex m_defaultFileMutex;
 
-    // Creates a new segment file and updates internal state. Not thread-safe, should be called with lock held.
-    void createNewSegment();
+    // Structure to track segment information for each custom file
+    struct SegmentInfo
+    {
+        std::atomic<size_t> segmentIndex{0};
+        std::atomic<size_t> currentOffset{0};
+        std::unique_ptr<std::ofstream> fileStream;
+        std::mutex fileMutex;
+    };
 
-    /**
-     * Generates the file path for a given segment index.
-     * @param segmentIndex The segment index
-     * @return Full path to the segment file
-     */
-    std::string generateSegmentPath(size_t segmentIndex) const;
+    std::unordered_map<std::string, std::unique_ptr<SegmentInfo>> m_fileSegments;
+    mutable std::shared_mutex m_mapMutex;
+
+    SegmentInfo *getOrCreateSegment(const std::string &filename);
+    std::string generateSegmentPath(const std::string &filename, size_t segmentIndex) const;
 };
 
 #endif
