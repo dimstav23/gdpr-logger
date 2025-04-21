@@ -44,26 +44,56 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
         return 0;
 
     SegmentInfo *segment = getOrCreateSegment(filename);
+    size_t writeOffset;
+    int currentFd;
 
-    // Reserve byte range atomically
-    size_t writeOffset = segment->currentOffset.fetch_add(size, std::memory_order_acq_rel);
-
-    // Handle rotation if this write exceeds segment size
-    if (writeOffset + size > m_maxSegmentSize)
+    // This loop handles the case where rotation happens between offset reservation and writing
+    while (true)
     {
-        std::unique_lock<std::shared_mutex> rotLock(segment->fileMutex);
-        // double-check against currentOffset
-        if (segment->currentOffset.load(std::memory_order_acquire) + size > m_maxSegmentSize)
+        // Reserve byte range atomically
+        writeOffset = segment->currentOffset.fetch_add(size, std::memory_order_acq_rel);
+
+        // Need to rotate?
+        if (writeOffset + size > m_maxSegmentSize)
         {
-            rotateSegment(filename);
-            // reserve on new segment
-            writeOffset = segment->currentOffset.fetch_add(size, std::memory_order_acq_rel);
+            std::unique_lock<std::shared_mutex> rotLock(segment->fileMutex);
+
+            // Double-check if we still need to rotate (another thread might have already rotated)
+            if (segment->currentOffset.load(std::memory_order_acquire) > m_maxSegmentSize)
+            {
+                // Reset the offset counter for the new segment
+                rotateSegment(filename);
+
+                // Try again with the new segment
+                continue;
+            }
         }
+
+        // Capture file descriptor to ensure we use the same one consistently
+        std::shared_lock<std::shared_mutex> readLock(segment->fileMutex);
+        currentFd = segment->fd;
+
+        // If we can't fit the data or the fd changed (rotation happened), try again
+        if (writeOffset + size > m_maxSegmentSize || currentFd < 0)
+        {
+            continue;
+        }
+
+        // We have a valid offset and fd, so we can proceed with the write
+        break;
     }
 
-    // Write under shared lock to prevent racing rotate/close
+    // Write under shared lock to prevent racing with rotate/close
     {
         std::shared_lock<std::shared_mutex> writeLock(segment->fileMutex);
+
+        // Double-check that fd hasn't changed (which would indicate rotation happened)
+        if (segment->fd != currentFd)
+        {
+            // If rotation happened during this time, retry the write
+            return writeToFile(filename, data);
+        }
+
         ssize_t written = ::pwrite(segment->fd,
                                    reinterpret_cast<const void *>(data.data()),
                                    size,
@@ -79,7 +109,10 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
         (writeOffset + size > m_maxSegmentSize - m_bufferSize))
     {
         std::shared_lock<std::shared_mutex> syncLock(segment->fileMutex);
-        ::fsync(segment->fd);
+        if (segment->fd == currentFd)
+        { // Only fsync if fd hasn't changed
+            ::fsync(segment->fd);
+        }
     }
 
     return size;

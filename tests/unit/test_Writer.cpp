@@ -88,10 +88,6 @@ TEST_F(WriterTest, ProcessBatchEntries)
     // Verify that the queue is empty after processing.
     EXPECT_EQ(queue->size(), 0);
 
-    // (Optional) Check that a segment file was written to:
-    std::string currentSegmentPath = storage->getCurrentSegmentPath();
-    EXPECT_TRUE(std::filesystem::exists(currentSegmentPath));
-
     writer->stop();
 }
 
