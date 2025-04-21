@@ -28,17 +28,6 @@ public:
 
     void flush();
 
-    void flushFile(const std::string &filename);
-
-    size_t getCurrentSegmentIndex() const;
-    size_t getCurrentSegmentIndex(const std::string &filename) const;
-
-    size_t getCurrentSegmentSize() const;
-    size_t getCurrentSegmentSize(const std::string &filename) const;
-
-    std::string getCurrentSegmentPath() const;
-    std::string getCurrentSegmentPath(const std::string &filename) const;
-
 private:
     std::string m_basePath;
     std::string m_baseFilename;

@@ -95,65 +95,6 @@ void SegmentedStorage::flush()
     }
 }
 
-void SegmentedStorage::flushFile(const std::string &filename)
-{
-    SegmentInfo *segment = getOrCreateSegment(filename);
-    std::unique_lock<std::mutex> lock(segment->fileMutex);
-    if (segment->fileStream && segment->fileStream->is_open())
-    {
-        segment->fileStream->flush();
-    }
-}
-
-size_t SegmentedStorage::getCurrentSegmentIndex() const
-{
-    return getCurrentSegmentIndex(m_baseFilename);
-}
-
-size_t SegmentedStorage::getCurrentSegmentIndex(const std::string &filename) const
-{
-    std::shared_lock<std::shared_mutex> lock(m_mapMutex);
-    auto it = m_fileSegments.find(filename);
-    if (it != m_fileSegments.end())
-    {
-        return it->second->segmentIndex.load(std::memory_order_acquire);
-    }
-    throw std::runtime_error("Segment not found for filename: " + filename);
-}
-
-size_t SegmentedStorage::getCurrentSegmentSize() const
-{
-    return getCurrentSegmentSize(m_baseFilename);
-}
-
-size_t SegmentedStorage::getCurrentSegmentSize(const std::string &filename) const
-{
-    std::shared_lock<std::shared_mutex> lock(m_mapMutex);
-    auto it = m_fileSegments.find(filename);
-    if (it != m_fileSegments.end())
-    {
-        return it->second->currentOffset.load(std::memory_order_acquire);
-    }
-    throw std::runtime_error("Segment not found for filename: " + filename);
-}
-
-std::string SegmentedStorage::getCurrentSegmentPath() const
-{
-    return getCurrentSegmentPath(m_baseFilename);
-}
-
-std::string SegmentedStorage::getCurrentSegmentPath(const std::string &filename) const
-{
-    std::shared_lock<std::shared_mutex> lock(m_mapMutex);
-    auto it = m_fileSegments.find(filename);
-    if (it != m_fileSegments.end())
-    {
-        size_t index = it->second->segmentIndex.load(std::memory_order_acquire);
-        return generateSegmentPath(filename, index);
-    }
-    throw std::runtime_error("Segment not found for filename: " + filename);
-}
-
 std::string SegmentedStorage::rotateSegment(const std::string &filename)
 {
     // Important: This method assumes that segment->fileMutex is already locked by the caller
