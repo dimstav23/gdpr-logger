@@ -45,34 +45,38 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
     size_t writeOffset;
     int currentFd;
 
-    // This loop handles the case where rotation happens between offset reservation and writing
+    // This loop handles race conditions around rotation
     while (true)
     {
-        // Reserve byte range atomically
-        writeOffset = segment->currentOffset.fetch_add(size, std::memory_order_acq_rel);
-
-        // Need to rotate?
-        if (writeOffset + size > m_maxSegmentSize)
+        // First check if we need to rotate WITHOUT reserving space
+        size_t currentOffset = segment->currentOffset.load(std::memory_order_acquire);
+        if (currentOffset + size > m_maxSegmentSize)
         {
             std::unique_lock<std::shared_mutex> rotLock(segment->fileMutex);
-
-            // Double-check if we still need to rotate (another thread might have already rotated)
-            if (segment->currentOffset.load(std::memory_order_acquire) > m_maxSegmentSize)
+            // Double-check if rotation is still needed
+            if (segment->currentOffset.load(std::memory_order_acquire) + size > m_maxSegmentSize)
             {
-                // Reset the offset counter for the new segment
                 rotateSegment(filename);
-
-                // Try again with the new segment
                 continue;
             }
+        }
+
+        // Now safely reserve space
+        writeOffset = segment->currentOffset.fetch_add(size, std::memory_order_acq_rel);
+
+        // Double-check we didn't cross the boundary after reservation
+        if (writeOffset + size > m_maxSegmentSize)
+        {
+            // Someone else increased the offset past our threshold, try again
+            continue;
         }
 
         // Capture file descriptor to ensure we use the same one consistently
         std::shared_lock<std::shared_mutex> readLock(segment->fileMutex);
         currentFd = segment->fd;
 
-        // If we can't fit the data or the fd changed (rotation happened), try again
-        if (writeOffset + size > m_maxSegmentSize || currentFd < 0)
+        // If fd is invalid (rotation happened), try again
+        if (currentFd < 0)
         {
             continue;
         }
@@ -172,10 +176,15 @@ std::string SegmentedStorage::generateSegmentPath(const std::string &filename, s
 {
     auto now = std::chrono::system_clock::now();
     auto now_time_t = std::chrono::system_clock::to_time_t(now);
+    std::tm time_info;
+
+    // Linux-specific thread-safe version of localtime
+    localtime_r(&now_time_t, &time_info);
+
     std::stringstream ss;
     ss << m_basePath << "/";
     ss << filename << "_";
-    ss << std::put_time(std::localtime(&now_time_t), "%Y%m%d_%H%M%S") << "_";
+    ss << std::put_time(&time_info, "%Y%m%d_%H%M%S") << "_";
     ss << std::setw(6) << std::setfill('0') << segmentIndex << ".log";
     return ss.str();
 }
