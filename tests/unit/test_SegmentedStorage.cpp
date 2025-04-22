@@ -653,34 +653,6 @@ TEST_F(SegmentedStorageTest, WriteErrorRecoveryTest)
     }
 }
 
-// Test with extremely small buffer size to trigger frequent fsyncs
-TEST_F(SegmentedStorageTest, SmallBufferFrequentFsyncTest)
-{
-    size_t maxSegmentSize = 10000;
-    size_t bufferSize = 10; // Very small buffer size to force frequent fsyncs
-
-    SegmentedStorage storage(testPath, baseFilename, maxSegmentSize, bufferSize);
-
-    size_t numWrites = 15;
-    size_t dataSize = 20; // Larger than buffer size
-
-    // Write data in chunks to trigger multiple fsyncs
-    for (size_t i = 0; i < numWrites; i++)
-    {
-        auto data = generateRandomData(dataSize);
-        storage.write(data);
-    }
-
-    storage.flush();
-
-    // Verify data was written correctly
-    auto files = getSegmentFiles(testPath, baseFilename);
-    ASSERT_EQ(files.size(), 1);
-
-    size_t fileSize = getFileSize(files[0]);
-    ASSERT_EQ(fileSize, numWrites * dataSize);
-}
-
 // Test boundary case for multiple segments
 TEST_F(SegmentedStorageTest, MultiSegmentBoundaryTest)
 {

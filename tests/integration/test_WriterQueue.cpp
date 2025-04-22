@@ -21,8 +21,7 @@ protected:
         storage = std::make_shared<SegmentedStorage>(
             testDir,
             "test_logsegment",
-            1024 * 1024, // Maximum segment size (1 MB for testing)
-            1024         // Buffer size (1 KB for testing)
+            1024 * 1024 // Maximum segment size (1 MB for testing)
         );
 
         writer = std::make_unique<Writer>(*logQueue, storage);

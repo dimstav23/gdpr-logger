@@ -17,8 +17,8 @@ class SegmentedStorage
 public:
     SegmentedStorage(const std::string &basePath,
                      const std::string &baseFilename,
-                     size_t maxSegmentSize = 100 * 1024 * 1024, // 100 MB default
-                     size_t bufferSize = 64 * 1024);            // 64 KB buffer default
+                     size_t maxSegmentSize = 100 * 1024 * 1024 // 100 MB default
+    );
 
     ~SegmentedStorage();
 
@@ -30,7 +30,6 @@ private:
     std::string m_basePath;
     std::string m_baseFilename;
     size_t m_maxSegmentSize;
-    size_t m_bufferSize;
 
     struct SegmentInfo
     {

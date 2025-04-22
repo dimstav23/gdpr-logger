@@ -17,7 +17,7 @@ LoggingSystem::LoggingSystem(const LoggingConfig &config)
     m_queue = std::make_shared<LockFreeQueue>(config.queueCapacity);
     m_storage = std::make_shared<SegmentedStorage>(
         config.basePath, config.baseFilename,
-        config.maxSegmentSize, config.bufferSize);
+        config.maxSegmentSize);
 
     LoggingAPI::getInstance().initialize(m_queue, config.appendTimeout);
 

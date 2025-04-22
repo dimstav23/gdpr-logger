@@ -15,12 +15,11 @@ protected:
         testDir = "test_logs";
         std::filesystem::create_directories(testDir);
         queue = std::make_unique<LockFreeQueue>(8192);
-        // Create a SegmentedStorage instance with small segment and buffer sizes for testing
+        // Create a SegmentedStorage instance with small segment size for testing
         storage = std::make_shared<SegmentedStorage>(
             testDir,
             "test_logsegment",
-            1024 * 1024, // max segment size (e.g., 1 MB for test)
-            1024         // buffer size (e.g., 1 KB)
+            1024 * 1024 // max segment size (e.g., 1 MB for test)
         );
     }
 

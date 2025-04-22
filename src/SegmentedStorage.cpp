@@ -6,12 +6,10 @@
 
 SegmentedStorage::SegmentedStorage(const std::string &basePath,
                                    const std::string &baseFilename,
-                                   size_t maxSegmentSize,
-                                   size_t bufferSize)
+                                   size_t maxSegmentSize)
     : m_basePath(basePath),
       m_baseFilename(baseFilename),
-      m_maxSegmentSize(maxSegmentSize),
-      m_bufferSize(bufferSize)
+      m_maxSegmentSize(maxSegmentSize)
 {
     std::filesystem::create_directories(m_basePath);
     getOrCreateSegment(m_baseFilename);
