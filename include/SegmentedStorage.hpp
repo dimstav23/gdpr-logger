@@ -39,10 +39,10 @@ private:
         mutable std::shared_mutex fileMutex; // shared for writes, exclusive for rotate/flush
     };
 
-    std::unordered_map<std::string, std::unique_ptr<SegmentInfo>> m_fileSegments;
+    std::unordered_map<std::string, std::shared_ptr<SegmentInfo>> m_fileSegments;
     mutable std::shared_mutex m_mapMutex;
 
-    SegmentInfo *getOrCreateSegment(const std::string &filename);
+    std::shared_ptr<SegmentInfo> getOrCreateSegment(const std::string &filename);
     std::string rotateSegment(const std::string &filename);
     std::string generateSegmentPath(const std::string &filename, size_t segmentIndex) const;
 };

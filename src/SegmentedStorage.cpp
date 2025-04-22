@@ -41,7 +41,7 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
     if (size == 0)
         return 0;
 
-    SegmentInfo *segment = getOrCreateSegment(filename);
+    std::shared_ptr<SegmentInfo> segment = getOrCreateSegment(filename);
     size_t writeOffset;
     int currentFd;
 
@@ -120,7 +120,7 @@ void SegmentedStorage::flush()
 
 std::string SegmentedStorage::rotateSegment(const std::string &filename)
 {
-    SegmentInfo *segment = getOrCreateSegment(filename);
+    std::shared_ptr<SegmentInfo> segment = getOrCreateSegment(filename);
 
     // exclusive lock assumed
     if (segment->fd >= 0)
@@ -143,29 +143,29 @@ std::string SegmentedStorage::rotateSegment(const std::string &filename)
     return newPath;
 }
 
-SegmentedStorage::SegmentInfo *SegmentedStorage::getOrCreateSegment(const std::string &filename)
+std::shared_ptr<SegmentedStorage::SegmentInfo> SegmentedStorage::getOrCreateSegment(const std::string &filename)
 {
     {
         std::shared_lock<std::shared_mutex> readLock(m_mapMutex);
         auto it = m_fileSegments.find(filename);
         if (it != m_fileSegments.end())
-            return it->second.get();
+            return it->second;
     }
 
     std::unique_lock<std::shared_mutex> writeLock(m_mapMutex);
     auto it = m_fileSegments.find(filename);
     if (it != m_fileSegments.end())
-        return it->second.get();
+        return it->second;
 
-    auto segmentInfo = std::make_unique<SegmentInfo>();
+    auto segmentInfo = std::make_shared<SegmentInfo>();
     std::string segmentPath = generateSegmentPath(filename, 0);
     int fd = ::open(segmentPath.c_str(), O_CREAT | O_RDWR, 0644);
     if (fd < 0)
         throw std::runtime_error("Failed to open segment file: " + segmentPath);
 
     segmentInfo->fd = fd;
-    m_fileSegments[filename] = std::move(segmentInfo);
-    return m_fileSegments[filename].get();
+    m_fileSegments[filename] = segmentInfo;
+    return segmentInfo;
 }
 
 std::string SegmentedStorage::generateSegmentPath(const std::string &filename, size_t segmentIndex) const
