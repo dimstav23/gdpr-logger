@@ -104,17 +104,6 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
         }
     }
 
-    // Optionally fsync at buffer or near-rotation boundaries
-    if ((writeOffset + size) % m_bufferSize == 0 ||
-        (writeOffset + size > m_maxSegmentSize - m_bufferSize))
-    {
-        std::shared_lock<std::shared_mutex> syncLock(segment->fileMutex);
-        if (segment->fd == currentFd)
-        { // Only fsync if fd hasn't changed
-            ::fsync(segment->fd);
-        }
-    }
-
     return size;
 }
 
