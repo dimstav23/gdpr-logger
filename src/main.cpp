@@ -91,6 +91,8 @@ int main()
         config.basePath = "./logs";
         config.baseFilename = "gdpr_audit";
         config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+        config.maxAttempts = 5;
+        config.baseRetryDelay = std::chrono::milliseconds(1);
         config.queueCapacity = 16384;
         config.batchSize = 750; // number of entries a single writer thread can dequeue at once at most
         config.numWriterThreads = 4;

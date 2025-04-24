@@ -1,15 +1,15 @@
 #include "SegmentedStorage.hpp"
-#include <chrono>
-#include <iomanip>
-#include <sstream>
-#include <stdexcept>
 
 SegmentedStorage::SegmentedStorage(const std::string &basePath,
                                    const std::string &baseFilename,
-                                   size_t maxSegmentSize)
+                                   size_t maxSegmentSize,
+                                   size_t maxAttempts,
+                                   std::chrono::milliseconds baseRetryDelay)
     : m_basePath(basePath),
       m_baseFilename(baseFilename),
-      m_maxSegmentSize(maxSegmentSize)
+      m_maxSegmentSize(maxSegmentSize),
+      m_maxAttempts(maxAttempts),
+      m_baseRetryDelay(baseRetryDelay)
 {
     std::filesystem::create_directories(m_basePath);
     getOrCreateSegment(m_baseFilename);
@@ -24,7 +24,7 @@ SegmentedStorage::~SegmentedStorage()
         std::unique_lock<std::shared_mutex> lock(pair.second->fileMutex);
         if (pair.second->fd >= 0)
         {
-            ::fsync(pair.second->fd);
+            fsyncRetry(pair.second->fd);
             ::close(pair.second->fd);
         }
     }
@@ -67,7 +67,7 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
         // Double-check we didn't cross the boundary after reservation
         if (writeOffset + size > m_maxSegmentSize)
         {
-            // Someone else increased the offset past our threshold, try again
+            // Someone other thread increased the offset past our threshold, try again
             continue;
         }
 
@@ -96,14 +96,7 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
             return writeToFile(filename, data);
         }
 
-        ssize_t written = ::pwrite(segment->fd,
-                                   reinterpret_cast<const void *>(data.data()),
-                                   size,
-                                   static_cast<off_t>(writeOffset));
-        if (written < 0 || static_cast<size_t>(written) != size)
-        {
-            throw std::runtime_error("pwrite failed or partial write");
-        }
+        pwriteFull(currentFd, data.data(), size, static_cast<off_t>(writeOffset));
     }
 
     return size;
@@ -117,7 +110,7 @@ void SegmentedStorage::flush()
         std::unique_lock<std::shared_mutex> lock(pair.second->fileMutex);
         if (pair.second->fd >= 0)
         {
-            ::fsync(pair.second->fd);
+            fsyncRetry(pair.second->fd);
         }
     }
 }
@@ -129,7 +122,7 @@ std::string SegmentedStorage::rotateSegment(const std::string &filename)
     // exclusive lock assumed
     if (segment->fd >= 0)
     {
-        ::fsync(segment->fd);
+        fsyncRetry(segment->fd);
         ::close(segment->fd);
     }
 
@@ -137,11 +130,7 @@ std::string SegmentedStorage::rotateSegment(const std::string &filename)
     segment->currentOffset.store(0, std::memory_order_release);
     std::string newPath = generateSegmentPath(filename, newIndex);
 
-    int fd = ::open(newPath.c_str(), O_CREAT | O_RDWR, 0644);
-    if (fd < 0)
-    {
-        throw std::runtime_error("Failed to open new segment file: " + newPath);
-    }
+    int fd = openWithRetry(newPath.c_str(), O_CREAT | O_RDWR, 0644);
     segment->fd = fd;
 
     return newPath;
@@ -163,10 +152,7 @@ std::shared_ptr<SegmentedStorage::SegmentInfo> SegmentedStorage::getOrCreateSegm
 
     auto segmentInfo = std::make_shared<SegmentInfo>();
     std::string segmentPath = generateSegmentPath(filename, 0);
-    int fd = ::open(segmentPath.c_str(), O_CREAT | O_RDWR, 0644);
-    if (fd < 0)
-        throw std::runtime_error("Failed to open segment file: " + segmentPath);
-
+    int fd = openWithRetry(segmentPath.c_str(), O_CREAT | O_RDWR, 0644);
     segmentInfo->fd = fd;
     m_fileSegments[filename] = segmentInfo;
     return segmentInfo;
