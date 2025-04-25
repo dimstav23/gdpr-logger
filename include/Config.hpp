@@ -10,7 +10,7 @@ struct LoggingConfig
     std::string basePath = "./logs";
     std::string baseFilename = "gdpr_audit";
     size_t maxSegmentSize = 100 * 1024 * 1024; // 100 MB
-    size_t maxAttempts = 5;
+    size_t maxAttempts = 10;
     std::chrono::milliseconds baseRetryDelay = std::chrono::milliseconds(1);
     // queue
     size_t queueCapacity = 8192;
