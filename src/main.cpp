@@ -13,6 +13,10 @@ void generateLogEntries(LoggingSystem &loggingSystem, int numEntries, const std:
     std::vector<LogEntry> batch;
     const int MAX_BATCH_SIZE = 20;
 
+    // Define the specific filenames to use in 10% of cases each
+    const std::string filename1 = "specific_log_file1.log";
+    const std::string filename2 = "specific_log_file2.log";
+
     for (int i = 0; i < numEntries; i++)
     {
         std::string dataLocation = "database/table/row" + std::to_string(i);
@@ -38,8 +42,23 @@ void generateLogEntries(LoggingSystem &loggingSystem, int numEntries, const std:
 
         LogEntry entry(action, dataLocation, userId, dataSubjectId);
 
+        // Determine which filename to use (if any) based on the distribution requirement
+        std::optional<std::string> targetFilename = std::nullopt;
+        int fileChoice = rand() % 100; // Random number between 0-99
+
+        if (fileChoice < 10)
+        {
+            // 10% chance for filename1
+            targetFilename = filename1;
+        }
+        else if (fileChoice < 20)
+        {
+            // 10% chance for filename2
+            targetFilename = filename2;
+        }
+        // remaining 80% keeps targetFilename as std::nullopt (default)
+
         // Decide whether to use batch append or single append
-        // Use batch about 30% of the time, but build the batch gradually
         if (i % 10 < 3) // 30% probability
         {
             batch.push_back(entry);
@@ -47,7 +66,7 @@ void generateLogEntries(LoggingSystem &loggingSystem, int numEntries, const std:
             // When batch reaches MAX_BATCH_SIZE or at random intervals, append the batch
             if (batch.size() >= MAX_BATCH_SIZE || (batch.size() > 0 && rand() % 10 == 0))
             {
-                if (!loggingSystem.appendBatch(batch))
+                if (!loggingSystem.appendBatch(batch, targetFilename))
                 {
                     std::cerr << "Failed to append batch of " << batch.size() << " entries" << std::endl;
                 }
@@ -60,7 +79,7 @@ void generateLogEntries(LoggingSystem &loggingSystem, int numEntries, const std:
         else
         {
             // Use regular append
-            if (!loggingSystem.append(entry))
+            if (!loggingSystem.append(entry, targetFilename))
             {
                 std::cerr << "Failed to append single log entry " << i << std::endl;
             }
@@ -76,6 +95,7 @@ void generateLogEntries(LoggingSystem &loggingSystem, int numEntries, const std:
     // Make sure to append any remaining entries in the batch
     if (!batch.empty())
     {
+        // For the final batch, use default filename (no specific target)
         if (!loggingSystem.appendBatch(batch))
         {
             std::cerr << "Failed to append final batch of " << batch.size() << " entries" << std::endl;
@@ -98,28 +118,26 @@ int main()
         config.numWriterThreads = 4;
         config.appendTimeout = std::chrono::milliseconds(30000);
 
+        // Define the benchmark parameters
+        const int numThreads = 25;
+        const int entriesPerThread = 40000;
+
         LoggingSystem loggingSystem(config);
-
-        if (!loggingSystem.start())
-        {
-            std::cerr << "Failed to start logging system" << std::endl;
-            return 1;
-        }
-
+        loggingSystem.start();
         std::cout << "Logging system started" << std::endl;
         auto startTime = std::chrono::high_resolution_clock::now();
 
         // Create multiple producer threads to generate log entries
         std::vector<std::future<void>> futures;
 
-        for (int i = 0; i < 25; i++)
+        for (int i = 0; i < numThreads; i++)
         {
             std::string userId = "user" + std::to_string(i);
             futures.push_back(std::async(
                 std::launch::async,
                 generateLogEntries,
                 std::ref(loggingSystem),
-                40000,
+                entriesPerThread,
                 userId));
         }
 
@@ -144,15 +162,21 @@ int main()
 
         // Stop the logging system gracefully
         std::cout << "Stopping logging system..." << std::endl;
-        if (!loggingSystem.stop(true))
-        {
-            std::cerr << "Failed to stop logging system" << std::endl;
-            return 1;
-        }
+        loggingSystem.stop(true);
 
         auto endTime = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double> elapsed = endTime - startTime;
-        std::cout << "Execution time: " << elapsed.count() << " seconds" << std::endl;
+
+        // Calculate and print statistics
+        double elapsedSeconds = elapsed.count();
+        const size_t totalEntries = numThreads * entriesPerThread;
+        double throughput = totalEntries / elapsedSeconds;
+
+        std::cout << "============== Benchmark Results ==============" << std::endl;
+        std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
+        std::cout << "Total entries enqueued: " << totalEntries << std::endl;
+        std::cout << "Throughput: " << throughput << " entries/second" << std::endl;
+        std::cout << "===============================================" << std::endl;
 
         return 0;
     }
