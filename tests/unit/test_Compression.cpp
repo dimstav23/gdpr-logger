@@ -30,23 +30,6 @@ bool LogEntriesEqual(const LogEntry &a, const LogEntry &b)
     return serializedA == serializedB;
 }
 
-// Test compressing and decompressing a single log entry
-TEST_F(CompressionTest, CompressDecompressSingleEntry)
-{
-    // Compress a single entry
-    std::vector<uint8_t> compressed = Compression::compressEntry(entry1);
-
-    // Make sure compression actually reduced the size (or at least did something)
-    ASSERT_GT(compressed.size(), 0);
-
-    // Decompress the entry
-    std::unique_ptr<LogEntry> decompressed = Compression::decompressEntry(compressed);
-
-    // Verify the decompressed entry matches the original
-    ASSERT_TRUE(decompressed != nullptr);
-    EXPECT_TRUE(LogEntriesEqual(entry1, *decompressed));
-}
-
 // Test compressing and decompressing a batch of log entries
 TEST_F(CompressionTest, CompressDecompressBatch)
 {
@@ -89,28 +72,6 @@ TEST_F(CompressionTest, EmptyBatch)
     EXPECT_TRUE(decompressed.empty());
 }
 
-// Test with extremely large entries
-TEST_F(CompressionTest, LargeEntry)
-{
-    // Create a log entry with large fields
-    std::string largeDataLocation(10000, 'A'); // 10KB string of 'A's
-    std::string largeUserId(5000, 'B');        // 5KB string of 'B's
-    std::string largeSubjectId(5000, 'C');     // 5KB string of 'C's
-
-    LogEntry largeEntry(LogEntry::ActionType::CREATE, largeDataLocation, largeUserId, largeSubjectId);
-
-    // Compress and decompress
-    std::vector<uint8_t> compressed = Compression::compressEntry(largeEntry);
-    std::unique_ptr<LogEntry> decompressed = Compression::decompressEntry(compressed);
-
-    // Verify compression worked (should be much smaller)
-    EXPECT_LT(compressed.size(), largeDataLocation.size() + largeUserId.size() + largeSubjectId.size());
-
-    // Verify the entry was correctly reconstructed
-    ASSERT_TRUE(decompressed != nullptr);
-    EXPECT_TRUE(LogEntriesEqual(largeEntry, *decompressed));
-}
-
 // Test with invalid compressed data
 TEST_F(CompressionTest, InvalidCompressedData)
 {
@@ -118,33 +79,46 @@ TEST_F(CompressionTest, InvalidCompressedData)
     std::vector<uint8_t> invalidData = {0x01, 0x02, 0x03, 0x04};
 
     // Try to decompress it
-    std::unique_ptr<LogEntry> decompressedEntry = Compression::decompressEntry(invalidData);
     std::vector<LogEntry> decompressedBatch = Compression::decompressBatch(invalidData);
 
     // Verify that decompression failed
-    EXPECT_EQ(nullptr, decompressedEntry);
     EXPECT_TRUE(decompressedBatch.empty());
 }
 
-// Test compression ratio
-TEST_F(CompressionTest, CompressionRatio)
+// Test batch compression ratio
+TEST_F(CompressionTest, BatchCompressionRatio)
 {
-    // Create log entries with repetitive data which should compress well
+    // Create a batch of log entries with repetitive data which should compress well
+    const int batchSize = 50;
     std::string repetitiveData(1000, 'X');
     LogEntry repetitiveEntry(LogEntry::ActionType::CREATE, repetitiveData, repetitiveData, repetitiveData);
 
-    // Compress the entry
-    std::vector<uint8_t> serialized = repetitiveEntry.serialize();
-    std::vector<uint8_t> compressed = Compression::compressEntry(repetitiveEntry);
+    std::vector<LogEntry> repetitiveBatch(batchSize, repetitiveEntry);
 
-    // Check that compression significantly reduced the size
-    double compressionRatio = static_cast<double>(compressed.size()) / static_cast<double>(serialized.size());
-    EXPECT_LT(compressionRatio, 0.1); // Expect at least 90% compression
+    // Calculate the total size of serialized entries
+    std::vector<uint8_t> totalSerialized;
+    for (const auto &entry : repetitiveBatch)
+    {
+        auto serialized = entry.serialize();
+        totalSerialized.insert(totalSerialized.end(), serialized.begin(), serialized.end());
+    }
+
+    // Compress the batch
+    std::vector<uint8_t> compressed = Compression::compressBatch(repetitiveBatch);
+
+    // Check that batch compression significantly reduced the size
+    double compressionRatio = static_cast<double>(compressed.size()) / static_cast<double>(totalSerialized.size());
+    EXPECT_LT(compressionRatio, 0.05); // Expect at least 95% compression for batch
 
     // Decompress to verify integrity
-    std::unique_ptr<LogEntry> decompressed = Compression::decompressEntry(compressed);
-    ASSERT_TRUE(decompressed != nullptr);
-    EXPECT_TRUE(LogEntriesEqual(repetitiveEntry, *decompressed));
+    std::vector<LogEntry> decompressed = Compression::decompressBatch(compressed);
+
+    // Verify the correct number of entries and their content
+    ASSERT_EQ(repetitiveBatch.size(), decompressed.size());
+    for (size_t i = 0; i < repetitiveBatch.size(); i++)
+    {
+        EXPECT_TRUE(LogEntriesEqual(repetitiveBatch[i], decompressed[i]));
+    }
 }
 
 // Test with a large batch of entries

@@ -34,38 +34,7 @@ protected:
     std::vector<uint8_t> wrongKey;
 };
 
-// Test 1: Single entry full cycle - original -> compress -> encrypt -> decrypt -> decompress -> recovered
-TEST_F(CompressionCryptoTest, SingleEntryFullCycle)
-{
-    std::vector<uint8_t> compressed = Compression::compressEntry(entry1);
-    ASSERT_GT(compressed.size(), 0);
-
-    std::vector<uint8_t> encrypted = crypto.encrypt(compressed, key);
-    ASSERT_GT(encrypted.size(), 0);
-    EXPECT_NE(encrypted, compressed);
-
-    // Verify wrong key produces invalid or no results
-    std::vector<uint8_t> wrongDecrypted = crypto.decrypt(encrypted, wrongKey);
-    if (!wrongDecrypted.empty())
-    {
-        EXPECT_NE(wrongDecrypted, compressed);
-    }
-
-    std::vector<uint8_t> decrypted = crypto.decrypt(encrypted, key);
-    ASSERT_GT(decrypted.size(), 0);
-    EXPECT_EQ(decrypted, compressed);
-
-    std::unique_ptr<LogEntry> recovered = Compression::decompressEntry(decrypted);
-
-    ASSERT_TRUE(recovered != nullptr);
-    EXPECT_TRUE(LogEntriesEqual(entry1, *recovered));
-    EXPECT_EQ(entry1.getActionType(), recovered->getActionType());
-    EXPECT_EQ(entry1.getDataLocation(), recovered->getDataLocation());
-    EXPECT_EQ(entry1.getUserId(), recovered->getUserId());
-    EXPECT_EQ(entry1.getDataSubjectId(), recovered->getDataSubjectId());
-}
-
-// Test 2: Batch processing - riginal -> compress -> encrypt -> decrypt -> decompress -> recovered
+// Batch processing - riginal -> compress -> encrypt -> decrypt -> decompress -> recovered
 TEST_F(CompressionCryptoTest, BatchProcessing)
 {
     std::vector<LogEntry> batch = {entry1, entry2, entry3};

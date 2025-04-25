@@ -21,26 +21,7 @@ void generateLogEntries(LoggingSystem &loggingSystem, int numEntries, const std:
     {
         std::string dataLocation = "database/table/row" + std::to_string(i);
         std::string dataSubjectId = "subject" + std::to_string(i % 10);
-
-        // Randomly select an action type
-        LogEntry::ActionType action;
-        switch (i % 4)
-        {
-        case 0:
-            action = LogEntry::ActionType::CREATE;
-            break;
-        case 1:
-            action = LogEntry::ActionType::READ;
-            break;
-        case 2:
-            action = LogEntry::ActionType::UPDATE;
-            break;
-        default:
-            action = LogEntry::ActionType::DELETE;
-            break;
-        }
-
-        LogEntry entry(action, dataLocation, userId, dataSubjectId);
+        LogEntry entry(LogEntry::ActionType::CREATE, dataLocation, userId, dataSubjectId);
 
         // Determine which filename to use (if any) based on the distribution requirement
         std::optional<std::string> targetFilename = std::nullopt;
@@ -113,7 +94,7 @@ int main()
         config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
         config.maxAttempts = 5;
         config.baseRetryDelay = std::chrono::milliseconds(1);
-        config.queueCapacity = 16384;
+        config.queueCapacity = 200000;
         config.batchSize = 750; // number of entries a single writer thread can dequeue at once at most
         config.numWriterThreads = 4;
         config.appendTimeout = std::chrono::milliseconds(30000);

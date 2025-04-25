@@ -9,11 +9,7 @@
 class Compression
 {
 public:
-    static std::vector<uint8_t> compressEntry(const LogEntry &entry);
-
     static std::vector<uint8_t> compressBatch(const std::vector<LogEntry> &entries);
-
-    static std::unique_ptr<LogEntry> decompressEntry(const std::vector<uint8_t> &compressedData);
 
     static std::vector<LogEntry> decompressBatch(const std::vector<uint8_t> &compressedData);
 

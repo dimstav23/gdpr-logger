@@ -4,13 +4,6 @@
 #include <cstring>
 #include <iostream>
 
-// Compress a single log entry
-std::vector<uint8_t> Compression::compressEntry(const LogEntry &entry)
-{
-    std::vector<uint8_t> serializedData = entry.serialize();
-    return compress(serializedData);
-}
-
 // Compress multiple log entries in a batch
 std::vector<uint8_t> Compression::compressBatch(const std::vector<LogEntry> &entries)
 {
@@ -40,29 +33,6 @@ std::vector<uint8_t> Compression::compressBatch(const std::vector<LogEntry> &ent
     }
 
     return compress(batchData);
-}
-
-// Decompress data into a single log entry
-std::unique_ptr<LogEntry> Compression::decompressEntry(const std::vector<uint8_t> &compressedData)
-{
-    try
-    {
-        std::vector<uint8_t> decompressedData = decompress(compressedData);
-        auto entry = std::make_unique<LogEntry>();
-        if (entry->deserialize(decompressedData))
-        {
-            return entry;
-        }
-        else
-        {
-            return nullptr;
-        }
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << "Error decompressing log entry: " << e.what() << std::endl;
-        return nullptr;
-    }
 }
 
 // Decompress data into multiple log entries
