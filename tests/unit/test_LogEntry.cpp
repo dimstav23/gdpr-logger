@@ -77,14 +77,3 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_NEAR(std::chrono::system_clock::to_time_t(newEntry.getTimestamp()),
                 std::chrono::system_clock::to_time_t(entry.getTimestamp()), 1);
 }
-
-// Test action type conversion functions
-TEST(LogEntryTest7, ActionTypeConversion_ValidAndInvalidCases)
-{
-    EXPECT_EQ(actionTypeToString(LogEntry::ActionType::CREATE), "CREATE");
-    EXPECT_EQ(actionTypeToString(LogEntry::ActionType::READ), "READ");
-    EXPECT_EQ(actionTypeToString(LogEntry::ActionType::UPDATE), "UPDATE");
-    EXPECT_EQ(actionTypeToString(LogEntry::ActionType::DELETE), "DELETE");
-
-    EXPECT_THROW(actionTypeToString(static_cast<LogEntry::ActionType>(99)), std::invalid_argument);
-}

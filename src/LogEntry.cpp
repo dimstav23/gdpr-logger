@@ -5,23 +5,6 @@
 #include <chrono>
 #include <stdexcept>
 
-std::string actionTypeToString(LogEntry::ActionType actionType)
-{
-    switch (actionType)
-    {
-    case LogEntry::ActionType::CREATE:
-        return "CREATE";
-    case LogEntry::ActionType::READ:
-        return "READ";
-    case LogEntry::ActionType::UPDATE:
-        return "UPDATE";
-    case LogEntry::ActionType::DELETE:
-        return "DELETE";
-    default:
-        throw std::invalid_argument("Unknown ActionType");
-    }
-}
-
 LogEntry::LogEntry()
     : m_actionType(ActionType::CREATE),
       m_dataLocation(""),
@@ -91,16 +74,4 @@ bool LogEntry::deserialize(const std::vector<uint8_t> &data)
         std::cerr << "Deserialization failed: " << e.what() << std::endl;
         return false;
     }
-}
-
-std::string LogEntry::toString() const
-{
-    std::ostringstream oss;
-    oss << "ActionType: " << actionTypeToString(m_actionType) << "\n"
-        << "DataLocation: " << m_dataLocation << "\n"
-        << "UserId: " << m_userId << "\n"
-        << "DataSubjectId: " << m_dataSubjectId << "\n"
-        << "Timestamp: " << std::chrono::system_clock::to_time_t(m_timestamp);
-
-    return oss.str();
 }

@@ -30,8 +30,6 @@ public:
 
     bool deserialize(const std::vector<uint8_t> &data);
 
-    std::string toString() const;
-
     ActionType getActionType() const { return m_actionType; }
     void setActionType(ActionType actionType) { m_actionType = actionType; }
 
@@ -54,8 +52,5 @@ private:
     std::string m_dataSubjectId;                       // ID of the data subject
     std::chrono::system_clock::time_point m_timestamp; // When the operation occurred
 };
-
-// Helper functions
-std::string actionTypeToString(LogEntry::ActionType actionType);
 
 #endif
