@@ -17,8 +17,9 @@ LoggingAPI &LoggingAPI::getInstance()
 }
 
 LoggingAPI::LoggingAPI()
-    : m_initialized(false),
-      m_appendTimeout(std::chrono::milliseconds::max())
+    : m_logQueue(nullptr),
+      m_appendTimeout(std::chrono::milliseconds::max()),
+      m_initialized(false)
 {
 }
 
