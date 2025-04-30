@@ -16,9 +16,6 @@ public:
 
     std::vector<uint8_t> decrypt(const std::vector<uint8_t> &encryptedData, const std::vector<uint8_t> &key);
 
-    // Helper method to convert a single entry to batch format
-    static std::vector<uint8_t> singleToBatchFormat(const std::vector<uint8_t> &singleEntryData);
-
 private:
     // Generate a random IV (Initialization Vector), 12 bytes is typical for GCM mode
     std::vector<uint8_t> generateIV(size_t size = 12);

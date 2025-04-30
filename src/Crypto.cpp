@@ -29,31 +29,6 @@ std::vector<uint8_t> Crypto::generateIV(size_t size)
     return iv;
 }
 
-// Helper method to convert a single entry to batch format
-std::vector<uint8_t> Crypto::singleToBatchFormat(const std::vector<uint8_t> &singleEntryData)
-{
-    // Create a batch with a single entry
-    std::vector<uint8_t> batchData;
-
-    // Store number of entries (1)
-    uint32_t numEntries = 1;
-    batchData.resize(sizeof(numEntries));
-    std::memcpy(batchData.data(), &numEntries, sizeof(numEntries));
-
-    // Store entry size
-    uint32_t entrySize = singleEntryData.size();
-    size_t currentSize = batchData.size();
-    batchData.resize(currentSize + sizeof(entrySize));
-    std::memcpy(batchData.data() + currentSize, &entrySize, sizeof(entrySize));
-
-    // Store entry data
-    currentSize = batchData.size();
-    batchData.resize(currentSize + singleEntryData.size());
-    std::memcpy(batchData.data() + currentSize, singleEntryData.data(), singleEntryData.size());
-
-    return batchData;
-}
-
 // Encrypt data using AES-256-GCM
 std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &compressedData, const std::vector<uint8_t> &key)
 {

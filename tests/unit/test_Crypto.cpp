@@ -166,36 +166,6 @@ TEST_F(CryptoTest, TamperingDetection)
     }
 }
 
-// Test the singleToBatchFormat method
-TEST_F(CryptoTest, SingleToBatchFormat)
-{
-    std::string testEntry = "Single entry test data";
-    std::vector<uint8_t> entryData = stringToBytes(testEntry);
-
-    // Convert to batch format
-    std::vector<uint8_t> batchData = Crypto::singleToBatchFormat(entryData);
-
-    // Verify batch format structure
-    ASSERT_GE(batchData.size(), sizeof(uint32_t) * 2 + entryData.size());
-
-    // Extract and check number of entries (should be 1)
-    uint32_t numEntries;
-    memcpy(&numEntries, batchData.data(), sizeof(numEntries));
-    EXPECT_EQ(numEntries, 1u);
-
-    // Extract and check entry size
-    uint32_t entrySize;
-    memcpy(&entrySize, batchData.data() + sizeof(numEntries), sizeof(entrySize));
-    EXPECT_EQ(entrySize, entryData.size());
-
-    // Extract and check entry data
-    std::vector<uint8_t> extractedData(entrySize);
-    memcpy(extractedData.data(),
-           batchData.data() + sizeof(numEntries) + sizeof(entrySize),
-           entrySize);
-    EXPECT_EQ(extractedData, entryData);
-}
-
 // Test binary data encryption and decryption
 TEST_F(CryptoTest, BinaryData)
 {
