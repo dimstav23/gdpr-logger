@@ -78,16 +78,16 @@ int main()
     config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
     config.maxAttempts = 5;
     config.baseRetryDelay = std::chrono::milliseconds(1);
-    config.queueCapacity = 200000;
+    config.queueCapacity = 1000000;
     config.batchSize = 750; // number of entries a single writer thread can dequeue at once at most
     config.numWriterThreads = 4;
     config.appendTimeout = std::chrono::milliseconds(30000);
 
     // benchmark parameters
     const int numProducerThreads = 25;
-    const int entriesPerProducer = 40000;
-    const int numSpecificFiles = 5;   // Number of specific files to distribute logs to
-    const int producerBatchSize = 20; // Size of batches for batch append operations
+    const int entriesPerProducer = 400000;
+    const int numSpecificFiles = 25;  // Number of specific files to distribute logs to
+    const int producerBatchSize = 25; // Size of batches for batch append operations
 
     // Pre-generate all batches with destinations for all threads
     std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;

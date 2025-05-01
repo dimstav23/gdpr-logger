@@ -271,7 +271,7 @@ int main()
     const int numProducers = 20;          // Number of producer threads
     const int entriesPerProducer = 50000; // Each producer generates this many entries
 
-    std::vector<int> segmentSizesKB = {5000, 2500, 1000, 500, 100, 50};
+    std::vector<int> segmentSizesKB = {10000, 5000, 2500, 1000, 500, 100, 50};
 
     runFileRotationComparison(
         segmentSizesKB,
