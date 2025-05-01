@@ -86,7 +86,6 @@ int countLogFiles(const std::string &basePath)
     return count;
 }
 
-// Function to delete all log files in a directory
 void cleanupLogDirectory(const std::string &logDir)
 {
     try
@@ -97,10 +96,6 @@ void cleanupLogDirectory(const std::string &logDir)
             {
                 std::filesystem::remove_all(entry.path());
             }
-        }
-        else
-        {
-            std::filesystem::create_directories(logDir);
         }
     }
     catch (const std::exception &e)
@@ -120,7 +115,6 @@ double runFileRotationBenchmark(
     // Create a unique directory for this test run
     std::string logDir = "./logs/rotation_" + std::to_string(maxSegmentSizeKB) + "kb";
 
-    // Clean up any existing log files from previous runs
     cleanupLogDirectory(logDir);
 
     // system parameters

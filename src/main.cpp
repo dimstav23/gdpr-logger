@@ -5,11 +5,29 @@
 #include <vector>
 #include <future>
 #include <optional>
+#include <filesystem>
 
 // Type alias for a batch of log entries with a destination
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
-// Function to generate batches of log entries with pre-determined destinations
+void cleanupLogDirectory(const std::string &logDir)
+{
+    try
+    {
+        if (std::filesystem::exists(logDir))
+        {
+            for (const auto &entry : std::filesystem::directory_iterator(logDir))
+            {
+                std::filesystem::remove_all(entry.path());
+            }
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error cleaning log directory: " << e.what() << std::endl;
+    }
+}
+
 std::vector<BatchWithDestination> generateBatches(int numEntries, const std::string &userId, int numSpecificFiles, int batchSize)
 {
     std::vector<BatchWithDestination> batches;
@@ -82,6 +100,8 @@ int main()
     config.batchSize = 750; // number of entries a single writer thread can dequeue at once at most
     config.numWriterThreads = 4;
     config.appendTimeout = std::chrono::seconds(1);
+
+    cleanupLogDirectory(config.basePath);
 
     // benchmark parameters
     const int numProducerThreads = 25;

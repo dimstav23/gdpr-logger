@@ -6,9 +6,28 @@
 #include <future>
 #include <optional>
 #include <iomanip>
+#include <filesystem>
 
 // Type alias for a batch of log entries with a destination
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
+
+void cleanupLogDirectory(const std::string &logDir)
+{
+    try
+    {
+        if (std::filesystem::exists(logDir))
+        {
+            for (const auto &entry : std::filesystem::directory_iterator(logDir))
+            {
+                std::filesystem::remove_all(entry.path());
+            }
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error cleaning log directory: " << e.what() << std::endl;
+    }
+}
 
 // Function to generate batches of log entries with pre-determined destinations
 std::vector<BatchWithDestination> generateBatches(int numEntries, const std::string &userId, int numSpecificFiles, int batchSize)
@@ -87,6 +106,8 @@ double runFilepathDiversityBenchmark(int numSpecificFiles,
     config.batchSize = 750;
     config.numWriterThreads = 4;
     config.appendTimeout = std::chrono::milliseconds(300000);
+
+    cleanupLogDirectory(config.basePath);
 
     // Pre-generate all batches with destinations for all threads
     if (verbose)

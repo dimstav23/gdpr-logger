@@ -20,7 +20,6 @@ struct BenchmarkResult
     double throughput;
 };
 
-// Function to delete all log files in a directory
 void cleanupLogDirectory(const std::string &logDir)
 {
     try
@@ -31,10 +30,6 @@ void cleanupLogDirectory(const std::string &logDir)
             {
                 std::filesystem::remove_all(entry.path());
             }
-        }
-        else
-        {
-            std::filesystem::create_directories(logDir);
         }
     }
     catch (const std::exception &e)
