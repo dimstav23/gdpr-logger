@@ -47,6 +47,7 @@ private:
 
     size_t m_numWriterThreads; // Number of writer threads
     size_t m_batchSize;        // Batch size for writers
+    bool m_useEncryption;
 };
 
 #endif

@@ -14,7 +14,8 @@ class Writer
 public:
     explicit Writer(LockFreeQueue &queue,
                     std::shared_ptr<SegmentedStorage> storage,
-                    size_t batchSize = 100);
+                    size_t batchSize = 100,
+                    bool useEncryption = true);
 
     ~Writer();
 
@@ -30,5 +31,6 @@ private:
     std::unique_ptr<std::thread> m_writerThread;
     std::atomic<bool> m_running{false};
     const size_t m_batchSize;
+    const bool m_useEncryption;
 };
 #endif

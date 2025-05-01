@@ -7,10 +7,12 @@
 
 Writer::Writer(LockFreeQueue &queue,
                std::shared_ptr<SegmentedStorage> storage,
-               size_t batchSize)
+               size_t batchSize,
+               bool useEncryption)
     : m_queue(queue),
       m_storage(std::move(storage)),
-      m_batchSize(batchSize) {}
+      m_batchSize(batchSize),
+      m_useEncryption(useEncryption) {}
 
 Writer::~Writer()
 {
@@ -72,19 +74,29 @@ void Writer::processLogEntries()
         // Process each group separately
         for (const auto &[targetFilename, entries] : groupedEntries)
         {
-            // Compress and encrypt the batch of log entries
+            // Compress the batch of log entries
             std::vector<uint8_t> compressedData = Compression::compressBatch(entries);
-            std::vector<uint8_t> encryptedData = crypto.encrypt(compressedData, encryptionKey);
+
+            // encrypt if encryption is enabled
+            std::vector<uint8_t> dataToWrite;
+            if (m_useEncryption)
+            {
+                dataToWrite = crypto.encrypt(compressedData, encryptionKey);
+            }
+            else
+            {
+                dataToWrite = compressedData;
+            }
 
             if (targetFilename)
             {
                 // Write to the specified file
-                m_storage->writeToFile(*targetFilename, encryptedData);
+                m_storage->writeToFile(*targetFilename, dataToWrite);
             }
             else
             {
                 // Write to default segmented storage
-                m_storage->write(encryptedData);
+                m_storage->write(dataToWrite);
             }
         }
 
