@@ -76,13 +76,13 @@ void runBenchmark(int numWriterThreads, int numProducerThreads, int entriesPerPr
 {
     // system parameters
     LoggingConfig config;
-    config.basePath = "./logs";
+    config.basePath = "./logs/writers_" + std::to_string(numWriterThreads);
     config.baseFilename = "gdpr_audit";
-    config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+    config.maxSegmentSize = 1 * 1024 * 1024; // 50 MB
     config.maxAttempts = 5;
     config.baseRetryDelay = std::chrono::milliseconds(1);
-    config.queueCapacity = 200000;
-    config.batchSize = 750;                     // number of entries a single writer thread can dequeue at once at most
+    config.queueCapacity = 1000000;
+    config.batchSize = 15;                      // number of entries a single writer thread can dequeue at once at most
     config.numWriterThreads = numWriterThreads; // Set the number of writer threads
     config.appendTimeout = std::chrono::milliseconds(30000);
 
@@ -205,19 +205,15 @@ void runConcurrencyBenchmark(const std::vector<int> &writerThreadCounts,
 int main()
 {
     // benchmark parameters
-    const int numProducerThreads = 25;
-    const int entriesPerProducer = 40000;
-    const int numSpecificFiles = 5;   // Number of specific files to distribute logs to
-    const int producerBatchSize = 20; // Size of batches for batch append operations
-
+    const int numSpecificFiles = 20;  // Number of specific files to distribute logs to
+    const int producerBatchSize = 50; // Size of batches for batch append operations
+    const int numProducers = 20;
+    const int entriesPerProducer = 100000;
     std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16};
 
-    const int concurrencyTestProducers = 20;
-    const int concurrencyEntriesPerProducer = 400000;
-
     runConcurrencyBenchmark(writerThreadCounts,
-                            concurrencyTestProducers,
-                            concurrencyEntriesPerProducer,
+                            numProducers,
+                            entriesPerProducer,
                             numSpecificFiles,
                             producerBatchSize);
 
