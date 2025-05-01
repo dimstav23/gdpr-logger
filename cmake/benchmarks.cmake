@@ -12,6 +12,7 @@ set(BENCHMARK_NAMES
     file_rotation
     filepath_diversity
     queue_capacity
+    encryption_usage
 )
 
 foreach(benchmark ${BENCHMARK_NAMES})
