@@ -1,0 +1,99 @@
+#include "BenchmarkUtils.hpp"
+#include "LoggingSystem.hpp"
+#include <iostream>
+#include <thread>
+#include <chrono>
+#include <vector>
+#include <future>
+#include <optional>
+#include <filesystem>
+#include <numeric>
+
+void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
+{
+    for (const auto &batchWithDest : batches)
+    {
+        if (!loggingSystem.appendBatch(batchWithDest.first, batchWithDest.second))
+        {
+            std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
+                      << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
+        }
+        // Add a small delay after batch operations to simulate real-world patterns
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+}
+
+int main()
+{
+    // system parameters
+    LoggingConfig config;
+    config.basePath = "./logs";
+    config.baseFilename = "gdpr_audit";
+    config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+    config.maxAttempts = 5;
+    config.baseRetryDelay = std::chrono::milliseconds(1);
+    config.queueCapacity = 1000000;
+    config.batchSize = 750;
+    config.numWriterThreads = 4;
+    config.appendTimeout = std::chrono::minutes(2);
+    // benchmark parameters
+    const int numProducerThreads = 25;
+    const int entriesPerProducer = 900000;
+    const int numSpecificFiles = 25;
+    const int producerBatchSize = 100;
+
+    cleanupLogDirectory(config.basePath);
+
+    std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
+    std::vector<std::vector<BatchWithDestination>> allBatches(numProducerThreads);
+    for (int i = 0; i < numProducerThreads; i++)
+    {
+        std::string userId = "user" + std::to_string(i);
+        allBatches[i] = generateBatches(entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
+    }
+
+    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    double totalDataSizeGB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
+    std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes (" << totalDataSizeGB << " GB)" << std::endl;
+
+    LoggingSystem loggingSystem(config);
+    loggingSystem.start();
+    auto startTime = std::chrono::high_resolution_clock::now();
+
+    std::vector<std::future<void>> futures;
+    for (int i = 0; i < numProducerThreads; i++)
+    {
+        futures.push_back(std::async(
+            std::launch::async,
+            appendLogEntries,
+            std::ref(loggingSystem),
+            std::ref(allBatches[i])));
+    }
+
+    for (auto &future : futures)
+    {
+        future.wait();
+    }
+
+    auto endTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = endTime - startTime;
+    std::cout << "All log entries appended" << std::endl;
+    loggingSystem.stop(true);
+
+    double elapsedSeconds = elapsed.count();
+    const size_t totalEntries = numProducerThreads * entriesPerProducer;
+    double entriesThroughput = totalEntries / elapsedSeconds;
+    double dataThroughputGB = totalDataSizeGB / elapsedSeconds;
+    double averageEntrySize = static_cast<double>(totalDataSizeBytes) / totalEntries;
+
+    std::cout << "============== Benchmark Results ==============" << std::endl;
+    std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
+    std::cout << "Total entries appended: " << totalEntries << std::endl;
+    std::cout << "Average entry size: " << averageEntrySize << " bytes" << std::endl;
+    std::cout << "Total data written: " << totalDataSizeGB << " GB" << std::endl;
+    std::cout << "Throughput (entries): " << entriesThroughput << " entries/second" << std::endl;
+    std::cout << "Throughput (data): " << dataThroughputGB << " GB/second" << std::endl;
+    std::cout << "===============================================" << std::endl;
+
+    return 0;
+}

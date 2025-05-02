@@ -1,3 +1,4 @@
+#include "BenchmarkUtils.hpp"
 #include "LoggingSystem.hpp"
 #include <iostream>
 #include <thread>
@@ -7,53 +8,6 @@
 #include <optional>
 #include <iomanip>
 #include <filesystem>
-
-using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
-
-std::vector<BatchWithDestination> generateBatches(int numEntries, const std::string &userId, int numSpecificFiles, int batchSize)
-{
-    std::vector<BatchWithDestination> batches;
-
-    // Generate specific filenames based on the parameter
-    std::vector<std::string> specificFilenames;
-    for (int i = 0; i < numSpecificFiles; i++)
-    {
-        specificFilenames.push_back("specific_log_file" + std::to_string(i + 1) + ".log");
-    }
-
-    int totalChoices = numSpecificFiles + 1; // +1 for default (std::nullopt)
-    int generated = 0;
-    int destinationIndex = 0;
-
-    while (generated < numEntries)
-    {
-        int currentBatchSize = std::min(batchSize, numEntries - generated);
-
-        // Deterministically assign a destination (cycling through options)
-        std::optional<std::string> targetFilename = std::nullopt;
-        if (destinationIndex % totalChoices > 0)
-        {
-            targetFilename = specificFilenames[(destinationIndex % totalChoices) - 1];
-        }
-
-        // Generate the batch
-        std::vector<LogEntry> batch;
-        batch.reserve(currentBatchSize);
-        for (int i = 0; i < currentBatchSize; i++)
-        {
-            std::string dataLocation = "database/table/row" + std::to_string(generated + i);
-            std::string dataSubjectId = "subject" + std::to_string((generated + i) % 10);
-            LogEntry entry(LogEntry::ActionType::CREATE, dataLocation, userId, dataSubjectId);
-            batch.push_back(entry);
-        }
-
-        batches.push_back({batch, targetFilename});
-        generated += currentBatchSize;
-        destinationIndex++; // Move to the next destination
-    }
-
-    return batches;
-}
 
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
 {
@@ -70,7 +24,6 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-// Function to count the number of log files in the log directory
 int countLogFiles(const std::string &basePath)
 {
     int count = 0;
@@ -82,24 +35,6 @@ int countLogFiles(const std::string &basePath)
         }
     }
     return count;
-}
-
-void cleanupLogDirectory(const std::string &logDir)
-{
-    try
-    {
-        if (std::filesystem::exists(logDir))
-        {
-            for (const auto &entry : std::filesystem::directory_iterator(logDir))
-            {
-                std::filesystem::remove_all(entry.path());
-            }
-        }
-    }
-    catch (const std::exception &e)
-    {
-        std::cerr << "Error cleaning log directory: " << e.what() << std::endl;
-    }
 }
 
 double runFileRotationBenchmark(
@@ -118,7 +53,6 @@ double runFileRotationBenchmark(
     config.basePath = logDir;
     config.maxSegmentSize = maxSegmentSizeKB * 1024; // Convert KB to bytes
 
-    // Pre-generate all batches with destinations for all threads
     std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
 
     std::vector<std::vector<BatchWithDestination>> allBatches(numProducerThreads);
@@ -134,7 +68,6 @@ double runFileRotationBenchmark(
     loggingSystem.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    // Create multiple producer threads to append pre-generated batches
     std::vector<std::future<void>> futures;
     for (int i = 0; i < numProducerThreads; i++)
     {
@@ -145,7 +78,6 @@ double runFileRotationBenchmark(
             std::ref(allBatches[i])));
     }
 
-    // Wait for all producer threads to complete
     for (auto &future : futures)
     {
         future.wait();
@@ -154,10 +86,8 @@ double runFileRotationBenchmark(
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
     std::cout << "All log entries processed" << std::endl;
-
     loggingSystem.stop(true);
 
-    // Calculate and print statistics
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughput = totalEntries / elapsedSeconds;
@@ -174,13 +104,11 @@ void runFileRotationComparison(
     int producerBatchSize)
 {
 
-    // Store results for comparison
     std::vector<double> throughputs;
     std::vector<int> fileCountsPerRun;
 
     for (int segmentSize : segmentSizesKB)
     {
-        // Run the benchmark and collect throughput
         double throughput = runFileRotationBenchmark(
             baseConfig,
             segmentSize,
@@ -189,10 +117,8 @@ void runFileRotationComparison(
             numSpecificFiles,
             producerBatchSize);
 
-        // Store the results
         throughputs.push_back(throughput);
 
-        // Count log files in the directory
         std::string logDir = "./logs/rotation_" + std::to_string(segmentSize) + "kb";
         int fileCount = countLogFiles(logDir);
         fileCountsPerRun.push_back(fileCount);
@@ -234,10 +160,10 @@ int main()
     baseConfig.numWriterThreads = 4;
     baseConfig.appendTimeout = std::chrono::milliseconds(30000);
     // benchmark parameters
-    const int numSpecificFiles = 0;       // Number of specific log files
-    const int producerBatchSize = 50;     // Size of batches for batch append operations
-    const int numProducers = 20;          // Number of producer threads
-    const int entriesPerProducer = 50000; // Each producer generates this many entries
+    const int numSpecificFiles = 0;
+    const int producerBatchSize = 50;
+    const int numProducers = 20;
+    const int entriesPerProducer = 50000;
 
     std::vector<int> segmentSizesKB = {10000, 5000, 2500, 1000, 500, 100, 50};
 

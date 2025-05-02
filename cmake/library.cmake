@@ -7,6 +7,7 @@ set(LIBRARY_SOURCES
     src/Writer.cpp
     src/SegmentedStorage.cpp
     src/LoggingSystem.cpp
+    benchmarks/BenchmarkUtils.cpp
 )
 
 add_library(GDPR_Logging_lib ${LIBRARY_SOURCES})

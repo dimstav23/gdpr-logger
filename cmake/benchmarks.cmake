@@ -13,6 +13,7 @@ set(BENCHMARK_NAMES
     filepath_diversity
     queue_capacity
     encryption_usage
+    main
 )
 
 foreach(benchmark ${BENCHMARK_NAMES})
