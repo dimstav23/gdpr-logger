@@ -103,6 +103,7 @@ void cleanupLogDirectory(const std::string &logDir)
 }
 
 double runFileRotationBenchmark(
+    const LoggingConfig &baseConfig,
     int maxSegmentSizeKB,
     int numProducerThreads,
     int entriesPerProducer,
@@ -113,17 +114,9 @@ double runFileRotationBenchmark(
 
     cleanupLogDirectory(logDir);
 
-    // system parameters
-    LoggingConfig config;
+    LoggingConfig config = baseConfig;
     config.basePath = logDir;
-    config.baseFilename = "gdpr_audit";
     config.maxSegmentSize = maxSegmentSizeKB * 1024; // Convert KB to bytes
-    config.maxAttempts = 5;
-    config.baseRetryDelay = std::chrono::milliseconds(1);
-    config.queueCapacity = 200000; // Use large queue to avoid queueing effects
-    config.batchSize = 250;
-    config.numWriterThreads = 4;
-    config.appendTimeout = std::chrono::milliseconds(30000);
 
     // Pre-generate all batches with destinations for all threads
     std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
@@ -173,6 +166,7 @@ double runFileRotationBenchmark(
 }
 
 void runFileRotationComparison(
+    const LoggingConfig &baseConfig,
     const std::vector<int> &segmentSizesKB,
     int numProducerThreads,
     int entriesPerProducer,
@@ -188,6 +182,7 @@ void runFileRotationComparison(
     {
         // Run the benchmark and collect throughput
         double throughput = runFileRotationBenchmark(
+            baseConfig,
             segmentSize,
             numProducerThreads,
             entriesPerProducer,
@@ -229,6 +224,15 @@ void runFileRotationComparison(
 
 int main()
 {
+    // system parameters
+    LoggingConfig baseConfig;
+    baseConfig.baseFilename = "gdpr_audit";
+    baseConfig.maxAttempts = 5;
+    baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
+    baseConfig.queueCapacity = 200000; // Use large queue to avoid queueing effects
+    baseConfig.batchSize = 250;
+    baseConfig.numWriterThreads = 4;
+    baseConfig.appendTimeout = std::chrono::milliseconds(30000);
     // benchmark parameters
     const int numSpecificFiles = 0;       // Number of specific log files
     const int producerBatchSize = 50;     // Size of batches for batch append operations
@@ -238,6 +242,7 @@ int main()
     std::vector<int> segmentSizesKB = {10000, 5000, 2500, 1000, 500, 100, 50};
 
     runFileRotationComparison(
+        baseConfig,
         segmentSizesKB,
         numProducers,
         entriesPerProducer,

@@ -88,23 +88,14 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-// Function to run a benchmark with a specific number of target files
-double runFilepathDiversityBenchmark(int numSpecificFiles, int numProducerThreads,
+double runFilepathDiversityBenchmark(const LoggingConfig &config, int numSpecificFiles, int numProducerThreads,
                                      int entriesPerProducer, int producerBatchSize)
 {
-    // system parameters
-    LoggingConfig config;
-    config.basePath = "./logs/files_" + std::to_string(numSpecificFiles);
-    config.baseFilename = "gdpr_audit";
-    config.maxSegmentSize = 5 * 1024 * 1024; // 5 MB
-    config.maxAttempts = 5;
-    config.baseRetryDelay = std::chrono::milliseconds(1);
-    config.queueCapacity = 1000000;
-    config.batchSize = 750;
-    config.numWriterThreads = 4;
-    config.appendTimeout = std::chrono::milliseconds(300000);
+    // modify the basePath based on the numSpecificFiles
+    LoggingConfig runConfig = config;
+    runConfig.basePath = "./logs/files_" + std::to_string(numSpecificFiles);
 
-    cleanupLogDirectory(config.basePath);
+    cleanupLogDirectory(runConfig.basePath);
 
     // Pre-generate all batches with destinations for all threads
     std::cout << "Generating batches with " << numSpecificFiles << " specific files for all threads..." << std::endl;
@@ -116,7 +107,7 @@ double runFilepathDiversityBenchmark(int numSpecificFiles, int numProducerThread
     }
     std::cout << "All batches with destinations pre-generated" << std::endl;
 
-    LoggingSystem loggingSystem(config);
+    LoggingSystem loggingSystem(runConfig);
     loggingSystem.start();
 
     auto startTime = std::chrono::high_resolution_clock::now();
@@ -151,7 +142,7 @@ double runFilepathDiversityBenchmark(int numSpecificFiles, int numProducerThread
     return throughput;
 }
 
-void runFilepathDiversityComparison(const std::vector<int> &numFilesVariants,
+void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::vector<int> &numFilesVariants,
                                     int numProducerThreads, int entriesPerProducer, int producerBatchSize)
 {
     // Store results for comparison
@@ -182,6 +173,7 @@ void runFilepathDiversityComparison(const std::vector<int> &numFilesVariants,
 
         // Run the benchmark and collect throughput
         double throughput = runFilepathDiversityBenchmark(
+            baseConfig,
             fileCount,
             numProducerThreads, entriesPerProducer, producerBatchSize);
 
@@ -214,6 +206,16 @@ void runFilepathDiversityComparison(const std::vector<int> &numFilesVariants,
 
 int main()
 {
+    // system parameters
+    LoggingConfig baseConfig;
+    baseConfig.baseFilename = "gdpr_audit";
+    baseConfig.maxSegmentSize = 5 * 1024 * 1024; // 5 MB
+    baseConfig.maxAttempts = 5;
+    baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
+    baseConfig.queueCapacity = 1000000;
+    baseConfig.batchSize = 750;
+    baseConfig.numWriterThreads = 4;
+    baseConfig.appendTimeout = std::chrono::milliseconds(300000);
     // benchmark parameters
     const int numProducers = 25;
     const int entriesPerProducer = 100000;
@@ -221,7 +223,8 @@ int main()
 
     std::vector<int> numFilesVariants = {0, 1, 5, 20, 50, 100, 200, 500, 1000};
 
-    runFilepathDiversityComparison(numFilesVariants,
+    runFilepathDiversityComparison(baseConfig,
+                                   numFilesVariants,
                                    numProducers,
                                    entriesPerProducer,
                                    producerBatchSize);

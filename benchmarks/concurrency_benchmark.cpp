@@ -88,21 +88,12 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-// Function to run a benchmark with a specific number of writer threads
-void runBenchmark(int numWriterThreads, int numProducerThreads, int entriesPerProducer,
-                  int numSpecificFiles, int producerBatchSize)
+void runBenchmark(const LoggingConfig &baseConfig, int numWriterThreads, int numProducerThreads,
+                  int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
 {
-    // system parameters
-    LoggingConfig config;
+    LoggingConfig config = baseConfig;
     config.basePath = "./logs/writers_" + std::to_string(numWriterThreads);
-    config.baseFilename = "gdpr_audit";
-    config.maxSegmentSize = 1 * 1024 * 1024; // 50 MB
-    config.maxAttempts = 5;
-    config.baseRetryDelay = std::chrono::milliseconds(1);
-    config.queueCapacity = 1000000;
-    config.batchSize = 15;
     config.numWriterThreads = numWriterThreads;
-    config.appendTimeout = std::chrono::milliseconds(30000);
 
     cleanupLogDirectory(config.basePath);
 
@@ -142,12 +133,10 @@ void runBenchmark(int numWriterThreads, int numProducerThreads, int entriesPerPr
     return;
 }
 
-// Run a concurrency benchmark comparing different numbers of writer threads
-void runConcurrencyBenchmark(const std::vector<int> &writerThreadCounts,
+void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<int> &writerThreadCounts,
                              int numProducerThreads, int entriesPerProducer,
                              int numSpecificFiles, int producerBatchSize)
 {
-
     // Store results for comparison
     std::vector<double> throughputs;
     std::vector<double> times;
@@ -158,7 +147,7 @@ void runConcurrencyBenchmark(const std::vector<int> &writerThreadCounts,
 
         auto startTime = std::chrono::high_resolution_clock::now();
 
-        runBenchmark(writerCount, numProducerThreads, entriesPerProducer,
+        runBenchmark(baseConfig, writerCount, numProducerThreads, entriesPerProducer,
                      numSpecificFiles, producerBatchSize);
 
         auto endTime = std::chrono::high_resolution_clock::now();
@@ -194,14 +183,25 @@ void runConcurrencyBenchmark(const std::vector<int> &writerThreadCounts,
 
 int main()
 {
+    // system parameters
+    LoggingConfig baseConfig;
+    baseConfig.baseFilename = "gdpr_audit";
+    baseConfig.maxSegmentSize = 1 * 1024 * 1024; // 1 MB
+    baseConfig.maxAttempts = 5;
+    baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
+    baseConfig.queueCapacity = 1000000;
+    baseConfig.batchSize = 15;
+    baseConfig.appendTimeout = std::chrono::milliseconds(30000);
     // benchmark parameters
     const int numSpecificFiles = 20;
     const int producerBatchSize = 50;
     const int numProducers = 20;
     const int entriesPerProducer = 100000;
+
     std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16};
 
-    runConcurrencyBenchmark(writerThreadCounts,
+    runConcurrencyBenchmark(baseConfig,
+                            writerThreadCounts,
                             numProducers,
                             entriesPerProducer,
                             numSpecificFiles,

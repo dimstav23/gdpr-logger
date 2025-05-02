@@ -87,21 +87,12 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-// Function to run a benchmark with a specific writer batch size
-double runBatchSizeBenchmark(int writerBatchSize, int numProducerThreads,
+double runBatchSizeBenchmark(const LoggingConfig &baseConfig, int writerBatchSize, int numProducerThreads,
                              int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
 {
-    // system parameters
-    LoggingConfig config;
+    LoggingConfig config = baseConfig;
     config.basePath = "./logs/batch_" + std::to_string(writerBatchSize);
-    config.baseFilename = "gdpr_audit";
-    config.maxSegmentSize = 5 * 1024 * 1024; // 5 MB
-    config.maxAttempts = 5;
-    config.baseRetryDelay = std::chrono::milliseconds(1);
-    config.queueCapacity = 1000000;
     config.batchSize = writerBatchSize;
-    config.numWriterThreads = 4;
-    config.appendTimeout = std::chrono::milliseconds(300000);
 
     cleanupLogDirectory(config.basePath);
 
@@ -157,9 +148,9 @@ double runBatchSizeBenchmark(int writerBatchSize, int numProducerThreads,
     return throughput;
 }
 
-void runBatchSizeComparison(const std::vector<int> &batchSizes,
-                            int numProducerThreads,
-                            int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
+void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<int> &batchSizes,
+                            int numProducerThreads, int entriesPerProducer,
+                            int numSpecificFiles, int producerBatchSize)
 {
     std::vector<double> throughputs;
 
@@ -168,7 +159,7 @@ void runBatchSizeComparison(const std::vector<int> &batchSizes,
         std::cout << "\nRunning benchmark with writer batch size: " << batchSize << "..." << std::endl;
 
         double throughput = runBatchSizeBenchmark(
-            batchSize, numProducerThreads,
+            baseConfig, batchSize, numProducerThreads,
             entriesPerProducer, numSpecificFiles, producerBatchSize);
 
         throughputs.push_back(throughput);
@@ -195,6 +186,15 @@ void runBatchSizeComparison(const std::vector<int> &batchSizes,
 
 int main()
 {
+    // system parameters
+    LoggingConfig baseConfig;
+    baseConfig.baseFilename = "gdpr_audit";
+    baseConfig.maxSegmentSize = 5 * 1024 * 1024; // 5 MB
+    baseConfig.maxAttempts = 5;
+    baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
+    baseConfig.queueCapacity = 1000000;
+    baseConfig.numWriterThreads = 4;
+    baseConfig.appendTimeout = std::chrono::milliseconds(300000);
     // benchmark parameters
     const int numSpecificFiles = 20;
     const int producerBatchSize = 50;
@@ -203,7 +203,8 @@ int main()
 
     std::vector<int> batchSizes = {10, 50, 100, 250, 500, 750, 1000, 2000};
 
-    runBatchSizeComparison(batchSizes,
+    runBatchSizeComparison(baseConfig,
+                           batchSizes,
                            numProducers,
                            entriesPerProducer,
                            numSpecificFiles,

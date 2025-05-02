@@ -94,21 +94,12 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-// Function to run the benchmark with the given encryption setting
-BenchmarkResult runBenchmark(bool useEncryption, const std::vector<std::vector<BatchWithDestination>> &allBatches,
+BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption,
+                             const std::vector<std::vector<BatchWithDestination>> &allBatches,
                              int numProducerThreads, int entriesPerProducer)
 {
-    // Create config with the specified encryption setting
-    LoggingConfig config;
+    LoggingConfig config = baseConfig;
     config.basePath = useEncryption ? "./logs_encrypted" : "./logs_unencrypted";
-    config.baseFilename = "gdpr_audit";
-    config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
-    config.maxAttempts = 5;
-    config.baseRetryDelay = std::chrono::milliseconds(1);
-    config.queueCapacity = 1000000;
-    config.batchSize = 20;
-    config.numWriterThreads = 4;
-    config.appendTimeout = std::chrono::minutes(1);
     config.useEncryption = useEncryption;
 
     cleanupLogDirectory(config.basePath);
@@ -146,6 +137,16 @@ BenchmarkResult runBenchmark(bool useEncryption, const std::vector<std::vector<B
 
 int main()
 {
+    // system parameters
+    LoggingConfig baseConfig;
+    baseConfig.baseFilename = "gdpr_audit";
+    baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+    baseConfig.maxAttempts = 5;
+    baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
+    baseConfig.queueCapacity = 1000000;
+    baseConfig.batchSize = 20;
+    baseConfig.numWriterThreads = 4;
+    baseConfig.appendTimeout = std::chrono::minutes(1);
     // Benchmark parameters
     const int numProducerThreads = 20;
     const int entriesPerProducer = 100000;
@@ -163,8 +164,8 @@ int main()
     std::cout << "All batches with destinations pre-generated" << std::endl;
 
     // Run benchmarks and store results
-    BenchmarkResult resultEncrypted = runBenchmark(true, allBatches, numProducerThreads, entriesPerProducer);
-    BenchmarkResult resultUnencrypted = runBenchmark(false, allBatches, numProducerThreads, entriesPerProducer);
+    BenchmarkResult resultEncrypted = runBenchmark(baseConfig, true, allBatches, numProducerThreads, entriesPerProducer);
+    BenchmarkResult resultUnencrypted = runBenchmark(baseConfig, false, allBatches, numProducerThreads, entriesPerProducer);
 
     // Print comparison summary table
     std::cout << "\n============== ENCRYPTION BENCHMARK SUMMARY ==============" << std::endl;

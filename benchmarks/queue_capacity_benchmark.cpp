@@ -88,22 +88,9 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-// Function to run a benchmark with a specific queue capacity
-double runQueueCapacityBenchmark(int queueCapacity, int numWriterThreads, int numProducerThreads,
+double runQueueCapacityBenchmark(const LoggingConfig &config, int numProducerThreads,
                                  int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
 {
-    // system parameters
-    LoggingConfig config;
-    config.basePath = "./logs/queue_" + std::to_string(queueCapacity);
-    config.baseFilename = "gdpr_audit";
-    config.maxSegmentSize = 5 * 1024 * 1024; // 1 MB
-    config.maxAttempts = 5;
-    config.baseRetryDelay = std::chrono::milliseconds(1);
-    config.queueCapacity = queueCapacity;
-    config.batchSize = 250;                     // number of entries a single writer thread can dequeue at once at most
-    config.numWriterThreads = numWriterThreads; // Set the number of writer threads
-    config.appendTimeout = std::chrono::milliseconds(300000);
-
     cleanupLogDirectory(config.basePath);
 
     std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
@@ -149,20 +136,22 @@ double runQueueCapacityBenchmark(int queueCapacity, int numWriterThreads, int nu
     return throughput;
 }
 
-void runQueueCapacityComparison(const std::vector<int> &queueSizes,
-                                int numWriterThreads, int numProducerThreads,
+void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vector<int> &queueSizes,
+                                int numProducerThreads,
                                 int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
 {
-    // Store results for comparison
     std::vector<double> throughputs;
     std::vector<int> queueFullCounts;
     std::vector<int> maxQueueSizes;
 
     for (int queueSize : queueSizes)
     {
-        // Run the benchmark and collect throughput
+        LoggingConfig runConfig = baseConfig;
+        runConfig.queueCapacity = queueSize;
+        runConfig.basePath = "./logs/queue_" + std::to_string(queueSize);
+
         double throughput = runQueueCapacityBenchmark(
-            queueSize, numWriterThreads, numProducerThreads,
+            runConfig, numProducerThreads,
             entriesPerProducer, numSpecificFiles, producerBatchSize);
 
         throughputs.push_back(throughput);
@@ -182,23 +171,30 @@ void runQueueCapacityComparison(const std::vector<int> &queueSizes,
         double relativePerf = throughputs[i] / throughputs[0]; // Relative to smallest queue
         std::cout << std::left << std::setw(15) << queueSizes[i]
                   << std::setw(20) << std::fixed << std::setprecision(2) << throughputs[i]
-                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << "x" << std::endl;
+                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << std::endl;
     }
     std::cout << "=======================================================" << std::endl;
 }
 
 int main()
 {
+    // system parameters
+    LoggingConfig baseConfig;
+    baseConfig.baseFilename = "gdpr_audit";
+    baseConfig.maxSegmentSize = 5 * 1024 * 1024; // 5 MB
+    baseConfig.maxAttempts = 5;
+    baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
+    baseConfig.batchSize = 250;
+    baseConfig.numWriterThreads = 4;
+    baseConfig.appendTimeout = std::chrono::milliseconds(300000);
     // benchmark parameters
-    const int numWriterThreads = 4;
     const int numSpecificFiles = 20;
     const int producerBatchSize = 50;
     const int numProducers = 20;
     const int entriesPerProducer = 50000;
 
     std::vector<int> queueSizes = {2000, 10000, 50000, 100000, 200000, 500000, 1000000};
-    runQueueCapacityComparison(queueSizes,
-                               numWriterThreads,
+    runQueueCapacityComparison(baseConfig, queueSizes,
                                numProducers,
                                entriesPerProducer,
                                numSpecificFiles,
