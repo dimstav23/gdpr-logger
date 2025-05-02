@@ -53,8 +53,8 @@ int main()
     }
 
     size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
-    double totalDataSizeGB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
-    std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes (" << totalDataSizeGB << " GB)" << std::endl;
+    double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
+    std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes (" << totalDataSizeGiB << " GiB)" << std::endl;
 
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
@@ -83,16 +83,16 @@ int main()
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double entriesThroughput = totalEntries / elapsedSeconds;
-    double dataThroughputGB = totalDataSizeGB / elapsedSeconds;
+    double dataThroughputGiB = totalDataSizeGiB / elapsedSeconds;
     double averageEntrySize = static_cast<double>(totalDataSizeBytes) / totalEntries;
 
     std::cout << "============== Benchmark Results ==============" << std::endl;
     std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
     std::cout << "Total entries appended: " << totalEntries << std::endl;
     std::cout << "Average entry size: " << averageEntrySize << " bytes" << std::endl;
-    std::cout << "Total data written: " << totalDataSizeGB << " GB" << std::endl;
+    std::cout << "Total data written: " << totalDataSizeGiB << " GiB" << std::endl;
     std::cout << "Throughput (entries): " << entriesThroughput << " entries/second" << std::endl;
-    std::cout << "Throughput (data): " << dataThroughputGB << " GB/second" << std::endl;
+    std::cout << "Throughput (data): " << dataThroughputGiB << " GiB/second" << std::endl;
     std::cout << "===============================================" << std::endl;
 
     return 0;

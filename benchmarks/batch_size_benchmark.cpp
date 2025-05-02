@@ -9,6 +9,12 @@
 #include <iomanip>
 #include <filesystem>
 
+struct BenchmarkResult
+{
+    double throughputEntries;
+    double throughputGiB;
+};
+
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
 {
     for (const auto &batchWithDest : batches)
@@ -24,8 +30,8 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-double runBatchSizeBenchmark(const LoggingConfig &baseConfig, int writerBatchSize, int numProducerThreads,
-                             int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
+BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int writerBatchSize, int numProducerThreads,
+                                      int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
 {
     LoggingConfig config = baseConfig;
     config.basePath = "./logs/batch_" + std::to_string(writerBatchSize);
@@ -41,6 +47,11 @@ double runBatchSizeBenchmark(const LoggingConfig &baseConfig, int writerBatchSiz
         allBatches[i] = generateBatches(entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
     }
     std::cout << "All batches with destinations pre-generated" << std::endl;
+
+    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
+    std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes ("
+              << totalDataSizeGiB << " GiB)" << std::endl;
 
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
@@ -68,35 +79,27 @@ double runBatchSizeBenchmark(const LoggingConfig &baseConfig, int writerBatchSiz
 
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
-    double throughput = totalEntries / elapsedSeconds;
+    double throughputEntries = totalEntries / elapsedSeconds;
+    double throughputGiB = totalDataSizeGiB / elapsedSeconds;
 
-    std::cout << "============== Benchmark Results ==============" << std::endl;
-    std::cout << "Writer batch size: " << writerBatchSize << std::endl;
-    std::cout << "Number of specific log files: " << numSpecificFiles << std::endl;
-    std::cout << "Client batch size: " << producerBatchSize << std::endl;
-    std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
-    std::cout << "Total entries to process: " << totalEntries << std::endl;
-    std::cout << "Throughput: " << throughput << " entries/second" << std::endl;
-    std::cout << "===============================================" << std::endl;
-
-    return throughput;
+    return BenchmarkResult{throughputEntries, throughputGiB};
 }
 
 void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<int> &batchSizes,
                             int numProducerThreads, int entriesPerProducer,
                             int numSpecificFiles, int producerBatchSize)
 {
-    std::vector<double> throughputs;
+    std::vector<BenchmarkResult> results;
 
     for (int batchSize : batchSizes)
     {
         std::cout << "\nRunning benchmark with writer batch size: " << batchSize << "..." << std::endl;
 
-        double throughput = runBatchSizeBenchmark(
+        BenchmarkResult result = runBatchSizeBenchmark(
             baseConfig, batchSize, numProducerThreads,
             entriesPerProducer, numSpecificFiles, producerBatchSize);
 
-        throughputs.push_back(throughput);
+        results.push_back(result);
 
         // small delay between runs
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -104,18 +107,20 @@ void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<i
 
     std::cout << "\n=========== WRITER BATCH SIZE BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(15) << "Batch Size"
-              << std::setw(20) << "Throughput (entries/s)"
-              << std::setw(20) << "Relative Performance" << std::endl;
-    std::cout << "--------------------------------------------------------" << std::endl;
+              << std::setw(25) << "Throughput (entries/s)"
+              << std::setw(25) << "Throughput (GiB/s)"
+              << std::setw(25) << "Relative Performance" << std::endl;
+    std::cout << "------------------------------------------------------------------------" << std::endl;
 
     for (size_t i = 0; i < batchSizes.size(); i++)
     {
-        double relativePerf = throughputs[i] / throughputs[0];
+        double relativePerf = results[i].throughputEntries / results[0].throughputEntries;
         std::cout << std::left << std::setw(15) << batchSizes[i]
-                  << std::setw(20) << std::fixed << std::setprecision(2) << throughputs[i]
-                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << "x" << std::endl;
+                  << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
+                  << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
+                  << std::setw(25) << std::fixed << std::setprecision(2) << relativePerf << "x" << std::endl;
     }
-    std::cout << "=========================================================" << std::endl;
+    std::cout << "========================================================================" << std::endl;
 }
 
 int main()

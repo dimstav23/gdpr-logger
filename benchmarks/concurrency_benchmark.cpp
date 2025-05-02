@@ -9,6 +9,13 @@
 #include <iomanip>
 #include <filesystem>
 
+struct BenchmarkResult
+{
+    double executionTime;
+    double throughputEntries;
+    double throughputGiB;
+};
+
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
 {
     for (const auto &batchWithDest : batches)
@@ -23,8 +30,8 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-void runBenchmark(const LoggingConfig &baseConfig, int numWriterThreads, int numProducerThreads,
-                  int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
+BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThreads, int numProducerThreads,
+                             int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
 {
     LoggingConfig config = baseConfig;
     config.basePath = "./logs/writers_" + std::to_string(numWriterThreads);
@@ -41,8 +48,14 @@ void runBenchmark(const LoggingConfig &baseConfig, int numWriterThreads, int num
     }
     std::cout << "All batches with destinations pre-generated" << std::endl;
 
+    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
+    std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes ("
+              << totalDataSizeGiB << " GiB)" << std::endl;
+
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
+    auto startTime = std::chrono::high_resolution_clock::now();
 
     std::vector<std::future<void>> futures;
     for (int i = 0; i < numProducerThreads; i++)
@@ -59,57 +72,53 @@ void runBenchmark(const LoggingConfig &baseConfig, int numWriterThreads, int num
         future.wait();
     }
 
+    auto endTime = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double> elapsed = endTime - startTime;
     std::cout << "All log entries appended" << std::endl;
     loggingSystem.stop(true);
 
-    return;
+    double elapsedSeconds = elapsed.count();
+    const size_t totalEntries = numProducerThreads * entriesPerProducer;
+    double throughputEntries = totalEntries / elapsedSeconds;
+    double throughputGiB = totalDataSizeGiB / elapsedSeconds;
+
+    return BenchmarkResult{elapsedSeconds, throughputEntries, throughputGiB};
 }
 
 void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<int> &writerThreadCounts,
                              int numProducerThreads, int entriesPerProducer,
                              int numSpecificFiles, int producerBatchSize)
 {
-    std::vector<double> throughputs;
-    std::vector<double> times;
+    std::vector<BenchmarkResult> results;
 
     for (int writerCount : writerThreadCounts)
     {
         std::cout << "\nRunning benchmark with " << writerCount << " writer thread(s)..." << std::endl;
 
-        auto startTime = std::chrono::high_resolution_clock::now();
+        BenchmarkResult result = runBenchmark(baseConfig, writerCount, numProducerThreads, entriesPerProducer,
+                                              numSpecificFiles, producerBatchSize);
 
-        runBenchmark(baseConfig, writerCount, numProducerThreads, entriesPerProducer,
-                     numSpecificFiles, producerBatchSize);
-
-        auto endTime = std::chrono::high_resolution_clock::now();
-        std::chrono::duration<double> elapsed = endTime - startTime;
-
-        double elapsedSeconds = elapsed.count();
-        const size_t totalEntries = numProducerThreads * entriesPerProducer;
-        double throughput = totalEntries / elapsedSeconds;
-
-        throughputs.push_back(throughput);
-        times.push_back(elapsedSeconds);
+        results.push_back(result);
     }
 
     std::cout << "\n=================== CONCURRENCY BENCHMARK SUMMARY ===================" << std::endl;
     std::cout << std::left << std::setw(20) << "Writer Threads"
               << std::setw(25) << "Throughput (entries/s)"
-              << std::setw(25) << "Time (seconds)"
-              << std::setw(10) << "Speedup vs. 1 Thread" << std::endl;
-    std::cout << "---------------------------------------------------------------------" << std::endl;
+              << std::setw(25) << "Throughput (GiB/s)"
+              << std::setw(15) << "Speedup vs. 1" << std::endl;
+    std::cout << "-------------------------------------------------------------------------" << std::endl;
 
-    double baselineThroughput = throughputs[0];
+    double baselineThroughputEntries = results[0].throughputEntries;
 
     for (size_t i = 0; i < writerThreadCounts.size(); i++)
     {
-        double speedup = throughputs[i] / baselineThroughput;
+        double speedup = results[i].throughputEntries / baselineThroughputEntries;
         std::cout << std::left << std::setw(20) << writerThreadCounts[i]
-                  << std::setw(25) << std::fixed << std::setprecision(2) << throughputs[i]
-                  << std::setw(25) << std::fixed << std::setprecision(2) << times[i]
-                  << std::setw(10) << std::fixed << std::setprecision(2) << speedup << std::endl;
+                  << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
+                  << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
+                  << std::setw(15) << std::fixed << std::setprecision(2) << speedup << std::endl;
     }
-    std::cout << "=====================================================================" << std::endl;
+    std::cout << "=========================================================================" << std::endl;
 }
 
 int main()

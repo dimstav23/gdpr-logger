@@ -9,6 +9,12 @@
 #include <iomanip>
 #include <filesystem>
 
+struct BenchmarkResult
+{
+    double throughputEntries;
+    double throughputGiB;
+};
+
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
 {
     for (const auto &batchWithDest : batches)
@@ -24,8 +30,8 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-double runFilepathDiversityBenchmark(const LoggingConfig &config, int numSpecificFiles, int numProducerThreads,
-                                     int entriesPerProducer, int producerBatchSize)
+BenchmarkResult runFilepathDiversityBenchmark(const LoggingConfig &config, int numSpecificFiles, int numProducerThreads,
+                                              int entriesPerProducer, int producerBatchSize)
 {
     LoggingConfig runConfig = config;
     runConfig.basePath = "./logs/files_" + std::to_string(numSpecificFiles);
@@ -40,6 +46,12 @@ double runFilepathDiversityBenchmark(const LoggingConfig &config, int numSpecifi
         allBatches[i] = generateBatches(entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
     }
     std::cout << "All batches with destinations pre-generated" << std::endl;
+
+    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
+
+    std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes ("
+              << totalDataSizeGiB << " GiB)" << std::endl;
 
     LoggingSystem loggingSystem(runConfig);
     loggingSystem.start();
@@ -68,15 +80,16 @@ double runFilepathDiversityBenchmark(const LoggingConfig &config, int numSpecifi
 
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
-    double throughput = totalEntries / elapsedSeconds;
+    double throughputEntries = totalEntries / elapsedSeconds;
+    double throughputGiB = totalDataSizeGiB / elapsedSeconds;
 
-    return throughput;
+    return BenchmarkResult{throughputEntries, throughputGiB};
 }
 
 void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::vector<int> &numFilesVariants,
                                     int numProducerThreads, int entriesPerProducer, int producerBatchSize)
 {
-    std::vector<double> throughputs;
+    std::vector<BenchmarkResult> results;
     std::vector<std::string> descriptions;
 
     for (int fileCount : numFilesVariants)
@@ -100,12 +113,12 @@ void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::
         int fileCount = numFilesVariants[i];
         std::cout << "\nRunning benchmark with " << descriptions[i] << "..." << std::endl;
 
-        double throughput = runFilepathDiversityBenchmark(
+        BenchmarkResult result = runFilepathDiversityBenchmark(
             baseConfig,
             fileCount,
             numProducerThreads, entriesPerProducer, producerBatchSize);
 
-        throughputs.push_back(throughput);
+        results.push_back(result);
 
         // Add a small delay between runs
         std::this_thread::sleep_for(std::chrono::seconds(1));
@@ -113,21 +126,23 @@ void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::
 
     std::cout << "\n=========== FILEPATH DIVERSITY BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(30) << "Configuration"
-              << std::setw(20) << "Throughput (entries/s)"
+              << std::setw(25) << "Throughput (entries/s)"
+              << std::setw(25) << "Throughput (GiB/s)"
               << std::setw(20) << "Relative Performance" << std::endl;
-    std::cout << "-----------------------------------------------------------" << std::endl;
+    std::cout << "------------------------------------------------------------------------" << std::endl;
 
     // Calculate base throughput for relative performance
-    double baseThroughput = throughputs[0];
+    double baseThroughputEntries = results[0].throughputEntries;
 
     for (size_t i = 0; i < numFilesVariants.size(); i++)
     {
-        double relativePerf = throughputs[i] / baseThroughput;
+        double relativePerf = results[i].throughputEntries / baseThroughputEntries;
         std::cout << std::left << std::setw(30) << descriptions[i]
-                  << std::setw(20) << std::fixed << std::setprecision(2) << throughputs[i]
+                  << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
+                  << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
                   << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << "x" << std::endl;
     }
-    std::cout << "===========================================================" << std::endl;
+    std::cout << "========================================================================" << std::endl;
 }
 
 int main()

@@ -14,7 +14,9 @@ struct BenchmarkResult
     bool useEncryption;
     double executionTime;
     size_t totalEntries;
-    double throughput;
+    double throughputEntries;
+    size_t totalDataSizeBytes;
+    double throughputGiB;
 };
 
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
@@ -41,6 +43,12 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
 
     cleanupLogDirectory(config.basePath);
 
+    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
+    std::cout << (useEncryption ? "Encrypted" : "Unencrypted")
+              << " benchmark - Total data to be written: " << totalDataSizeBytes
+              << " bytes (" << totalDataSizeGiB << " GiB)" << std::endl;
+
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
     auto startTime = std::chrono::high_resolution_clock::now();
@@ -66,8 +74,16 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
 
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
-    double throughput = totalEntries / elapsedSeconds;
-    return BenchmarkResult{useEncryption, elapsedSeconds, totalEntries, throughput};
+    double throughputEntries = totalEntries / elapsedSeconds;
+    double throughputGiB = totalDataSizeGiB / elapsedSeconds;
+
+    return BenchmarkResult{
+        useEncryption,
+        elapsedSeconds,
+        totalEntries,
+        throughputEntries,
+        totalDataSizeBytes,
+        throughputGiB};
 }
 
 int main()
@@ -100,25 +116,36 @@ int main()
     BenchmarkResult resultEncrypted = runBenchmark(baseConfig, true, allBatches, numProducerThreads, entriesPerProducer);
     BenchmarkResult resultUnencrypted = runBenchmark(baseConfig, false, allBatches, numProducerThreads, entriesPerProducer);
 
+    double averageEntrySize = static_cast<double>(resultUnencrypted.totalDataSizeBytes) /
+                              resultUnencrypted.totalEntries;
+
     std::cout << "\n============== ENCRYPTION BENCHMARK SUMMARY ==============" << std::endl;
+    std::cout << "Average entry size: " << std::fixed << std::setprecision(2)
+              << averageEntrySize << " bytes" << std::endl;
+    std::cout << "Total data size: " << std::fixed << std::setprecision(3)
+              << (static_cast<double>(resultUnencrypted.totalDataSizeBytes) / (1024 * 1024 * 1024))
+              << " GiB" << std::endl;
     std::cout << std::left << std::setw(15) << "Encryption"
               << std::setw(20) << "Execution Time (s)"
               << std::setw(25) << "Throughput (entries/s)"
+              << std::setw(20) << "Throughput (GiB/s)"
               << std::setw(20) << "Relative Performance" << std::endl;
-    std::cout << "--------------------------------------------------------" << std::endl;
+    std::cout << "---------------------------------------------------------------------------" << std::endl;
 
     std::cout << std::left << std::setw(15) << "Disabled"
               << std::fixed << std::setprecision(3) << std::setw(20) << resultUnencrypted.executionTime
-              << std::fixed << std::setprecision(3) << std::setw(25) << resultUnencrypted.throughput
+              << std::fixed << std::setprecision(3) << std::setw(25) << resultUnencrypted.throughputEntries
+              << std::fixed << std::setprecision(3) << std::setw(20) << resultUnencrypted.throughputGiB
               << std::fixed << std::setprecision(3) << std::setw(20) << 1.00 << std::endl;
 
-    double relativePerf = resultEncrypted.throughput / resultUnencrypted.throughput;
+    double relativePerf = resultEncrypted.throughputEntries / resultUnencrypted.throughputEntries;
     std::cout << std::left << std::setw(15) << "Enabled"
               << std::fixed << std::setprecision(3) << std::setw(20) << resultEncrypted.executionTime
-              << std::fixed << std::setprecision(3) << std::setw(25) << resultEncrypted.throughput
+              << std::fixed << std::setprecision(3) << std::setw(25) << resultEncrypted.throughputEntries
+              << std::fixed << std::setprecision(3) << std::setw(20) << resultEncrypted.throughputGiB
               << std::fixed << std::setprecision(3) << std::setw(20) << relativePerf << std::endl;
 
-    std::cout << "========================================================" << std::endl;
+    std::cout << "===========================================================================" << std::endl;
 
     return 0;
 }
