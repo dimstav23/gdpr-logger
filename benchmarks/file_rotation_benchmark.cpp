@@ -8,10 +8,8 @@
 #include <iomanip>
 #include <filesystem>
 
-// Type alias for a batch of log entries with a destination
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
-// Function to generate batches of log entries with pre-determined destinations
 std::vector<BatchWithDestination> generateBatches(int numEntries, const std::string &userId, int numSpecificFiles, int batchSize)
 {
     std::vector<BatchWithDestination> batches;
@@ -104,7 +102,6 @@ void cleanupLogDirectory(const std::string &logDir)
     }
 }
 
-// Function to run a benchmark with a specific segment size
 double runFileRotationBenchmark(
     int maxSegmentSizeKB,
     int numProducerThreads,
@@ -112,7 +109,6 @@ double runFileRotationBenchmark(
     int numSpecificFiles,
     int producerBatchSize)
 {
-    // Create a unique directory for this test run
     std::string logDir = "./logs/rotation_" + std::to_string(maxSegmentSizeKB) + "kb";
 
     cleanupLogDirectory(logDir);
@@ -125,7 +121,7 @@ double runFileRotationBenchmark(
     config.maxAttempts = 5;
     config.baseRetryDelay = std::chrono::milliseconds(1);
     config.queueCapacity = 200000; // Use large queue to avoid queueing effects
-    config.batchSize = 250;        // number of entries a single writer thread can dequeue at once at most
+    config.batchSize = 250;
     config.numWriterThreads = 4;
     config.appendTimeout = std::chrono::milliseconds(30000);
 
@@ -143,7 +139,6 @@ double runFileRotationBenchmark(
 
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
-    std::cout << "Logging system started with max segment size: " << maxSegmentSizeKB << " KB" << std::endl;
     auto startTime = std::chrono::high_resolution_clock::now();
 
     // Create multiple producer threads to append pre-generated batches
@@ -167,27 +162,12 @@ double runFileRotationBenchmark(
     std::chrono::duration<double> elapsed = endTime - startTime;
     std::cout << "All log entries processed" << std::endl;
 
-    // Count the number of log files generated
-    int logFileCount = countLogFiles(logDir);
-
-    // Stop the logging system gracefully
-    std::cout << "Stopping logging system..." << std::endl;
     loggingSystem.stop(true);
 
     // Calculate and print statistics
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughput = totalEntries / elapsedSeconds;
-
-    std::cout << "============== Benchmark Results ==============" << std::endl;
-    std::cout << "Max segment size: " << maxSegmentSizeKB << " KB" << std::endl;
-    std::cout << "Number of specific log files: " << numSpecificFiles << std::endl;
-    std::cout << "Client batch size: " << producerBatchSize << std::endl;
-    std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
-    std::cout << "Total entries processed: " << totalEntries << std::endl;
-    std::cout << "Throughput: " << throughput << " entries/second" << std::endl;
-    std::cout << "Total log files created: " << logFileCount << std::endl;
-    std::cout << "===============================================" << std::endl;
 
     return throughput;
 }
@@ -199,13 +179,6 @@ void runFileRotationComparison(
     int numSpecificFiles,
     int producerBatchSize)
 {
-    std::cout << "\n============== FILE ROTATION BENCHMARK ==============" << std::endl;
-    std::cout << "Testing performance with different maximum segment sizes" << std::endl;
-    std::cout << "Producer threads: " << numProducerThreads << std::endl;
-    std::cout << "Entries per producer: " << entriesPerProducer << std::endl;
-    std::cout << "Specific log files: " << numSpecificFiles << std::endl;
-    std::cout << "Producer batch size: " << producerBatchSize << std::endl;
-    std::cout << "======================================================" << std::endl;
 
     // Store results for comparison
     std::vector<double> throughputs;
@@ -213,8 +186,6 @@ void runFileRotationComparison(
 
     for (int segmentSize : segmentSizesKB)
     {
-        std::cout << "\nRunning benchmark with max segment size: " << segmentSize << " KB..." << std::endl;
-
         // Run the benchmark and collect throughput
         double throughput = runFileRotationBenchmark(
             segmentSize,
@@ -235,13 +206,12 @@ void runFileRotationComparison(
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    // Print comparison table
-    std::cout << "\n=========== FILE ROTATION BENCHMARK SUMMARY ===========" << std::endl;
+    std::cout << "\n========================== FILE ROTATION BENCHMARK SUMMARY ==========================" << std::endl;
     std::cout << std::left << std::setw(20) << "Segment Size (KB)"
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(20) << "Log Files Created"
               << std::setw(20) << "Relative Performance" << std::endl;
-    std::cout << "--------------------------------------------------------" << std::endl;
+    std::cout << "-------------------------------------------------------------------------------------" << std::endl;
 
     // Use the largest segment size as the baseline for relative performance
     double baselineThroughput = throughputs[0];
@@ -252,9 +222,9 @@ void runFileRotationComparison(
         std::cout << std::left << std::setw(20) << segmentSizesKB[i]
                   << std::setw(25) << std::fixed << std::setprecision(2) << throughputs[i]
                   << std::setw(20) << fileCountsPerRun[i]
-                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << "x" << std::endl;
+                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << std::endl;
     }
-    std::cout << "========================================================" << std::endl;
+    std::cout << "=====================================================================================" << std::endl;
 }
 
 int main()

@@ -8,7 +8,6 @@
 #include <iomanip>
 #include <filesystem>
 
-// Type alias for a batch of log entries with a destination
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
 void cleanupLogDirectory(const std::string &logDir)
@@ -29,7 +28,6 @@ void cleanupLogDirectory(const std::string &logDir)
     }
 }
 
-// Function to generate batches of log entries with pre-determined destinations
 std::vector<BatchWithDestination> generateBatches(int numEntries, const std::string &userId, int numSpecificFiles, int batchSize)
 {
     std::vector<BatchWithDestination> batches;
@@ -91,9 +89,8 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
 }
 
 // Function to run a benchmark with a specific number of target files
-double runFilepathDiversityBenchmark(int numSpecificFiles,
-                                     int numProducerThreads, int entriesPerProducer,
-                                     int producerBatchSize, bool verbose = true)
+double runFilepathDiversityBenchmark(int numSpecificFiles, int numProducerThreads,
+                                     int entriesPerProducer, int producerBatchSize)
 {
     // system parameters
     LoggingConfig config;
@@ -110,28 +107,17 @@ double runFilepathDiversityBenchmark(int numSpecificFiles,
     cleanupLogDirectory(config.basePath);
 
     // Pre-generate all batches with destinations for all threads
-    if (verbose)
-    {
-        std::cout << "Generating batches with " << numSpecificFiles << " specific files for all threads..." << std::endl;
-    }
+    std::cout << "Generating batches with " << numSpecificFiles << " specific files for all threads..." << std::endl;
     std::vector<std::vector<BatchWithDestination>> allBatches(numProducerThreads);
     for (int i = 0; i < numProducerThreads; i++)
     {
         std::string userId = "user" + std::to_string(i);
         allBatches[i] = generateBatches(entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
     }
-    if (verbose)
-    {
-        std::cout << "All batches with destinations pre-generated" << std::endl;
-    }
+    std::cout << "All batches with destinations pre-generated" << std::endl;
 
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
-    if (verbose)
-    {
-        std::cout << "Logging system started with " << numSpecificFiles << " specific files" << std::endl;
-        std::cout << "Using producer batch size: " << producerBatchSize << std::endl;
-    }
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -154,16 +140,7 @@ double runFilepathDiversityBenchmark(int numSpecificFiles,
 
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
-    if (verbose)
-    {
-        std::cout << "All log entries processed" << std::endl;
-    }
-
-    // Stop the logging system gracefully
-    if (verbose)
-    {
-        std::cout << "Stopping logging system..." << std::endl;
-    }
+    std::cout << "All log entries appended" << std::endl;
     loggingSystem.stop(true);
 
     // Calculate and print statistics
@@ -171,31 +148,12 @@ double runFilepathDiversityBenchmark(int numSpecificFiles,
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughput = totalEntries / elapsedSeconds;
 
-    if (verbose)
-    {
-        std::cout << "============== Benchmark Results ==============" << std::endl;
-        std::cout << "Number of specific log files: " << numSpecificFiles << std::endl;
-        std::cout << "Producer threads: " << numProducerThreads << std::endl;
-        std::cout << "Producer batch size: " << producerBatchSize << std::endl;
-        std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
-        std::cout << "Total entries to process: " << totalEntries << std::endl;
-        std::cout << "Throughput: " << throughput << " entries/second" << std::endl;
-        std::cout << "===============================================" << std::endl;
-    }
-
     return throughput;
 }
 
 void runFilepathDiversityComparison(const std::vector<int> &numFilesVariants,
                                     int numProducerThreads, int entriesPerProducer, int producerBatchSize)
 {
-    std::cout << "\n============== FILEPATH DIVERSITY BENCHMARK ==============" << std::endl;
-    std::cout << "Testing performance with different numbers of target log files" << std::endl;
-    std::cout << "Producer threads: " << numProducerThreads << std::endl;
-    std::cout << "Entries per producer: " << entriesPerProducer << std::endl;
-    std::cout << "Producer batch size: " << producerBatchSize << std::endl;
-    std::cout << "========================================================" << std::endl;
-
     // Store results for comparison
     std::vector<double> throughputs;
     std::vector<std::string> descriptions;
@@ -209,11 +167,11 @@ void runFilepathDiversityComparison(const std::vector<int> &numFilesVariants,
         }
         else if (fileCount == 1)
         {
-            descriptions.push_back("1 specific file + default");
+            descriptions.push_back("1 specific file");
         }
         else
         {
-            descriptions.push_back(std::to_string(fileCount) + " specific files + default");
+            descriptions.push_back(std::to_string(fileCount) + " specific files");
         }
     }
 
@@ -261,10 +219,8 @@ int main()
     const int entriesPerProducer = 100000;
     const int producerBatchSize = 100;
 
-    // Test a range of filepath diversity levels
     std::vector<int> numFilesVariants = {0, 1, 5, 20, 50, 100, 200, 500, 1000};
 
-    // Run filepath diversity benchmark
     runFilepathDiversityComparison(numFilesVariants,
                                    numProducers,
                                    entriesPerProducer,

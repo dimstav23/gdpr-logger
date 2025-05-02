@@ -8,7 +8,6 @@
 #include <iomanip>
 #include <filesystem>
 
-// Type alias for a batch of log entries with a destination
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
 void cleanupLogDirectory(const std::string &logDir)
@@ -101,8 +100,8 @@ void runBenchmark(int numWriterThreads, int numProducerThreads, int entriesPerPr
     config.maxAttempts = 5;
     config.baseRetryDelay = std::chrono::milliseconds(1);
     config.queueCapacity = 1000000;
-    config.batchSize = 15;                      // number of entries a single writer thread can dequeue at once at most
-    config.numWriterThreads = numWriterThreads; // Set the number of writer threads
+    config.batchSize = 15;
+    config.numWriterThreads = numWriterThreads;
     config.appendTimeout = std::chrono::milliseconds(30000);
 
     cleanupLogDirectory(config.basePath);
@@ -119,9 +118,6 @@ void runBenchmark(int numWriterThreads, int numProducerThreads, int entriesPerPr
 
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
-    std::cout << "Logging system started with " << numWriterThreads << " writer thread(s)" << std::endl;
-    std::cout << "Using batch size: " << producerBatchSize << std::endl;
-    auto startTime = std::chrono::high_resolution_clock::now();
 
     // Create multiple producer threads to append pre-generated batches
     std::vector<std::future<void>> futures;
@@ -140,27 +136,8 @@ void runBenchmark(int numWriterThreads, int numProducerThreads, int entriesPerPr
         future.wait();
     }
 
-    auto endTime = std::chrono::high_resolution_clock::now();
-    std::chrono::duration<double> elapsed = endTime - startTime;
     std::cout << "All log entries appended" << std::endl;
-
-    // Stop the logging system gracefully
-    std::cout << "Stopping logging system..." << std::endl;
     loggingSystem.stop(true);
-
-    // Calculate and print statistics
-    double elapsedSeconds = elapsed.count();
-    const size_t totalEntries = numProducerThreads * entriesPerProducer;
-    double throughput = totalEntries / elapsedSeconds;
-
-    std::cout << "============== Benchmark Results ==============" << std::endl;
-    std::cout << "Writer threads: " << numWriterThreads << std::endl;
-    std::cout << "Number of specific log files: " << numSpecificFiles << std::endl;
-    std::cout << "Client batch size: " << producerBatchSize << std::endl;
-    std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
-    std::cout << "Total entries appended: " << totalEntries << std::endl;
-    std::cout << "Throughput: " << throughput << " entries/second" << std::endl;
-    std::cout << "===============================================" << std::endl;
 
     return;
 }
@@ -170,13 +147,6 @@ void runConcurrencyBenchmark(const std::vector<int> &writerThreadCounts,
                              int numProducerThreads, int entriesPerProducer,
                              int numSpecificFiles, int producerBatchSize)
 {
-    std::cout << "\n=================== CONCURRENCY BENCHMARK ===================" << std::endl;
-    std::cout << "Testing performance with different numbers of writer threads" << std::endl;
-    std::cout << "Producer threads: " << numProducerThreads << std::endl;
-    std::cout << "Entries per producer: " << entriesPerProducer << std::endl;
-    std::cout << "Specific log files: " << numSpecificFiles << std::endl;
-    std::cout << "Producer batch size: " << producerBatchSize << std::endl;
-    std::cout << "===========================================================" << std::endl;
 
     // Store results for comparison
     std::vector<double> throughputs;
@@ -202,32 +172,31 @@ void runConcurrencyBenchmark(const std::vector<int> &writerThreadCounts,
         times.push_back(elapsedSeconds);
     }
 
-    // Print comparison table
-    std::cout << "\n=========== CONCURRENCY BENCHMARK SUMMARY ===========" << std::endl;
-    std::cout << std::left << std::setw(15) << "Writer Threads"
-              << std::setw(20) << "Throughput (entries/s)"
-              << std::setw(20) << "Time (seconds)"
-              << std::setw(20) << "Speedup vs. 1 Thread" << std::endl;
-    std::cout << "---------------------------------------------------" << std::endl;
+    std::cout << "\n=================== CONCURRENCY BENCHMARK SUMMARY ===================" << std::endl;
+    std::cout << std::left << std::setw(20) << "Writer Threads"
+              << std::setw(25) << "Throughput (entries/s)"
+              << std::setw(25) << "Time (seconds)"
+              << std::setw(10) << "Speedup vs. 1 Thread" << std::endl;
+    std::cout << "---------------------------------------------------------------------" << std::endl;
 
     double baselineThroughput = throughputs[0];
 
     for (size_t i = 0; i < writerThreadCounts.size(); i++)
     {
         double speedup = throughputs[i] / baselineThroughput;
-        std::cout << std::left << std::setw(15) << writerThreadCounts[i]
-                  << std::setw(20) << std::fixed << std::setprecision(2) << throughputs[i]
-                  << std::setw(20) << std::fixed << std::setprecision(2) << times[i]
-                  << std::setw(20) << std::fixed << std::setprecision(2) << speedup << "x" << std::endl;
+        std::cout << std::left << std::setw(20) << writerThreadCounts[i]
+                  << std::setw(25) << std::fixed << std::setprecision(2) << throughputs[i]
+                  << std::setw(25) << std::fixed << std::setprecision(2) << times[i]
+                  << std::setw(10) << std::fixed << std::setprecision(2) << speedup << std::endl;
     }
-    std::cout << "===================================================" << std::endl;
+    std::cout << "=====================================================================" << std::endl;
 }
 
 int main()
 {
     // benchmark parameters
-    const int numSpecificFiles = 20;  // Number of specific files to distribute logs to
-    const int producerBatchSize = 50; // Size of batches for batch append operations
+    const int numSpecificFiles = 20;
+    const int producerBatchSize = 50;
     const int numProducers = 20;
     const int entriesPerProducer = 100000;
     std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16};

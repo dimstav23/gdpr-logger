@@ -7,7 +7,6 @@
 #include <optional>
 #include <filesystem>
 
-// Type alias for a batch of log entries with a destination
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
 void cleanupLogDirectory(const std::string &logDir)
@@ -99,7 +98,7 @@ int main()
     config.queueCapacity = 1000000;
     config.batchSize = 750; // number of entries a single writer thread can dequeue at once at most
     config.numWriterThreads = 4;
-    config.appendTimeout = std::chrono::seconds(1);
+    config.appendTimeout = std::chrono::minutes(2);
 
     cleanupLogDirectory(config.basePath);
 
@@ -121,8 +120,6 @@ int main()
 
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
-    std::cout << "Logging system started" << std::endl;
-    std::cout << "Using batch size: " << producerBatchSize << std::endl;
     auto startTime = std::chrono::high_resolution_clock::now();
 
     // Create multiple producer threads to append pre-generated batches
@@ -147,7 +144,6 @@ int main()
     std::cout << "All log entries appended" << std::endl;
 
     // Stop the logging system gracefully
-    std::cout << "Stopping logging system..." << std::endl;
     loggingSystem.stop(true);
 
     // Calculate and print statistics

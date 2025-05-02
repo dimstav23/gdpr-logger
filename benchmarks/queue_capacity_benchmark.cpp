@@ -8,7 +8,6 @@
 #include <iomanip>
 #include <filesystem>
 
-// Type alias for a batch of log entries with a destination
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
 void cleanupLogDirectory(const std::string &logDir)
@@ -29,7 +28,6 @@ void cleanupLogDirectory(const std::string &logDir)
     }
 }
 
-// Function to generate batches of log entries with pre-determined destinations
 std::vector<BatchWithDestination> generateBatches(int numEntries, const std::string &userId, int numSpecificFiles, int batchSize)
 {
     std::vector<BatchWithDestination> batches;
@@ -92,8 +90,7 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
 
 // Function to run a benchmark with a specific queue capacity
 double runQueueCapacityBenchmark(int queueCapacity, int numWriterThreads, int numProducerThreads,
-                                 int entriesPerProducer, int numSpecificFiles, int producerBatchSize,
-                                 bool verbose = true)
+                                 int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
 {
     // system parameters
     LoggingConfig config;
@@ -109,30 +106,17 @@ double runQueueCapacityBenchmark(int queueCapacity, int numWriterThreads, int nu
 
     cleanupLogDirectory(config.basePath);
 
-    // Pre-generate all batches with destinations for all threads
-    if (verbose)
-    {
-        std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
-    }
+    std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
     std::vector<std::vector<BatchWithDestination>> allBatches(numProducerThreads);
     for (int i = 0; i < numProducerThreads; i++)
     {
         std::string userId = "user" + std::to_string(i);
         allBatches[i] = generateBatches(entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
     }
-    if (verbose)
-    {
-        std::cout << "All batches with destinations pre-generated" << std::endl;
-    }
+    std::cout << "All batches with destinations pre-generated" << std::endl;
 
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
-    if (verbose)
-    {
-        std::cout << "Logging system started with queue capacity: " << queueCapacity << std::endl;
-        std::cout << "Using " << numWriterThreads << " writer thread(s)" << std::endl;
-        std::cout << "Using producer batch size: " << producerBatchSize << std::endl;
-    }
     auto startTime = std::chrono::high_resolution_clock::now();
 
     // Create multiple producer threads to append pre-generated batches
@@ -154,35 +138,13 @@ double runQueueCapacityBenchmark(int queueCapacity, int numWriterThreads, int nu
 
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
-    if (verbose)
-    {
-        std::cout << "All log entries processed" << std::endl;
-    }
-
-    // Stop the logging system gracefully
-    if (verbose)
-    {
-        std::cout << "Stopping logging system..." << std::endl;
-    }
+    std::cout << "All log entries appended" << std::endl;
     loggingSystem.stop(true);
 
     // Calculate and print statistics
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughput = totalEntries / elapsedSeconds;
-
-    if (verbose)
-    {
-        std::cout << "============== Benchmark Results ==============" << std::endl;
-        std::cout << "Queue capacity: " << queueCapacity << std::endl;
-        std::cout << "Writer threads: " << numWriterThreads << std::endl;
-        std::cout << "Number of specific log files: " << numSpecificFiles << std::endl;
-        std::cout << "Client batch size: " << producerBatchSize << std::endl;
-        std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
-        std::cout << "Total entries to process: " << totalEntries << std::endl;
-        std::cout << "Throughput: " << throughput << " entries/second" << std::endl;
-        std::cout << "===============================================" << std::endl;
-    }
 
     return throughput;
 }
@@ -191,15 +153,6 @@ void runQueueCapacityComparison(const std::vector<int> &queueSizes,
                                 int numWriterThreads, int numProducerThreads,
                                 int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
 {
-    std::cout << "\n============== QUEUE CAPACITY BENCHMARK ==============" << std::endl;
-    std::cout << "Testing performance with different queue capacities" << std::endl;
-    std::cout << "Writer threads: " << numWriterThreads << std::endl;
-    std::cout << "Producer threads: " << numProducerThreads << std::endl;
-    std::cout << "Entries per producer: " << entriesPerProducer << std::endl;
-    std::cout << "Specific log files: " << numSpecificFiles << std::endl;
-    std::cout << "Producer batch size: " << producerBatchSize << std::endl;
-    std::cout << "======================================================" << std::endl;
-
     // Store results for comparison
     std::vector<double> throughputs;
     std::vector<int> queueFullCounts;
@@ -207,8 +160,6 @@ void runQueueCapacityComparison(const std::vector<int> &queueSizes,
 
     for (int queueSize : queueSizes)
     {
-        std::cout << "\nRunning benchmark with queue capacity: " << queueSize << "..." << std::endl;
-
         // Run the benchmark and collect throughput
         double throughput = runQueueCapacityBenchmark(
             queueSize, numWriterThreads, numProducerThreads,
@@ -220,7 +171,6 @@ void runQueueCapacityComparison(const std::vector<int> &queueSizes,
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
 
-    // Print comparison table
     std::cout << "\n=========== QUEUE CAPACITY BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(15) << "Queue Capacity"
               << std::setw(20) << "Throughput (entries/s)"

@@ -64,7 +64,6 @@ bool LoggingSystem::stop(bool waitForCompletion)
 
     if (!m_running.load(std::memory_order_acquire))
     {
-        std::cerr << "LoggingSystem: Not running" << std::endl;
         return false;
     }
 

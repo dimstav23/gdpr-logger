@@ -8,10 +8,8 @@
 #include <iomanip>
 #include <filesystem>
 
-// Type alias for a batch of log entries with a destination
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
-// Struct to hold benchmark results
 struct BenchmarkResult
 {
     bool useEncryption;
@@ -38,12 +36,10 @@ void cleanupLogDirectory(const std::string &logDir)
     }
 }
 
-// Function to generate batches of log entries with pre-determined destinations
 std::vector<BatchWithDestination> generateBatches(int numEntries, const std::string &userId, int numSpecificFiles, int batchSize)
 {
     std::vector<BatchWithDestination> batches;
 
-    // Generate specific filenames based on the parameter
     std::vector<std::string> specificFilenames;
     for (int i = 0; i < numSpecificFiles; i++)
     {
@@ -110,7 +106,7 @@ BenchmarkResult runBenchmark(bool useEncryption, const std::vector<std::vector<B
     config.maxAttempts = 5;
     config.baseRetryDelay = std::chrono::milliseconds(1);
     config.queueCapacity = 1000000;
-    config.batchSize = 20; // number of entries a single writer thread can dequeue at once at most
+    config.batchSize = 20;
     config.numWriterThreads = 4;
     config.appendTimeout = std::chrono::minutes(1);
     config.useEncryption = useEncryption;
@@ -142,11 +138,9 @@ BenchmarkResult runBenchmark(bool useEncryption, const std::vector<std::vector<B
     std::chrono::duration<double> elapsed = endTime - startTime;
     loggingSystem.stop(true);
 
-    // Calculate statistics
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughput = totalEntries / elapsedSeconds;
-
     return BenchmarkResult{useEncryption, elapsedSeconds, totalEntries, throughput};
 }
 
