@@ -1,0 +1,86 @@
+#include "BenchmarkUtils.hpp"
+
+void cleanupLogDirectory(const std::string &logDir)
+{
+    try
+    {
+        if (std::filesystem::exists(logDir))
+        {
+            for (const auto &entry : std::filesystem::directory_iterator(logDir))
+            {
+                std::filesystem::remove_all(entry.path());
+            }
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error cleaning log directory: " << e.what() << std::endl;
+    }
+}
+
+size_t calculateTotalDataSize(const std::vector<std::vector<BatchWithDestination>> &allBatches)
+{
+    size_t totalSize = 0;
+
+    for (const auto &threadBatches : allBatches)
+    {
+        for (const auto &batchWithDest : threadBatches)
+        {
+            for (const auto &entry : batchWithDest.first)
+            {
+                totalSize += entry.serialize().size();
+            }
+        }
+    }
+
+    return totalSize;
+}
+
+std::vector<BatchWithDestination> generateBatches(
+    int numEntries,
+    const std::string &userId,
+    int numSpecificFiles,
+    int batchSize)
+{
+    std::vector<BatchWithDestination> batches;
+
+    // Generate specific filenames based on the parameter
+    std::vector<std::string> specificFilenames;
+    for (int i = 0; i < numSpecificFiles; i++)
+    {
+        specificFilenames.push_back("specific_log_file" + std::to_string(i + 1) + ".log");
+    }
+
+    int totalChoices = numSpecificFiles + 1; // +1 for default (std::nullopt)
+    int generated = 0;
+    int destinationIndex = 0;
+
+    while (generated < numEntries)
+    {
+        int currentBatchSize = std::min(batchSize, numEntries - generated);
+
+        // Deterministically assign a destination (cycling through options)
+        std::optional<std::string> targetFilename = std::nullopt;
+        if (destinationIndex % totalChoices > 0)
+        {
+            targetFilename = specificFilenames[(destinationIndex % totalChoices) - 1];
+        }
+
+        // Generate the batch
+        std::vector<LogEntry> batch;
+        batch.reserve(currentBatchSize);
+        for (int i = 0; i < currentBatchSize; i++)
+        {
+            std::string dataLocation = "database/table/row" + std::to_string(generated + i);
+            std::string dataSubjectId = "subject" + std::to_string((generated + i) % 10);
+            LogEntry entry(LogEntry::ActionType::CREATE, dataLocation, userId, dataSubjectId);
+            batch.push_back(entry);
+        }
+
+        batches.push_back({batch, targetFilename});
+        generated += currentBatchSize;
+        destinationIndex++; // Move to the next destination
+    }
+
+    return batches;
+}

@@ -6,6 +6,7 @@
 #include <future>
 #include <optional>
 #include <filesystem>
+#include <numeric>
 
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
@@ -25,6 +26,24 @@ void cleanupLogDirectory(const std::string &logDir)
     {
         std::cerr << "Error cleaning log directory: " << e.what() << std::endl;
     }
+}
+
+size_t calculateTotalDataSize(const std::vector<std::vector<BatchWithDestination>> &allBatches)
+{
+    size_t totalSize = 0;
+
+    for (const auto &threadBatches : allBatches)
+    {
+        for (const auto &batchWithDest : threadBatches)
+        {
+            for (const auto &entry : batchWithDest.first)
+            {
+                totalSize += entry.serialize().size();
+            }
+        }
+    }
+
+    return totalSize;
 }
 
 std::vector<BatchWithDestination> generateBatches(int numEntries, const std::string &userId, int numSpecificFiles, int batchSize)
@@ -102,13 +121,12 @@ int main()
 
     // benchmark parameters
     const int numProducerThreads = 25;
-    const int entriesPerProducer = 400000;
+    const int entriesPerProducer = 900000;
     const int numSpecificFiles = 25;
     const int producerBatchSize = 100;
 
     cleanupLogDirectory(config.basePath);
 
-    // Pre-generate all batches with destinations for all threads
     std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
     std::vector<std::vector<BatchWithDestination>> allBatches(numProducerThreads);
     for (int i = 0; i < numProducerThreads; i++)
@@ -116,7 +134,11 @@ int main()
         std::string userId = "user" + std::to_string(i);
         allBatches[i] = generateBatches(entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
     }
-    std::cout << "All batches with destinations pre-generated" << std::endl;
+
+    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    double totalDataSizeGB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
+    std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes ("
+              << totalDataSizeGB << " GB)" << std::endl;
 
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
@@ -149,14 +171,17 @@ int main()
     // Calculate and print statistics
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
-    double throughput = totalEntries / elapsedSeconds;
+    double entriesThroughput = totalEntries / elapsedSeconds;
+    double dataThroughputGB = totalDataSizeGB / elapsedSeconds;
+    double averageEntrySize = static_cast<double>(totalDataSizeBytes) / totalEntries;
 
     std::cout << "============== Benchmark Results ==============" << std::endl;
-    std::cout << "Number of specific log files: " << numSpecificFiles << std::endl;
-    std::cout << "Client batch size: " << producerBatchSize << std::endl;
     std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
     std::cout << "Total entries appended: " << totalEntries << std::endl;
-    std::cout << "Throughput: " << throughput << " entries/second" << std::endl;
+    std::cout << "Average entry size: " << averageEntrySize << " bytes" << std::endl;
+    std::cout << "Total data written: " << totalDataSizeGB << " GB" << std::endl;
+    std::cout << "Throughput (entries): " << entriesThroughput << " entries/second" << std::endl;
+    std::cout << "Throughput (data): " << dataThroughputGB << " GB/second" << std::endl;
     std::cout << "===============================================" << std::endl;
 
     return 0;
