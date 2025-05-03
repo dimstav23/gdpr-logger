@@ -80,6 +80,10 @@ int main()
     std::cout << "All log entries appended" << std::endl;
     loggingSystem.stop(true);
 
+    size_t finalStorageSize = calculateDirectorySize(config.basePath);
+    double finalStorageSizeGiB = static_cast<double>(finalStorageSize) / (1024 * 1024 * 1024);
+    double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
+
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double entriesThroughput = totalEntries / elapsedSeconds;
@@ -93,6 +97,8 @@ int main()
     std::cout << "Total data written: " << totalDataSizeGiB << " GiB" << std::endl;
     std::cout << "Throughput (entries): " << entriesThroughput << " entries/second" << std::endl;
     std::cout << "Throughput (data): " << dataThroughputGiB << " GiB/second" << std::endl;
+    std::cout << "Final storage size: " << finalStorageSizeGiB << " GiB" << std::endl;
+    std::cout << "Write amplification: " << writeAmplification << " (ratio)" << std::endl;
     std::cout << "===============================================" << std::endl;
 
     return 0;

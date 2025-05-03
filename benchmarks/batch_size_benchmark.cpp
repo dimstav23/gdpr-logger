@@ -13,6 +13,7 @@ struct BenchmarkResult
 {
     double throughputEntries;
     double throughputGiB;
+    double writeAmplification;
 };
 
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
@@ -77,12 +78,18 @@ BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int write
     std::cout << "All log entries appended" << std::endl;
     loggingSystem.stop(true);
 
+    size_t finalStorageSize = calculateDirectorySize(config.basePath);
+    double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
+
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughputEntries = totalEntries / elapsedSeconds;
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
 
-    return BenchmarkResult{throughputEntries, throughputGiB};
+    return BenchmarkResult{
+        throughputEntries,
+        throughputGiB,
+        writeAmplification};
 }
 
 void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<int> &batchSizes,
@@ -108,17 +115,19 @@ void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<i
     std::cout << "\n=========== WRITER BATCH SIZE BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(15) << "Batch Size"
               << std::setw(25) << "Throughput (entries/s)"
-              << std::setw(25) << "Throughput (GiB/s)"
-              << std::setw(25) << "Relative Performance" << std::endl;
-    std::cout << "------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Throughput (GiB/s)"
+              << std::setw(20) << "Relative Perf"
+              << std::setw(20) << "Write Amplification" << std::endl;
+    std::cout << "--------------------------------------------------------------------------------------------------------" << std::endl;
 
     for (size_t i = 0; i < batchSizes.size(); i++)
     {
         double relativePerf = results[i].throughputEntries / results[0].throughputEntries;
         std::cout << std::left << std::setw(15) << batchSizes[i]
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
-                  << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
-                  << std::setw(25) << std::fixed << std::setprecision(2) << relativePerf << "x" << std::endl;
+                  << std::setw(20) << std::fixed << std::setprecision(3) << results[i].throughputGiB
+                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf
+                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification << std::endl;
     }
     std::cout << "========================================================================" << std::endl;
 }

@@ -17,6 +17,7 @@ struct BenchmarkResult
     double throughputEntries;
     size_t totalDataSizeBytes;
     double throughputGiB;
+    double writeAmplification;
 };
 
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
@@ -72,6 +73,9 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
     std::chrono::duration<double> elapsed = endTime - startTime;
     loggingSystem.stop(true);
 
+    size_t finalStorageSize = calculateDirectorySize(config.basePath);
+    double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
+
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughputEntries = totalEntries / elapsedSeconds;
@@ -83,7 +87,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
         totalEntries,
         throughputEntries,
         totalDataSizeBytes,
-        throughputGiB};
+        throughputGiB,
+        writeAmplification};
 }
 
 int main()
@@ -116,34 +121,29 @@ int main()
     BenchmarkResult resultEncrypted = runBenchmark(baseConfig, true, allBatches, numProducerThreads, entriesPerProducer);
     BenchmarkResult resultUnencrypted = runBenchmark(baseConfig, false, allBatches, numProducerThreads, entriesPerProducer);
 
-    double averageEntrySize = static_cast<double>(resultUnencrypted.totalDataSizeBytes) /
-                              resultUnencrypted.totalEntries;
-
     std::cout << "\n============== ENCRYPTION BENCHMARK SUMMARY ==============" << std::endl;
-    std::cout << "Average entry size: " << std::fixed << std::setprecision(2)
-              << averageEntrySize << " bytes" << std::endl;
-    std::cout << "Total data size: " << std::fixed << std::setprecision(3)
-              << (static_cast<double>(resultUnencrypted.totalDataSizeBytes) / (1024 * 1024 * 1024))
-              << " GiB" << std::endl;
     std::cout << std::left << std::setw(15) << "Encryption"
               << std::setw(20) << "Execution Time (s)"
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(20) << "Throughput (GiB/s)"
-              << std::setw(20) << "Relative Performance" << std::endl;
-    std::cout << "---------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Relative Performance"
+              << std::setw(20) << "Write Amplification" << std::endl;
+    std::cout << "-------------------------------------------------------------------------------------------------------" << std::endl;
 
     std::cout << std::left << std::setw(15) << "Disabled"
               << std::fixed << std::setprecision(3) << std::setw(20) << resultUnencrypted.executionTime
               << std::fixed << std::setprecision(3) << std::setw(25) << resultUnencrypted.throughputEntries
               << std::fixed << std::setprecision(3) << std::setw(20) << resultUnencrypted.throughputGiB
-              << std::fixed << std::setprecision(3) << std::setw(20) << 1.00 << std::endl;
+              << std::fixed << std::setprecision(3) << std::setw(20) << 1.00
+              << std::fixed << std::setprecision(3) << std::setw(20) << resultUnencrypted.writeAmplification << std::endl;
 
     double relativePerf = resultEncrypted.throughputEntries / resultUnencrypted.throughputEntries;
     std::cout << std::left << std::setw(15) << "Enabled"
               << std::fixed << std::setprecision(3) << std::setw(20) << resultEncrypted.executionTime
               << std::fixed << std::setprecision(3) << std::setw(25) << resultEncrypted.throughputEntries
               << std::fixed << std::setprecision(3) << std::setw(20) << resultEncrypted.throughputGiB
-              << std::fixed << std::setprecision(3) << std::setw(20) << relativePerf << std::endl;
+              << std::fixed << std::setprecision(3) << std::setw(20) << relativePerf
+              << std::fixed << std::setprecision(3) << std::setw(20) << resultEncrypted.writeAmplification << std::endl;
 
     std::cout << "===========================================================================" << std::endl;
 

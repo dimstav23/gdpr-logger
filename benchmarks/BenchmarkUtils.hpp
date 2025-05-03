@@ -14,6 +14,8 @@ void cleanupLogDirectory(const std::string &logDir);
 
 size_t calculateTotalDataSize(const std::vector<std::vector<BatchWithDestination>> &allBatches);
 
+size_t calculateDirectorySize(const std::string &dirPath);
+
 std::vector<BatchWithDestination> generateBatches(
     int numEntries,
     const std::string &userId,

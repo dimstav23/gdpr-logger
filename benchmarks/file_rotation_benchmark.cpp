@@ -14,6 +14,7 @@ struct BenchmarkResult
     double throughputEntries;
     double throughputGiB;
     int fileCount;
+    double writeAmplification;
 };
 
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
@@ -101,13 +102,20 @@ BenchmarkResult runFileRotationBenchmark(
     std::cout << "All log entries processed" << std::endl;
     loggingSystem.stop(true);
 
+    size_t finalStorageSize = calculateDirectorySize(logDir);
+    double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
+
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughputEntries = totalEntries / elapsedSeconds;
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
     int fileCount = countLogFiles(logDir);
 
-    return BenchmarkResult{throughputEntries, throughputGiB, fileCount};
+    return BenchmarkResult{
+        throughputEntries,
+        throughputGiB,
+        fileCount,
+        writeAmplification};
 }
 
 void runFileRotationComparison(
@@ -141,8 +149,9 @@ void runFileRotationComparison(
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(25) << "Throughput (GiB/s)"
               << std::setw(20) << "Log Files Created"
+              << std::setw(20) << "Write Amplification"
               << std::setw(20) << "Relative Performance" << std::endl;
-    std::cout << "-------------------------------------------------------------------------------------" << std::endl;
+    std::cout << "------------------------------------------------------------------------------------------------" << std::endl;
 
     // Use the first segment size as the baseline for relative performance
     double baselineThroughput = results[0].throughputEntries;
@@ -154,9 +163,10 @@ void runFileRotationComparison(
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
                   << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
                   << std::setw(20) << results[i].fileCount
+                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
                   << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << std::endl;
     }
-    std::cout << "=====================================================================================" << std::endl;
+    std::cout << "================================================================================================" << std::endl;
 }
 
 int main()

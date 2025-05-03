@@ -14,6 +14,7 @@ struct BenchmarkResult
     double executionTime;
     double throughputEntries;
     double throughputGiB;
+    double writeAmplification;
 };
 
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
@@ -77,12 +78,19 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
     std::cout << "All log entries appended" << std::endl;
     loggingSystem.stop(true);
 
+    size_t finalStorageSize = calculateDirectorySize(config.basePath);
+    double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
+
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughputEntries = totalEntries / elapsedSeconds;
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
 
-    return BenchmarkResult{elapsedSeconds, throughputEntries, throughputGiB};
+    return BenchmarkResult{
+        elapsedSeconds,
+        throughputEntries,
+        throughputGiB,
+        writeAmplification};
 }
 
 void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<int> &writerThreadCounts,
@@ -104,9 +112,10 @@ void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<
     std::cout << "\n=================== CONCURRENCY BENCHMARK SUMMARY ===================" << std::endl;
     std::cout << std::left << std::setw(20) << "Writer Threads"
               << std::setw(25) << "Throughput (entries/s)"
-              << std::setw(25) << "Throughput (GiB/s)"
-              << std::setw(15) << "Speedup vs. 1" << std::endl;
-    std::cout << "-------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Throughput (GiB/s)"
+              << std::setw(15) << "Speedup vs. 1"
+              << std::setw(20) << "Write Amplification" << std::endl;
+    std::cout << "-----------------------------------------------------------------------------------------------------------" << std::endl;
 
     double baselineThroughputEntries = results[0].throughputEntries;
 
@@ -115,10 +124,11 @@ void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<
         double speedup = results[i].throughputEntries / baselineThroughputEntries;
         std::cout << std::left << std::setw(20) << writerThreadCounts[i]
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
-                  << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
-                  << std::setw(15) << std::fixed << std::setprecision(2) << speedup << std::endl;
+                  << std::setw(20) << std::fixed << std::setprecision(3) << results[i].throughputGiB
+                  << std::setw(15) << std::fixed << std::setprecision(2) << speedup
+                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification << std::endl;
     }
-    std::cout << "=========================================================================" << std::endl;
+    std::cout << "==========================================================================================================" << std::endl;
 }
 
 int main()

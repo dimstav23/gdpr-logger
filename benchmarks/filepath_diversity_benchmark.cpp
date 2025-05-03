@@ -13,6 +13,7 @@ struct BenchmarkResult
 {
     double throughputEntries;
     double throughputGiB;
+    double writeAmplification;
 };
 
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
@@ -78,12 +79,18 @@ BenchmarkResult runFilepathDiversityBenchmark(const LoggingConfig &config, int n
     std::cout << "All log entries appended" << std::endl;
     loggingSystem.stop(true);
 
+    size_t finalStorageSize = calculateDirectorySize(runConfig.basePath);
+    double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
+
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughputEntries = totalEntries / elapsedSeconds;
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
 
-    return BenchmarkResult{throughputEntries, throughputGiB};
+    return BenchmarkResult{
+        throughputEntries,
+        throughputGiB,
+        writeAmplification};
 }
 
 void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::vector<int> &numFilesVariants,
@@ -128,8 +135,9 @@ void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::
     std::cout << std::left << std::setw(30) << "Configuration"
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(25) << "Throughput (GiB/s)"
+              << std::setw(20) << "Write Amplification"
               << std::setw(20) << "Relative Performance" << std::endl;
-    std::cout << "------------------------------------------------------------------------" << std::endl;
+    std::cout << "------------------------------------------------------------------------------" << std::endl;
 
     // Calculate base throughput for relative performance
     double baseThroughputEntries = results[0].throughputEntries;
@@ -140,9 +148,10 @@ void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::
         std::cout << std::left << std::setw(30) << descriptions[i]
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
                   << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
-                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << "x" << std::endl;
+                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
+                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << std::endl;
     }
-    std::cout << "========================================================================" << std::endl;
+    std::cout << "==============================================================================" << std::endl;
 }
 
 int main()

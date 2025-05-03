@@ -36,6 +36,19 @@ size_t calculateTotalDataSize(const std::vector<std::vector<BatchWithDestination
     return totalSize;
 }
 
+size_t calculateDirectorySize(const std::string &dirPath)
+{
+    size_t totalSize = 0;
+    for (const auto &entry : std::filesystem::recursive_directory_iterator(dirPath))
+    {
+        if (entry.is_regular_file())
+        {
+            totalSize += std::filesystem::file_size(entry.path());
+        }
+    }
+    return totalSize;
+}
+
 std::vector<BatchWithDestination> generateBatches(
     int numEntries,
     const std::string &userId,
