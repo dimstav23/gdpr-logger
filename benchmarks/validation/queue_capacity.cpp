@@ -103,7 +103,7 @@ void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vect
         results.push_back(result);
 
         // Add a small delay between runs
-        std::this_thread::sleep_for(std::chrono::seconds(2));
+        std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 
     std::cout << "\n=========== QUEUE CAPACITY BENCHMARK SUMMARY ===========" << std::endl;
@@ -141,7 +141,7 @@ int main()
     const int numSpecificFiles = 20;
     const int producerBatchSize = 50;
     const int numProducers = 20;
-    const int entriesPerProducer = 50000;
+    const int entriesPerProducer = 125000;
 
     std::vector<int> queueSizes = {10000, 50000, 100000, 200000, 500000, 1000000};
     runQueueCapacityComparison(baseConfig, queueSizes,
