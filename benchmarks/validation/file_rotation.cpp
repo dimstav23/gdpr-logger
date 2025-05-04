@@ -134,7 +134,7 @@ void runFileRotationComparison(
         results.push_back(result);
 
         // Add a small delay between runs
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 
     std::cout << "\n========================== FILE ROTATION BENCHMARK SUMMARY ==========================" << std::endl;
@@ -169,7 +169,7 @@ int main()
     baseConfig.baseFilename = "gdpr_audit";
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.queueCapacity = 200000; // Use large queue to avoid queueing effects
+    baseConfig.queueCapacity = 200000;
     baseConfig.batchSize = 250;
     baseConfig.numWriterThreads = 4;
     baseConfig.appendTimeout = std::chrono::milliseconds(30000);
@@ -177,9 +177,9 @@ int main()
     const int numSpecificFiles = 0;
     const int producerBatchSize = 50;
     const int numProducers = 20;
-    const int entriesPerProducer = 50000;
+    const int entriesPerProducer = 250000;
 
-    std::vector<int> segmentSizesKB = {10000, 5000, 2500, 1000, 500, 100, 50};
+    std::vector<int> segmentSizesKB = {100, 500, 1000, 2500, 5000, 10000, 20000};
 
     runFileRotationComparison(
         baseConfig,
