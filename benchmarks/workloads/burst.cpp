@@ -42,21 +42,10 @@ int main()
 
     cleanupLogDirectory(config.basePath);
 
-    std::cout << "Generating burst batches for burst-pattern benchmark..." << std::endl;
-
-    std::string userId = "burst_user";
-    std::vector<BatchWithDestination> batches = generateBatches(entriesPerBurst, userId, numSpecificFiles, producerBatchSize);
-
-    size_t totalDataSizePerBurst = 0;
-    for (const auto &batchWithDest : batches)
-    {
-        for (const auto &entry : batchWithDest.first)
-        {
-            totalDataSizePerBurst += entry.serialize().size();
-        }
-    }
-
-    size_t totalDataSizeBytes = totalDataSizePerBurst * numBursts;
+    std::cout << "Generating burst batches for burst-pattern benchmark...";
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerBurst, numSpecificFiles, producerBatchSize);
+    std::cout << " Done." << std::endl;
+    size_t totalDataSizeBytes = calculateTotalDataSize(batches, numBursts);
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
 
     LoggingSystem loggingSystem(config);

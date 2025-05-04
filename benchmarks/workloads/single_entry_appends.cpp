@@ -61,15 +61,9 @@ BenchmarkResult runBenchmark(const BenchmarkConfig &benchConfig)
     cleanupLogDirectory(config.basePath);
 
     std::cout << "Generating batches..." << std::flush;
-    std::vector<std::vector<BatchWithDestination>> allBatches(benchConfig.numProducerThreads);
-    for (int i = 0; i < benchConfig.numProducerThreads; i++)
-    {
-        std::string userId = "user" + std::to_string(i);
-        allBatches[i] = generateBatches(benchConfig.entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
-    }
+    std::vector<BatchWithDestination> batches = generateBatches(benchConfig.entriesPerProducer, numSpecificFiles, producerBatchSize);
     std::cout << " Done." << std::endl;
-
-    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    size_t totalDataSizeBytes = calculateTotalDataSize(batches, benchConfig.numProducerThreads);
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
 
     LoggingSystem loggingSystem(config);
@@ -83,7 +77,7 @@ BenchmarkResult runBenchmark(const BenchmarkConfig &benchConfig)
             std::launch::async,
             appendLogEntries,
             std::ref(loggingSystem),
-            std::ref(allBatches[i])));
+            std::ref(batches)));
     }
 
     for (auto &future : futures)

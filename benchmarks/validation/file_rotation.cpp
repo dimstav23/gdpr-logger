@@ -61,18 +61,11 @@ BenchmarkResult runFileRotationBenchmark(
     config.basePath = logDir;
     config.maxSegmentSize = maxSegmentSizeKB * 1024; // Convert KB to bytes
 
-    std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
+    std::cout << "Generating batches with pre-determined destinations for all threads...";
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
+    std::cout << " Done." << std::endl;
 
-    std::vector<std::vector<BatchWithDestination>> allBatches(numProducerThreads);
-    for (int i = 0; i < numProducerThreads; i++)
-    {
-        std::string userId = "user" + std::to_string(i);
-        allBatches[i] = generateBatches(entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
-    }
-
-    std::cout << "All batches with destinations pre-generated" << std::endl;
-
-    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducerThreads);
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
 
     std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes ("
@@ -89,7 +82,7 @@ BenchmarkResult runFileRotationBenchmark(
             std::launch::async,
             appendLogEntries,
             std::ref(loggingSystem),
-            std::ref(allBatches[i])));
+            std::ref(batches)));
     }
 
     for (auto &future : futures)

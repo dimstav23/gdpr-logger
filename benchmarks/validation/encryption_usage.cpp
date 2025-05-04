@@ -35,7 +35,7 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
 }
 
 BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption,
-                             const std::vector<std::vector<BatchWithDestination>> &allBatches,
+                             const std::vector<BatchWithDestination> &batches,
                              int numProducerThreads, int entriesPerProducer)
 {
     LoggingConfig config = baseConfig;
@@ -44,7 +44,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
 
     cleanupLogDirectory(config.basePath);
 
-    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducerThreads);
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
     std::cout << (useEncryption ? "Encrypted" : "Unencrypted")
               << " benchmark - Total data to be written: " << totalDataSizeBytes
@@ -61,7 +61,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
             std::launch::async,
             appendLogEntries,
             std::ref(loggingSystem),
-            std::ref(allBatches[i])));
+            std::ref(batches)));
     }
 
     for (auto &future : futures)
@@ -109,17 +109,12 @@ int main()
     const int numSpecificFiles = 25;
     const int producerBatchSize = 100;
 
-    std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
-    std::vector<std::vector<BatchWithDestination>> allBatches(numProducerThreads);
-    for (int i = 0; i < numProducerThreads; i++)
-    {
-        std::string userId = "user" + std::to_string(i);
-        allBatches[i] = generateBatches(entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
-    }
-    std::cout << "All batches with destinations pre-generated" << std::endl;
+    std::cout << "Generating batches with pre-determined destinations for all threads...";
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
+    std::cout << " Done." << std::endl;
 
-    BenchmarkResult resultEncrypted = runBenchmark(baseConfig, true, allBatches, numProducerThreads, entriesPerProducer);
-    BenchmarkResult resultUnencrypted = runBenchmark(baseConfig, false, allBatches, numProducerThreads, entriesPerProducer);
+    BenchmarkResult resultEncrypted = runBenchmark(baseConfig, true, batches, numProducerThreads, entriesPerProducer);
+    BenchmarkResult resultUnencrypted = runBenchmark(baseConfig, false, batches, numProducerThreads, entriesPerProducer);
 
     std::cout << "\n============== ENCRYPTION BENCHMARK SUMMARY ==============" << std::endl;
     std::cout << std::left << std::setw(15) << "Encryption"

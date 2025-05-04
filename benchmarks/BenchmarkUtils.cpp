@@ -18,22 +18,19 @@ void cleanupLogDirectory(const std::string &logDir)
     }
 }
 
-size_t calculateTotalDataSize(const std::vector<std::vector<BatchWithDestination>> &allBatches)
+size_t calculateTotalDataSize(const std::vector<BatchWithDestination> &batches, int numProducers)
 {
     size_t totalSize = 0;
 
-    for (const auto &threadBatches : allBatches)
+    for (const auto &batchWithDest : batches)
     {
-        for (const auto &batchWithDest : threadBatches)
+        for (const auto &entry : batchWithDest.first)
         {
-            for (const auto &entry : batchWithDest.first)
-            {
-                totalSize += entry.serialize().size();
-            }
+            totalSize += entry.serialize().size();
         }
     }
 
-    return totalSize;
+    return totalSize * numProducers;
 }
 
 size_t calculateDirectorySize(const std::string &dirPath)
@@ -51,7 +48,6 @@ size_t calculateDirectorySize(const std::string &dirPath)
 
 std::vector<BatchWithDestination> generateBatches(
     int numEntries,
-    const std::string &userId,
     int numSpecificFiles,
     int batchSize)
 {
@@ -86,6 +82,7 @@ std::vector<BatchWithDestination> generateBatches(
         {
             std::string dataLocation = "database/table/row" + std::to_string(generated + i);
             std::string dataSubjectId = "subject" + std::to_string((generated + i) % 10);
+            std::string userId = "user" + std::to_string(generated + i);
             LogEntry entry(LogEntry::ActionType::CREATE, dataLocation, userId, dataSubjectId);
             batch.push_back(entry);
         }
