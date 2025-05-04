@@ -99,13 +99,13 @@ int main()
     baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.queueCapacity = 1000000;
-    baseConfig.batchSize = 20;
+    baseConfig.queueCapacity = 1500000;
+    baseConfig.batchSize = 25;
     baseConfig.numWriterThreads = 4;
     baseConfig.appendTimeout = std::chrono::minutes(1);
     // Benchmark parameters
     const int numProducerThreads = 20;
-    const int entriesPerProducer = 100000;
+    const int entriesPerProducer = 500000;
     const int numSpecificFiles = 25;
     const int producerBatchSize = 100;
 
