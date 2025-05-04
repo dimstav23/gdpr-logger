@@ -6,21 +6,31 @@ set(BENCHMARK_LIBS
     ZLIB::ZLIB
 )
 
-set(BENCHMARK_NAMES
+include_directories(${CMAKE_CURRENT_SOURCE_DIR}/benchmarks)
+
+set(VALIDATION_BENCHMARKS
     batch_size
     concurrency
-    file_rotation
-    filepath_diversity
-    queue_capacity
     encryption_usage
-    small_batch_storm
-    large_batch_steady
-    multi_producer_small_batch
-    burst
-    main
+    file_rotation
+    queue_capacity
 )
 
-foreach(benchmark ${BENCHMARK_NAMES})
-    add_executable(${benchmark}_benchmark benchmarks/${benchmark}_benchmark.cpp)
+set(WORKLOAD_BENCHMARKS
+    burst
+    diverse_filepaths
+    large_batches
+    main
+    multi_producer_small_batches
+    single_entry_appends
+)
+
+foreach(benchmark ${VALIDATION_BENCHMARKS})
+    add_executable(${benchmark}_benchmark benchmarks/validation/${benchmark}.cpp)
+    target_link_libraries(${benchmark}_benchmark ${BENCHMARK_LIBS})
+endforeach()
+
+foreach(benchmark ${WORKLOAD_BENCHMARKS})
+    add_executable(${benchmark}_benchmark benchmarks/workloads/${benchmark}.cpp)
     target_link_libraries(${benchmark}_benchmark ${BENCHMARK_LIBS})
 endforeach()
