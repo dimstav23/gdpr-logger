@@ -37,8 +37,8 @@ int main()
     config.numWriterThreads = 6;
     config.appendTimeout = std::chrono::minutes(2);
     // benchmark parameters
-    const int numProducerThreads = 32;
-    const int entriesPerProducer = 1000000;
+    const int numProducerThreads = 4;
+    const int entriesPerProducer = 10000000;
     const int numSpecificFiles = 25;
     const int producerBatchSize = 1000;
 

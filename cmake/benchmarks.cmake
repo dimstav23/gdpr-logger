@@ -13,6 +13,10 @@ set(BENCHMARK_NAMES
     filepath_diversity
     queue_capacity
     encryption_usage
+    small_batch_storm
+    large_batch_steady
+    multi_producer_small_batch
+    burst
     main
 )
 

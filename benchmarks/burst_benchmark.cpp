@@ -9,17 +9,14 @@
 #include <filesystem>
 #include <numeric>
 
-void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
+void appendLogEntriesBurst(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
 {
     for (const auto &batchWithDest : batches)
     {
-        if (!loggingSystem.appendBatch(batchWithDest.first, batchWithDest.second))
+        while (!loggingSystem.appendBatch(batchWithDest.first, batchWithDest.second))
         {
-            std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
-                      << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
+            std::this_thread::sleep_for(std::chrono::milliseconds(1));
         }
-        // Add a small delay after batch operations to simulate real-world patterns
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
@@ -37,47 +34,48 @@ int main()
     config.numWriterThreads = 6;
     config.appendTimeout = std::chrono::minutes(2);
     // benchmark parameters
-    const int numProducerThreads = 32;
-    const int entriesPerProducer = 1000000;
-    const int numSpecificFiles = 25;
-    const int producerBatchSize = 1000;
+    const int numBursts = 10;
+    const int numSpecificFiles = 0;
+    const int producerBatchSize = config.queueCapacity;
+    const int entriesPerBurst = config.queueCapacity;
+    const int waitBetweenBurstsSec = 2.5;
 
     cleanupLogDirectory(config.basePath);
 
-    std::cout << "Generating batches with pre-determined destinations for all threads..." << std::endl;
-    std::vector<std::vector<BatchWithDestination>> allBatches(numProducerThreads);
-    for (int i = 0; i < numProducerThreads; i++)
+    std::cout << "Generating burst batches for burst-pattern benchmark..." << std::endl;
+
+    std::string userId = "burst_user";
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerBurst, userId, numSpecificFiles, producerBatchSize);
+
+    size_t totalDataSizePerBurst = 0;
+    for (const auto &batchWithDest : batches)
     {
-        std::string userId = "user" + std::to_string(i);
-        allBatches[i] = generateBatches(entriesPerProducer, userId, numSpecificFiles, producerBatchSize);
+        for (const auto &entry : batchWithDest.first)
+        {
+            totalDataSizePerBurst += entry.serialize().size();
+        }
     }
 
-    size_t totalDataSizeBytes = calculateTotalDataSize(allBatches);
+    size_t totalDataSizeBytes = totalDataSizePerBurst * numBursts;
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
-    std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes (" << totalDataSizeGiB << " GiB)" << std::endl;
 
     LoggingSystem loggingSystem(config);
     loggingSystem.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    std::vector<std::future<void>> futures;
-    for (int i = 0; i < numProducerThreads; i++)
+    for (int burst = 0; burst < numBursts; burst++)
     {
-        futures.push_back(std::async(
-            std::launch::async,
-            appendLogEntries,
-            std::ref(loggingSystem),
-            std::ref(allBatches[i])));
-    }
+        appendLogEntriesBurst(loggingSystem, batches);
 
-    for (auto &future : futures)
-    {
-        future.wait();
+        if (burst < numBursts - 1)
+        {
+            std::this_thread::sleep_for(std::chrono::seconds(waitBetweenBurstsSec));
+        }
     }
 
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
-    std::cout << "All log entries appended" << std::endl;
+    std::cout << "All bursts finished" << std::endl;
     loggingSystem.stop(true);
 
     size_t finalStorageSize = calculateDirectorySize(config.basePath);
@@ -85,13 +83,15 @@ int main()
     double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
 
     double elapsedSeconds = elapsed.count();
-    const size_t totalEntries = numProducerThreads * entriesPerProducer;
+    const size_t totalEntries = entriesPerBurst * numBursts;
     double entriesThroughput = totalEntries / elapsedSeconds;
     double dataThroughputGiB = totalDataSizeGiB / elapsedSeconds;
     double averageEntrySize = static_cast<double>(totalDataSizeBytes) / totalEntries;
 
-    std::cout << "============== Benchmark Results ==============" << std::endl;
+    std::cout << "\n============== Burst Benchmark Results ==============" << std::endl;
     std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
+    std::cout << "Number of bursts: " << numBursts << std::endl;
+    std::cout << "Entries per burst: " << entriesPerBurst << std::endl;
     std::cout << "Total entries appended: " << totalEntries << std::endl;
     std::cout << "Average entry size: " << averageEntrySize << " bytes" << std::endl;
     std::cout << "Total data written: " << totalDataSizeGiB << " GiB" << std::endl;
@@ -99,7 +99,7 @@ int main()
     std::cout << "Throughput (data): " << dataThroughputGiB << " GiB/second" << std::endl;
     std::cout << "Final storage size: " << finalStorageSizeGiB << " GiB" << std::endl;
     std::cout << "Write amplification: " << writeAmplification << " (ratio)" << std::endl;
-    std::cout << "===============================================" << std::endl;
+    std::cout << "======================================================" << std::endl;
 
     return 0;
 }
