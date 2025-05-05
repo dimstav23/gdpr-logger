@@ -4,22 +4,20 @@
 #include <cstring>
 #include <iostream>
 
-// Compress multiple log entries in a batch
-std::vector<uint8_t> Compression::compressBatch(const std::vector<LogEntry> &entries)
+// Compress multiple already serialized log entries in a batch
+std::vector<uint8_t> Compression::compressBatch(const std::vector<std::vector<uint8_t>> &serializedEntries)
 {
-    // Serialize all entries into a single binary blob
+    // Combine all serialized entries into a single binary blob
     std::vector<uint8_t> batchData;
 
     // First, store the number of entries
-    uint32_t numEntries = entries.size();
+    uint32_t numEntries = serializedEntries.size();
     batchData.resize(sizeof(numEntries));
     std::memcpy(batchData.data(), &numEntries, sizeof(numEntries));
 
-    // Then serialize each entry
-    for (const auto &entry : entries)
+    // Then append each entry
+    for (const auto &entryData : serializedEntries)
     {
-        std::vector<uint8_t> entryData = entry.serialize();
-
         // Store the size of the serialized entry
         uint32_t entrySize = entryData.size();
         size_t currentSize = batchData.size();

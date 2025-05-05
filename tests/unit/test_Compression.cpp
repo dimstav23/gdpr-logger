@@ -30,14 +30,28 @@ bool LogEntriesEqual(const LogEntry &a, const LogEntry &b)
     return serializedA == serializedB;
 }
 
+// Helper function to create serialized batch from log entries
+std::vector<std::vector<uint8_t>> serializeBatch(const std::vector<LogEntry> &entries)
+{
+    std::vector<std::vector<uint8_t>> serializedEntries;
+    for (const auto &entry : entries)
+    {
+        serializedEntries.push_back(entry.serialize());
+    }
+    return serializedEntries;
+}
+
 // Test compressing and decompressing a batch of log entries
 TEST_F(CompressionTest, CompressDecompressBatch)
 {
     // Create a batch of entries
     std::vector<LogEntry> batch = {entry1, entry2, entry3, entry4};
 
-    // Compress the batch
-    std::vector<uint8_t> compressed = Compression::compressBatch(batch);
+    // Serialize the batch first
+    std::vector<std::vector<uint8_t>> serializedBatch = serializeBatch(batch);
+
+    // Compress the serialized batch
+    std::vector<uint8_t> compressed = Compression::compressBatch(serializedBatch);
 
     // Make sure compression produced data
     ASSERT_GT(compressed.size(), 0);
@@ -62,8 +76,11 @@ TEST_F(CompressionTest, EmptyBatch)
     // Create an empty batch
     std::vector<LogEntry> emptyBatch;
 
-    // Compress the empty batch
-    std::vector<uint8_t> compressed = Compression::compressBatch(emptyBatch);
+    // Serialize the empty batch
+    std::vector<std::vector<uint8_t>> serializedBatch = serializeBatch(emptyBatch);
+
+    // Compress the empty serialized batch
+    std::vector<uint8_t> compressed = Compression::compressBatch(serializedBatch);
 
     // Decompress it back
     std::vector<LogEntry> decompressed = Compression::decompressBatch(compressed);
@@ -103,8 +120,11 @@ TEST_F(CompressionTest, BatchCompressionRatio)
         totalSerialized.insert(totalSerialized.end(), serialized.begin(), serialized.end());
     }
 
-    // Compress the batch
-    std::vector<uint8_t> compressed = Compression::compressBatch(repetitiveBatch);
+    // Serialize the batch for compression
+    std::vector<std::vector<uint8_t>> serializedBatch = serializeBatch(repetitiveBatch);
+
+    // Compress the serialized batch
+    std::vector<uint8_t> compressed = Compression::compressBatch(serializedBatch);
 
     // Check that batch compression significantly reduced the size
     double compressionRatio = static_cast<double>(compressed.size()) / static_cast<double>(totalSerialized.size());
@@ -127,8 +147,11 @@ TEST_F(CompressionTest, LargeBatch)
     // Create a large batch of 100 identical entries
     std::vector<LogEntry> largeBatch(100, entry1);
 
-    // Compress the batch
-    std::vector<uint8_t> compressed = Compression::compressBatch(largeBatch);
+    // Serialize the batch
+    std::vector<std::vector<uint8_t>> serializedBatch = serializeBatch(largeBatch);
+
+    // Compress the serialized batch
+    std::vector<uint8_t> compressed = Compression::compressBatch(serializedBatch);
 
     // Decompress the batch
     std::vector<LogEntry> decompressed = Compression::decompressBatch(compressed);
@@ -141,6 +164,30 @@ TEST_F(CompressionTest, LargeBatch)
     {
         EXPECT_TRUE(LogEntriesEqual(largeBatch[i], decompressed[i]));
     }
+}
+
+// Additional test: Compress batches of already serialized data directly
+TEST_F(CompressionTest, DirectSerializedCompression)
+{
+    // Create some serialized data directly
+    std::vector<std::vector<uint8_t>> serializedEntries;
+
+    // Add a few serialized entries
+    for (int i = 0; i < 5; i++)
+    {
+        std::vector<uint8_t> data(50, static_cast<uint8_t>(i)); // Fill with values based on index
+        serializedEntries.push_back(data);
+    }
+
+    // Compress the serialized data
+    std::vector<uint8_t> compressed = Compression::compressBatch(serializedEntries);
+
+    // Make sure compression produced data
+    ASSERT_GT(compressed.size(), 0);
+
+    // Since we don't have valid LogEntry data, this will fail to deserialize completely,
+    // but we can still test the compression works with arbitrary byte vectors
+    // For actual testing, use real serialized LogEntry data
 }
 
 int main(int argc, char **argv)

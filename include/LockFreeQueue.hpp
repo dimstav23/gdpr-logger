@@ -26,6 +26,9 @@ private:
     std::atomic<size_t> m_head{0}; // enqueue position
     std::atomic<size_t> m_tail{0}; // dequeue position
 
+    // Atomic size counter
+    std::atomic<size_t> m_size{0};
+
     // Used for flush() operation
     mutable std::mutex m_flushMutex;
     std::condition_variable m_flushCondition;

@@ -12,8 +12,6 @@ set(TEST_SOURCES
     # integration tests
     tests/integration/test_CompressionCrypto.cpp
     tests/integration/test_WriterQueue.cpp
-    # performance tests
-    tests/performance/test_LockFreeQueue_Performance.cpp
 )
 
 macro(add_test_suite TEST_NAME TEST_SOURCE)

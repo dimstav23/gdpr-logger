@@ -29,16 +29,32 @@ protected:
         return a.serialize() == b.serialize();
     }
 
+    // Helper function to serialize a batch of log entries
+    std::vector<std::vector<uint8_t>> serializeBatch(const std::vector<LogEntry> &entries)
+    {
+        std::vector<std::vector<uint8_t>> serializedEntries;
+        for (const auto &entry : entries)
+        {
+            serializedEntries.push_back(entry.serialize());
+        }
+        return serializedEntries;
+    }
+
     LogEntry entry1, entry2, entry3;
     std::vector<uint8_t> key;
     std::vector<uint8_t> wrongKey;
 };
 
-// Batch processing - riginal -> compress -> encrypt -> decrypt -> decompress -> recovered
+// Batch processing - original -> compress -> encrypt -> decrypt -> decompress -> recovered
 TEST_F(CompressionCryptoTest, BatchProcessing)
 {
     std::vector<LogEntry> batch = {entry1, entry2, entry3};
-    std::vector<uint8_t> compressed = Compression::compressBatch(batch);
+
+    // Serialize the batch first
+    std::vector<std::vector<uint8_t>> serializedBatch = serializeBatch(batch);
+
+    // Compress the serialized batch
+    std::vector<uint8_t> compressed = Compression::compressBatch(serializedBatch);
     ASSERT_GT(compressed.size(), 0);
 
     std::vector<uint8_t> encrypted = crypto.encrypt(compressed, key);
@@ -60,7 +76,8 @@ TEST_F(CompressionCryptoTest, BatchProcessing)
 
     // Test with empty batch
     std::vector<LogEntry> emptyBatch;
-    std::vector<uint8_t> emptyCompressed = Compression::compressBatch(emptyBatch);
+    std::vector<std::vector<uint8_t>> emptySerializedBatch = serializeBatch(emptyBatch);
+    std::vector<uint8_t> emptyCompressed = Compression::compressBatch(emptySerializedBatch);
     std::vector<uint8_t> emptyEncrypted = crypto.encrypt(emptyCompressed, key);
     std::vector<uint8_t> emptyDecrypted = crypto.decrypt(emptyEncrypted, key);
     std::vector<LogEntry> emptyRecovered = Compression::decompressBatch(emptyDecrypted);
@@ -68,7 +85,8 @@ TEST_F(CompressionCryptoTest, BatchProcessing)
 
     // Test with single entry batch
     std::vector<LogEntry> singleBatch = {entry1};
-    std::vector<uint8_t> singleCompressed = Compression::compressBatch(singleBatch);
+    std::vector<std::vector<uint8_t>> singleSerializedBatch = serializeBatch(singleBatch);
+    std::vector<uint8_t> singleCompressed = Compression::compressBatch(singleSerializedBatch);
     std::vector<uint8_t> singleEncrypted = crypto.encrypt(singleCompressed, key);
     std::vector<uint8_t> singleDecrypted = crypto.decrypt(singleEncrypted, key);
     std::vector<LogEntry> singleRecovered = Compression::decompressBatch(singleDecrypted);

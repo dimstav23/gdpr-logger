@@ -1,6 +1,7 @@
 #include "LockFreeQueue.hpp"
 #include <algorithm>
 #include <thread>
+#include <iostream>
 #include <chrono>
 #include <cmath>
 
@@ -54,6 +55,9 @@ bool LockFreeQueue::enqueue(const QueueItem &item)
 
             // Mark the node as ready for consumption
             m_buffer[currentHead].ready.store(true, std::memory_order_release);
+
+            // Increment the atomic size
+            m_size.fetch_add(1, std::memory_order_relaxed);
 
             return true;
         }
@@ -144,6 +148,9 @@ bool LockFreeQueue::enqueueBatch(const std::vector<QueueItem> &items)
         index = (index + 1) & m_mask;
     }
 
+    // Increment the atomic size by the number of items added
+    m_size.fetch_add(itemCount, std::memory_order_relaxed);
+
     return true;
 }
 
@@ -227,6 +234,10 @@ bool LockFreeQueue::dequeue(QueueItem &item)
 
             // Mark the node as not ready
             m_buffer[currentTail].ready.store(false, std::memory_order_release);
+
+            // Decrement the atomic size
+            m_size.fetch_sub(1, std::memory_order_relaxed);
+
             m_flushCondition.notify_one();
             return true;
         }
@@ -265,17 +276,5 @@ bool LockFreeQueue::flush()
 
 size_t LockFreeQueue::size() const
 {
-    // Get the head and tail positions (just an approximation)
-    size_t head = m_head.load(std::memory_order_relaxed);
-    size_t tail = m_tail.load(std::memory_order_relaxed);
-
-    // Calculate the difference (with wrap-around)
-    if (head >= tail)
-    {
-        return head - tail;
-    }
-    else
-    {
-        return m_capacity - (tail - head);
-    }
+    return m_size.load(std::memory_order_relaxed);
 }

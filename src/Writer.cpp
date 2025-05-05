@@ -48,7 +48,6 @@ bool Writer::isRunning() const
 void Writer::processLogEntries()
 {
     std::vector<QueueItem> batch;
-    batch.reserve(m_batchSize);
 
     Crypto crypto;
     std::vector<uint8_t> encryptionKey(32, 0x42); // dummy key
@@ -59,23 +58,25 @@ void Writer::processLogEntries()
         size_t entriesDequeued = m_queue.dequeueBatch(batch, m_batchSize);
         if (entriesDequeued == 0)
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            std::this_thread::sleep_for(std::chrono::milliseconds(5));
             continue;
         }
 
         // Group log entries by destination (either default storage or specific file)
-        std::map<std::optional<std::string>, std::vector<LogEntry>> groupedEntries;
+        std::map<std::optional<std::string>, std::vector<std::vector<uint8_t>>> groupedSerializedEntries;
 
+        // Serialize all entries first, then group by destination
         for (const auto &item : batch)
         {
-            groupedEntries[item.targetFilename].push_back(item.entry);
+            std::vector<uint8_t> serializedEntry = item.entry.serialize();
+            groupedSerializedEntries[item.targetFilename].push_back(serializedEntry);
         }
 
         // Process each group separately
-        for (const auto &[targetFilename, entries] : groupedEntries)
+        for (const auto &[targetFilename, serializedEntries] : groupedSerializedEntries)
         {
-            // Compress the batch of log entries
-            std::vector<uint8_t> compressedData = Compression::compressBatch(entries);
+            // Compress the batch of serialized entries
+            std::vector<uint8_t> compressedData = Compression::compressBatch(serializedEntries);
 
             // encrypt if encryption is enabled
             std::vector<uint8_t> dataToWrite;
@@ -90,7 +91,6 @@ void Writer::processLogEntries()
 
             if (targetFilename)
             {
-                // Write to the specified file
                 m_storage->writeToFile(*targetFilename, dataToWrite);
             }
             else
@@ -102,7 +102,4 @@ void Writer::processLogEntries()
 
         batch.clear();
     }
-
-    // Ensure any remaining data is flushed when stopping
-    m_storage->flush();
 }
