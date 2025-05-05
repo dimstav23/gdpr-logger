@@ -121,7 +121,7 @@ void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::
         results.push_back(result);
 
         // Add a small delay between runs
-        std::this_thread::sleep_for(std::chrono::seconds(1));
+        std::this_thread::sleep_for(std::chrono::seconds(5));
     }
 
     std::cout << "\n=========== FILEPATH DIVERSITY BENCHMARK SUMMARY ===========" << std::endl;
@@ -155,16 +155,16 @@ int main()
     baseConfig.maxSegmentSize = 5 * 1024 * 1024; // 5 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.queueCapacity = 1000000;
+    baseConfig.queueCapacity = 2000000;
     baseConfig.batchSize = 750;
     baseConfig.numWriterThreads = 4;
     baseConfig.appendTimeout = std::chrono::milliseconds(300000);
     // benchmark parameters
     const int numProducers = 25;
-    const int entriesPerProducer = 100000;
+    const int entriesPerProducer = 500000;
     const int producerBatchSize = 100;
 
-    std::vector<int> numFilesVariants = {0, 1, 5, 20, 50, 100, 200, 500, 1000};
+    std::vector<int> numFilesVariants = {0, 10, 50, 100, 250, 500, 1000};
 
     runFilepathDiversityComparison(baseConfig,
                                    numFilesVariants,
