@@ -1,11 +1,9 @@
 cmake_minimum_required(VERSION 3.10)
 project(GDPR_Logging)
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake")
-
-include(project_settings)
-include(dependencies)
-include(library)
-include(executable)
-include(benchmarks)
-include(testing)
+include(cmake/project_settings.cmake)
+include(cmake/dependencies.cmake)
+include(cmake/library.cmake)
+include(cmake/testing.cmake)
+include(cmake/executable.cmake)
+include(cmake/benchmarks.cmake)

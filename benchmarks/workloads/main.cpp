@@ -32,14 +32,14 @@ int main()
     config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
     config.maxAttempts = 5;
     config.baseRetryDelay = std::chrono::milliseconds(1);
-    config.queueCapacity = 8300000;
+    config.queueCapacity = 2000000;
     config.batchSize = 8400;
     config.numWriterThreads = 12;
     config.appendTimeout = std::chrono::minutes(2);
     config.useEncryption = false;
     // benchmark parameters
     const int numProducerThreads = 24;
-    const int entriesPerProducer = 750000;
+    const int entriesPerProducer = 1000000;
     const int numSpecificFiles = 100;
     const int producerBatchSize = 1000;
 

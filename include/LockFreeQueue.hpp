@@ -2,39 +2,26 @@
 #define LOCK_FREE_QUEUE_HPP
 
 #include "QueueItem.hpp"
+#include "concurrentqueue.h"
 #include <atomic>
 #include <vector>
 #include <memory>
 #include <mutex>
 #include <condition_variable>
+#include <chrono>
 
 class LockFreeQueue
 {
 private:
-    struct Node
-    {
-        std::atomic<bool> ready{false};
-        QueueItem data;
-    };
+    moodycamel::ConcurrentQueue<QueueItem> m_queue;
 
-    // Circular buffer of nodes
-    std::unique_ptr<Node[]> m_buffer;
-    const size_t m_capacity;
-    const size_t m_mask;
-
-    // Head and tail indices
-    std::atomic<size_t> m_head{0}; // enqueue position
-    std::atomic<size_t> m_tail{0}; // dequeue position
-
-    // Atomic size counter
+    // Atomic size counter (Moodycamel queue size() is approximate)
     std::atomic<size_t> m_size{0};
 
-    // Used for flush() operation
     mutable std::mutex m_flushMutex;
     std::condition_variable m_flushCondition;
 
 public:
-    // Construct a lock-free queue with specified capacity rounded up to power of 2
     explicit LockFreeQueue(size_t capacity = 8192);
     ~LockFreeQueue();
 

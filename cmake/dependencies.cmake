@@ -7,3 +7,6 @@ message(STATUS "Using GTest version: ${GTEST_VERSION}")
 message(STATUS "Using ZLIB version: ${ZLIB_VERSION_STRING}")
 
 include_directories(include)
+
+add_subdirectory(external/concurrentqueue EXCLUDE_FROM_ALL)
+include_directories(external/concurrentqueue)

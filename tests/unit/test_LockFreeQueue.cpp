@@ -71,40 +71,43 @@ TEST_F(LockFreeQueueBasicTest, EnqueueDequeue)
     EXPECT_EQ(retrievedItem.targetFilename, item.targetFilename);
 }
 
-// Test enqueue until full
+// Test enqueue until full - Modified for dynamic queue
 TEST_F(LockFreeQueueBasicTest, EnqueueUntilFull)
 {
-    // Fill the queue (capacity - 1 items)
-    for (size_t i = 0; i < TEST_QUEUE_SIZE - 1; i++)
+    // New test focuses on verifying queue doesn't fail under load
+    const size_t MANY_ITEMS = TEST_QUEUE_SIZE * 3;
+
+    // Fill the queue with many more items than initial capacity
+    for (size_t i = 0; i < MANY_ITEMS; i++)
     {
         EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
 
-    // One more should fail because head would be equal to tail (using a short timeout)
-    EXPECT_FALSE(queue->enqueueBlocking(createTestItem(TEST_QUEUE_SIZE - 1), std::chrono::milliseconds(100)));
+    EXPECT_EQ(queue->size(), MANY_ITEMS);
 }
 
-// Test enqueue with consumer thread
+// Test enqueue with consumer thread - Modified for dynamic queue
 TEST_F(LockFreeQueueBasicTest, EnqueueWithConsumer)
 {
-    // Fill the queue (capacity - 1 items)
-    for (size_t i = 0; i < TEST_QUEUE_SIZE - 1; i++)
+    // Fill the queue with items
+    for (size_t i = 0; i < TEST_QUEUE_SIZE * 2; i++) // More than initial capacity
     {
         EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
 
-    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE - 1);
+    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE * 2);
 
+    // Test concurrent enqueue with consumer
     std::atomic<bool> producerSucceeded{false};
     std::thread producerThread([this, &producerSucceeded]()
                                {
-        // will block until space is available
-        if (queue->enqueueBlocking(createTestItem(TEST_QUEUE_SIZE - 1), std::chrono::seconds(3))) {
+        if (queue->enqueueBlocking(createTestItem(99999), std::chrono::seconds(3))) {
             producerSucceeded.store(true);
         } });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    EXPECT_FALSE(producerSucceeded.load());
+    // Producer should succeed immediately since queue can grow
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    EXPECT_TRUE(producerSucceeded.load());
 
     QueueItem retrievedItem;
     std::thread consumerThread([this, &retrievedItem]()
@@ -114,7 +117,7 @@ TEST_F(LockFreeQueueBasicTest, EnqueueWithConsumer)
     producerThread.join();
 
     EXPECT_TRUE(producerSucceeded.load());
-    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE - 1);
+    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE * 2);
 
     EXPECT_EQ(retrievedItem.entry.getActionType(), LogEntry::ActionType::READ);
     EXPECT_EQ(retrievedItem.entry.getDataLocation(), "data/location/0");
@@ -205,10 +208,11 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueue)
     EXPECT_EQ(queue->size(), 0);
 }
 
-// Test batch enqueue timeouts with full queue
+// Test batch enqueue with growing queue - Modified for dynamic queue
 TEST_F(LockFreeQueueBasicTest, BatchEnqueueWhenAlmostFull)
 {
-    for (size_t i = 0; i < TEST_QUEUE_SIZE - 4; i++)
+    // Fill the queue beyond initial capacity
+    for (size_t i = 0; i < TEST_QUEUE_SIZE * 2; i++)
     {
         EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
@@ -225,15 +229,17 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueueWhenAlmostFull)
     {
         largeBatch.push_back(createTestItem(200 + i));
     }
-    EXPECT_FALSE(queue->enqueueBatchBlocking(largeBatch, std::chrono::milliseconds(100)));
+    // This should still succeed with dynamic queue
+    EXPECT_TRUE(queue->enqueueBatchBlocking(largeBatch, std::chrono::milliseconds(500)));
 
-    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE - 1);
+    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE * 2 + 7);
 }
 
-// Test batch enqueue with blocking behavior
+// Test batch enqueue with dynamic growth - Modified for dynamic queue
 TEST_F(LockFreeQueueBasicTest, BatchEnqueueBlocking)
 {
-    for (size_t i = 0; i < TEST_QUEUE_SIZE - 1; i++)
+    // Fill the queue with items
+    for (size_t i = 0; i < TEST_QUEUE_SIZE + 10; i++)
     {
         EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)));
     }
@@ -244,6 +250,7 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueueBlocking)
         batch.push_back(createTestItem(100 + i));
     }
 
+    // Enqueue will succeed immediately since queue grows dynamically
     std::atomic<bool> producerSucceeded{false};
     std::thread producerThread([this, &batch, &producerSucceeded]()
                                {
@@ -251,16 +258,13 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueueBlocking)
             producerSucceeded.store(true);
         } });
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    EXPECT_FALSE(producerSucceeded.load());
-
-    std::vector<QueueItem> retrievedItems;
-    queue->dequeueBatch(retrievedItems, 3);
+    std::this_thread::sleep_for(std::chrono::milliseconds(100));
+    EXPECT_TRUE(producerSucceeded.load());
 
     producerThread.join();
 
     EXPECT_TRUE(producerSucceeded.load());
-    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE - 1);
+    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE + 13);
 }
 
 // Test flush method
@@ -717,30 +721,27 @@ TEST_F(LockFreeQueueThreadTest, RandomizedStressTest)
     EXPECT_EQ(queue->size(), 0);
 }
 
-// Test queue capacity enforcement
-TEST_F(LockFreeQueueThreadTest, CapacityEnforcement)
+// Test dynamic queue growth - Modified for dynamic queue
+TEST_F(LockFreeQueueThreadTest, DynamicQueueGrowth)
 {
     const size_t SMALL_CAPACITY = 128;
     auto smallQueue = std::make_unique<LockFreeQueue>(SMALL_CAPACITY);
 
-    // Fill the queue
+    // Fill the queue well beyond initial capacity
     size_t enqueued = 0;
-    while (enqueued < SMALL_CAPACITY - 1)
+    const size_t OVER_CAPACITY = SMALL_CAPACITY * 3;
+
+    while (enqueued < OVER_CAPACITY)
     {
-        if (smallQueue->enqueueBlocking(createTestItem(enqueued), std::chrono::milliseconds(100)))
-        {
-            enqueued++;
-        }
+        EXPECT_TRUE(smallQueue->enqueueBlocking(createTestItem(enqueued), std::chrono::milliseconds(100)));
+        enqueued++;
     }
 
-    // One more should fail
-    EXPECT_FALSE(smallQueue->enqueueBlocking(createTestItem(enqueued), std::chrono::milliseconds(100)));
-    enqueued++;
+    EXPECT_EQ(smallQueue->size(), OVER_CAPACITY);
 
-    // Dequeue one and try again
-    QueueItem item;
-    EXPECT_TRUE(smallQueue->dequeue(item));
+    // Verify we can still enqueue more
     EXPECT_TRUE(smallQueue->enqueueBlocking(createTestItem(enqueued), std::chrono::milliseconds(100)));
+    EXPECT_EQ(smallQueue->size(), OVER_CAPACITY + 1);
 }
 
 // Test timed operations

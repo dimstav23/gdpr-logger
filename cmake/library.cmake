@@ -18,3 +18,6 @@ target_link_libraries(GDPR_Logging_lib
     OpenSSL::Crypto 
     ZLIB::ZLIB
 )
+
+target_include_directories(GDPR_Logging_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
+target_include_directories(GDPR_Logging_lib PUBLIC external/concurrentqueue)

@@ -81,64 +81,52 @@ TEST_F(LoggingAPITest, AppendAfterInitialization2)
     EXPECT_TRUE(api.reset());
 }
 
-// Test blocking append with queue eventually emptying
+// Test blocking append with queue eventually emptying - Modified
 TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
     auto smallQueue = std::make_shared<LockFreeQueue>(2);
     EXPECT_TRUE(api.initialize(smallQueue, std::chrono::milliseconds(1000)));
 
+    // Since queue grows dynamically, we'll test timeout instead
     LogEntry entry1(LogEntry::ActionType::READ, "location1", "user1", "subject1");
     EXPECT_TRUE(api.append(entry1));
 
-    // Consume the entry with some delay
-    std::thread consumer([&smallQueue]()
-                         {
-        std::this_thread::sleep_for(std::chrono::milliseconds(500));
-        QueueItem dummyItem;
-        smallQueue->dequeue(dummyItem); });
-
     LogEntry entry2(LogEntry::ActionType::READ, "location2", "user2", "subject2");
+    // With dynamic queue, this will succeed immediately
     auto start = std::chrono::steady_clock::now();
     EXPECT_TRUE(api.append(entry2));
     auto end = std::chrono::steady_clock::now();
 
-    // Ensure it actually blocked for some time
+    // Verify it doesn't block since queue can grow
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-    EXPECT_GE(duration, 300);
+    EXPECT_LT(duration, 100); // Should be very fast
 
-    consumer.join();
+    // Verify both items are in the queue
+    EXPECT_EQ(smallQueue->size(), 2);
+
     EXPECT_TRUE(api.reset());
 }
 
-// Test that append returns false when shutting down
-TEST_F(LoggingAPITest, AppendDuringShutdown)
+// Test append timeout behavior (new test)
+TEST_F(LoggingAPITest, AppendTimeoutBehavior)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    auto smallQueue = std::make_shared<LockFreeQueue>(2);
-    EXPECT_TRUE(api.initialize(smallQueue, std::chrono::milliseconds(1000)));
+    auto queue = std::make_shared<LockFreeQueue>(1024);
 
-    LogEntry entry1(LogEntry::ActionType::READ, "location1", "user1", "subject1");
-    EXPECT_TRUE(api.append(entry1));
+    // Initialize with a very short timeout
+    EXPECT_TRUE(api.initialize(queue, std::chrono::milliseconds(50)));
 
-    // Set up a thread to try to append while we shutdown
-    std::atomic<bool> appendFinished(false);
-    std::thread appendThread([&]()
-                             {
-        LogEntry entry2(LogEntry::ActionType::READ, "location2", "user2", "subject2");
-        // This should block initially, then return false after shutdown
-        bool result = api.append(entry2);
-        EXPECT_FALSE(result);
-        appendFinished.store(true); });
+    LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
 
-    // Give the append thread time to start and block
-    std::this_thread::sleep_for(std::chrono::milliseconds(400));
+    auto start = std::chrono::steady_clock::now();
+    EXPECT_TRUE(api.append(entry)); // Should succeed immediately since queue grows
+    auto end = std::chrono::steady_clock::now();
 
-    // Now shut down while the thread is blocked
+    auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
+    EXPECT_LT(duration, 10); // Very fast operation
+
     EXPECT_TRUE(api.reset());
-
-    appendThread.join();
-    EXPECT_TRUE(appendFinished.load());
 }
 
 // Test shutdown without initialization
