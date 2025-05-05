@@ -32,7 +32,6 @@ private:
     // Used for flush() operation
     mutable std::mutex m_flushMutex;
     std::condition_variable m_flushCondition;
-    std::atomic<bool> m_shuttingDown{false};
 
 public:
     // Construct a lock-free queue with specified capacity rounded up to power of 2

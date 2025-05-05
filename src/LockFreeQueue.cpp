@@ -26,7 +26,6 @@ LockFreeQueue::LockFreeQueue(size_t capacity)
 
 LockFreeQueue::~LockFreeQueue()
 {
-    m_shuttingDown.store(true, std::memory_order_release);
     m_flushCondition.notify_all();
 }
 
@@ -76,11 +75,6 @@ bool LockFreeQueue::enqueueBlocking(const QueueItem &item, std::chrono::millisec
         if (enqueue(item))
         {
             return true;
-        }
-
-        if (m_shuttingDown.load(std::memory_order_acquire))
-        {
-            return false;
         }
 
         auto elapsed = std::chrono::steady_clock::now() - start;
@@ -167,11 +161,6 @@ bool LockFreeQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items,
         if (enqueueBatch(items))
         {
             return true;
-        }
-
-        if (m_shuttingDown.load(std::memory_order_acquire))
-        {
-            return false;
         }
 
         auto elapsed = std::chrono::steady_clock::now() - start;
@@ -268,10 +257,9 @@ bool LockFreeQueue::flush()
     // Wait until the queue is empty or shutting down
     m_flushCondition.wait(lock, [this]
                           { return (m_head.load(std::memory_order_acquire) ==
-                                    m_tail.load(std::memory_order_acquire)) ||
-                                   m_shuttingDown.load(std::memory_order_acquire); });
+                                    m_tail.load(std::memory_order_acquire)); });
 
-    return !m_shuttingDown.load(std::memory_order_acquire);
+    return true;
 }
 
 size_t LockFreeQueue::size() const
