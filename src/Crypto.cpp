@@ -18,19 +18,10 @@ Crypto::~Crypto()
     EVP_cleanup();
 }
 
-// Generate a random initialization vector
-std::vector<uint8_t> Crypto::generateIV(size_t size)
-{
-    std::vector<uint8_t> iv(size);
-    if (RAND_bytes(iv.data(), size) != 1)
-    {
-        throw std::runtime_error("Failed to generate random IV");
-    }
-    return iv;
-}
-
-// Encrypt data using AES-256-GCM
-std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &compressedData, const std::vector<uint8_t> &key)
+// Encrypt data using AES-256-GCM with provided IV
+std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &compressedData,
+                                     const std::vector<uint8_t> &key,
+                                     const std::vector<uint8_t> &iv)
 {
     if (compressedData.empty())
     {
@@ -43,8 +34,11 @@ std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &compressedData,
         throw std::runtime_error("Invalid key size. Expected 32 bytes for AES-256");
     }
 
-    // Generate a random IV
-    std::vector<uint8_t> iv = generateIV(GCM_IV_SIZE);
+    // Validate IV size
+    if (iv.size() != GCM_IV_SIZE)
+    {
+        throw std::runtime_error("Invalid IV size. Expected 12 bytes for GCM");
+    }
 
     // Initialize OpenSSL cipher context
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
@@ -95,27 +89,16 @@ std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &compressedData,
     // Resize the encrypted data to the actual length
     encryptedData.resize(encryptedLen + finalLen);
 
-    // Format the output: IV + Ciphertext + Tag
+    // Format the output: Ciphertext + Tag (no IV)
     std::vector<uint8_t> result;
-
-    // Store the IV size
-    uint32_t ivSize = iv.size();
-    result.resize(sizeof(ivSize));
-    std::memcpy(result.data(), &ivSize, sizeof(ivSize));
-
-    // Store the IV
-    size_t currentSize = result.size();
-    result.resize(currentSize + iv.size());
-    std::memcpy(result.data() + currentSize, iv.data(), iv.size());
 
     // Store the encrypted data size
     uint32_t dataSize = encryptedData.size();
-    currentSize = result.size();
-    result.resize(currentSize + sizeof(dataSize));
-    std::memcpy(result.data() + currentSize, &dataSize, sizeof(dataSize));
+    result.resize(sizeof(dataSize));
+    std::memcpy(result.data(), &dataSize, sizeof(dataSize));
 
     // Store the encrypted data
-    currentSize = result.size();
+    size_t currentSize = result.size();
     result.resize(currentSize + encryptedData.size());
     std::memcpy(result.data() + currentSize, encryptedData.data(), encryptedData.size());
 
@@ -127,8 +110,10 @@ std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &compressedData,
     return result;
 }
 
-// Decrypt data using AES-256-GCM
-std::vector<uint8_t> Crypto::decrypt(const std::vector<uint8_t> &encryptedData, const std::vector<uint8_t> &key)
+// Decrypt data using AES-256-GCM with provided IV
+std::vector<uint8_t> Crypto::decrypt(const std::vector<uint8_t> &encryptedData,
+                                     const std::vector<uint8_t> &key,
+                                     const std::vector<uint8_t> &iv)
 {
     try
     {
@@ -143,38 +128,22 @@ std::vector<uint8_t> Crypto::decrypt(const std::vector<uint8_t> &encryptedData, 
             throw std::runtime_error("Invalid key size. Expected 32 bytes for AES-256");
         }
 
-        // Ensure we have at least enough data for the IV size field
-        if (encryptedData.size() < sizeof(uint32_t))
-        {
-            throw std::runtime_error("Encrypted data too small - missing IV size");
-        }
-
-        // Extract the IV size
-        uint32_t ivSize;
-        std::memcpy(&ivSize, encryptedData.data(), sizeof(ivSize));
-
         // Validate IV size
-        if (ivSize != GCM_IV_SIZE || encryptedData.size() < sizeof(ivSize) + ivSize)
+        if (iv.size() != GCM_IV_SIZE)
         {
-            throw std::runtime_error("Invalid IV size or encrypted data too small");
+            throw std::runtime_error("Invalid IV size. Expected 12 bytes for GCM");
         }
 
-        // Extract the IV
-        std::vector<uint8_t> iv(ivSize);
-        std::memcpy(iv.data(), encryptedData.data() + sizeof(ivSize), ivSize);
-
-        // Position after IV
-        size_t position = sizeof(ivSize) + ivSize;
-
-        // Extract the encrypted data size
-        if (position + sizeof(uint32_t) > encryptedData.size())
+        // Ensure we have at least enough data for the data size field
+        if (encryptedData.size() < sizeof(uint32_t))
         {
             throw std::runtime_error("Encrypted data too small - missing data size");
         }
 
+        // Extract the encrypted data size
         uint32_t dataSize;
-        std::memcpy(&dataSize, encryptedData.data() + position, sizeof(dataSize));
-        position += sizeof(dataSize);
+        std::memcpy(&dataSize, encryptedData.data(), sizeof(dataSize));
+        size_t position = sizeof(dataSize);
 
         // Validate data size
         if (position + dataSize > encryptedData.size())

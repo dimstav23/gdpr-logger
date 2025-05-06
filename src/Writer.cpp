@@ -50,11 +50,11 @@ void Writer::processLogEntries()
     std::vector<QueueItem> batch;
 
     Crypto crypto;
-    std::vector<uint8_t> encryptionKey(32, 0x42); // dummy key
+    std::vector<uint8_t> encryptionKey(crypto.KEY_SIZE, 0x42); // dummy key
+    std::vector<uint8_t> dummyIV(crypto.GCM_IV_SIZE, 0x24);    // dummy IV
 
     while (m_running)
     {
-        // Try to dequeue a batch of log entries
         size_t entriesDequeued = m_queue.dequeueBatch(batch, m_batchSize);
         if (entriesDequeued == 0)
         {
@@ -62,7 +62,6 @@ void Writer::processLogEntries()
             continue;
         }
 
-        // Group log entries by destination (either default storage or specific file)
         std::map<std::optional<std::string>, std::vector<std::vector<uint8_t>>> groupedSerializedEntries;
 
         // Serialize all entries first, then group by destination
@@ -72,22 +71,11 @@ void Writer::processLogEntries()
             groupedSerializedEntries[item.targetFilename].push_back(serializedEntry);
         }
 
-        // Process each group separately
         for (const auto &[targetFilename, serializedEntries] : groupedSerializedEntries)
         {
-            // Compress the batch of serialized entries
             std::vector<uint8_t> compressedData = Compression::compressBatch(serializedEntries);
 
-            // encrypt if encryption is enabled
-            std::vector<uint8_t> dataToWrite;
-            if (m_useEncryption)
-            {
-                dataToWrite = crypto.encrypt(compressedData, encryptionKey);
-            }
-            else
-            {
-                dataToWrite = compressedData;
-            }
+            std::vector<uint8_t> dataToWrite = m_useEncryption ? crypto.encrypt(compressedData, encryptionKey, dummyIV) : compressedData;
 
             if (targetFilename)
             {
@@ -95,7 +83,6 @@ void Writer::processLogEntries()
             }
             else
             {
-                // Write to default segmented storage
                 m_storage->write(dataToWrite);
             }
         }
