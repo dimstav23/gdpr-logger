@@ -161,8 +161,8 @@ int main()
     baseConfig.appendTimeout = std::chrono::milliseconds(300000);
     // benchmark parameters
     const int numProducers = 25;
-    const int entriesPerProducer = 500000;
-    const int producerBatchSize = 100;
+    const int entriesPerProducer = 1000000;
+    const int producerBatchSize = 50;
 
     std::vector<int> numFilesVariants = {0, 10, 50, 100, 250, 500, 1000};
 

@@ -37,8 +37,8 @@ int main()
     const int numBursts = 10;
     const int numSpecificFiles = 0;
     const int producerBatchSize = config.queueCapacity;
-    const int entriesPerBurst = config.queueCapacity;
-    const int waitBetweenBurstsSec = 2.5;
+    const int entriesPerBurst = 2 * config.queueCapacity;
+    const int waitBetweenBurstsSec = 5;
 
     cleanupLogDirectory(config.basePath);
 
