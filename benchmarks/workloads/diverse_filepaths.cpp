@@ -86,7 +86,7 @@ BenchmarkResult runFilepathDiversityBenchmark(const LoggingConfig &config, int n
         writeAmplification};
 }
 
-void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::vector<int> &numFilesVariants,
+void runFilepathDiversityComparison(const LoggingConfig &config, const std::vector<int> &numFilesVariants,
                                     int numProducerThreads, int entriesPerProducer, int producerBatchSize)
 {
     std::vector<BenchmarkResult> results;
@@ -114,7 +114,7 @@ void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::
         std::cout << "\nRunning benchmark with " << descriptions[i] << "..." << std::endl;
 
         BenchmarkResult result = runFilepathDiversityBenchmark(
-            baseConfig,
+            config,
             fileCount,
             numProducerThreads, entriesPerProducer, producerBatchSize);
 
@@ -150,23 +150,24 @@ void runFilepathDiversityComparison(const LoggingConfig &baseConfig, const std::
 int main()
 {
     // system parameters
-    LoggingConfig baseConfig;
-    baseConfig.baseFilename = "gdpr_audit";
-    baseConfig.maxSegmentSize = 5 * 1024 * 1024; // 5 MB
-    baseConfig.maxAttempts = 5;
-    baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.queueCapacity = 2000000;
-    baseConfig.batchSize = 750;
-    baseConfig.numWriterThreads = 4;
-    baseConfig.appendTimeout = std::chrono::milliseconds(300000);
+    LoggingConfig config;
+    config.baseFilename = "gdpr_audit";
+    config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+    config.maxAttempts = 5;
+    config.baseRetryDelay = std::chrono::milliseconds(1);
+    config.queueCapacity = 3000000;
+    config.batchSize = 8400;
+    config.numWriterThreads = 12;
+    config.appendTimeout = std::chrono::minutes(2);
+    config.useEncryption = true;
     // benchmark parameters
     const int numProducers = 25;
     const int entriesPerProducer = 1000000;
     const int producerBatchSize = 50;
 
-    std::vector<int> numFilesVariants = {0, 10, 50, 100, 250, 500, 1000};
+    std::vector<int> numFilesVariants = {0, 10, 50, 100, 250, 500, 1000, 10000};
 
-    runFilepathDiversityComparison(baseConfig,
+    runFilepathDiversityComparison(config,
                                    numFilesVariants,
                                    numProducers,
                                    entriesPerProducer,

@@ -128,17 +128,18 @@ int main()
     // system parameters
     LoggingConfig baseConfig;
     baseConfig.baseFilename = "gdpr_audit";
-    baseConfig.maxSegmentSize = 1 * 1024 * 1024; // 1 MB
+    baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 3000000;
-    baseConfig.batchSize = 6000;
-    baseConfig.appendTimeout = std::chrono::seconds(90);
-    baseConfig.numWriterThreads = 6;
+    baseConfig.batchSize = 8400;
+    baseConfig.numWriterThreads = 12;
+    baseConfig.appendTimeout = std::chrono::minutes(2);
+    baseConfig.useEncryption = true;
     // benchmark parameters
     const int numSpecificFiles = 0;
     const int producerBatchSize = 50;
-    const int entriesPerProducer = 1000000;
+    const int entriesPerProducer = 3000000;
 
     std::vector<int> producerThreadCounts = {1, 2, 4, 8, 16, 32};
 

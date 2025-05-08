@@ -34,11 +34,11 @@ int main()
     config.numWriterThreads = 6;
     config.appendTimeout = std::chrono::minutes(2);
     // benchmark parameters
-    const int numBursts = 10;
-    const int numSpecificFiles = 0;
+    const int numBursts = 5;
+    const int numSpecificFiles = 100;
     const int producerBatchSize = config.queueCapacity;
-    const int entriesPerBurst = 2 * config.queueCapacity;
-    const int waitBetweenBurstsSec = 5;
+    const int entriesPerBurst = 10 * config.queueCapacity;
+    const int waitBetweenBurstsSec = 10;
 
     cleanupLogDirectory(config.basePath);
 
