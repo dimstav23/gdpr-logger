@@ -153,11 +153,11 @@ int main()
     LoggingConfig config;
     config.baseFilename = "gdpr_audit";
     config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
-    config.maxAttempts = 5;
-    config.baseRetryDelay = std::chrono::milliseconds(1);
+    config.maxAttempts = 10;
+    config.baseRetryDelay = std::chrono::milliseconds(2);
     config.queueCapacity = 3000000;
     config.batchSize = 8400;
-    config.numWriterThreads = 12;
+    config.numWriterThreads = 32;
     config.appendTimeout = std::chrono::minutes(2);
     config.useEncryption = true;
     // benchmark parameters
@@ -165,7 +165,7 @@ int main()
     const int entriesPerProducer = 1000000;
     const int producerBatchSize = 50;
 
-    std::vector<int> numFilesVariants = {0, 10, 50, 100, 250, 500, 1000, 10000};
+    std::vector<int> numFilesVariants = {0, 10, 50, 100, 250, 500, 1000, 5000};
 
     runFilepathDiversityComparison(config,
                                    numFilesVariants,

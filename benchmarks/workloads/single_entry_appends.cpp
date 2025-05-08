@@ -6,16 +6,8 @@
 #include <vector>
 #include <future>
 #include <optional>
-#include <iomanip>
 #include <filesystem>
-
-struct BenchmarkResult
-{
-    double executionTime;
-    double throughputEntries;
-    double throughputGiB;
-    double writeAmplification;
-};
+#include <numeric>
 
 void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
 {
@@ -31,11 +23,25 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
     }
 }
 
-BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numProducerThreads,
-                             int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
+int main()
 {
-    LoggingConfig config = baseConfig;
-    config.basePath = "./logs/single_entries_" + std::to_string(numProducerThreads);
+    // system parameters
+    LoggingConfig config;
+    config.basePath = "./logs";
+    config.baseFilename = "gdpr_audit";
+    config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+    config.maxAttempts = 5;
+    config.baseRetryDelay = std::chrono::milliseconds(1);
+    config.queueCapacity = 3000000;
+    config.batchSize = 8400;
+    config.numWriterThreads = 32;
+    config.appendTimeout = std::chrono::minutes(2);
+    config.useEncryption = true;
+    // benchmark parameters
+    const int numProducerThreads = 64;
+    const int entriesPerProducer = 25000;
+    const int numSpecificFiles = 25;
+    const int producerBatchSize = 1;
 
     cleanupLogDirectory(config.basePath);
 
@@ -71,83 +77,25 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numProducerThr
     loggingSystem.stop(true);
 
     size_t finalStorageSize = calculateDirectorySize(config.basePath);
+    double finalStorageSizeGiB = static_cast<double>(finalStorageSize) / (1024 * 1024 * 1024);
     double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
 
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
-    double throughputEntries = totalEntries / elapsedSeconds;
-    double throughputGiB = totalDataSizeGiB / elapsedSeconds;
+    double entriesThroughput = totalEntries / elapsedSeconds;
+    double dataThroughputGiB = totalDataSizeGiB / elapsedSeconds;
+    double averageEntrySize = static_cast<double>(totalDataSizeBytes) / totalEntries;
 
-    return BenchmarkResult{
-        elapsedSeconds,
-        throughputEntries,
-        throughputGiB,
-        writeAmplification};
-}
-
-void runConcurrencyBenchmark(const LoggingConfig &baseConfig,
-                             const std::vector<int> &producerThreadCounts, int entriesPerProducer,
-                             int numSpecificFiles, int producerBatchSize)
-{
-    std::vector<BenchmarkResult> results;
-
-    for (int producerCount : producerThreadCounts)
-    {
-        std::cout << "\nRunning benchmark with " << producerCount << " producer thread(s)..." << std::endl;
-
-        BenchmarkResult result = runBenchmark(baseConfig, producerCount, entriesPerProducer,
-                                              numSpecificFiles, producerBatchSize);
-
-        results.push_back(result);
-    }
-
-    std::cout << "\n=================== PRODUCER THREAD BENCHMARK SUMMARY ===================" << std::endl;
-    std::cout << std::left << std::setw(20) << "Producer Threads"
-              << std::setw(25) << "Throughput (entries/s)"
-              << std::setw(20) << "Throughput (GiB/s)"
-              << std::setw(15) << "Speedup vs. 1"
-              << std::setw(20) << "Write Amplification" << std::endl;
-    std::cout << "-----------------------------------------------------------------------------------------------------------" << std::endl;
-
-    double baselineThroughputEntries = results[0].throughputEntries;
-
-    for (size_t i = 0; i < producerThreadCounts.size(); i++)
-    {
-        double speedup = results[i].throughputEntries / baselineThroughputEntries;
-        std::cout << std::left << std::setw(20) << producerThreadCounts[i]
-                  << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
-                  << std::setw(20) << std::fixed << std::setprecision(3) << results[i].throughputGiB
-                  << std::setw(15) << std::fixed << std::setprecision(2) << speedup
-                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification << std::endl;
-    }
-    std::cout << "==========================================================================================================" << std::endl;
-}
-
-int main()
-{
-    // system parameters
-    LoggingConfig baseConfig;
-    baseConfig.baseFilename = "gdpr_audit";
-    baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
-    baseConfig.maxAttempts = 5;
-    baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.queueCapacity = 3000000;
-    baseConfig.batchSize = 8400;
-    baseConfig.numWriterThreads = 12;
-    baseConfig.appendTimeout = std::chrono::minutes(2);
-    baseConfig.useEncryption = true;
-    // benchmark parameters
-    const int numSpecificFiles = 0;
-    const int producerBatchSize = 1;
-    const int entriesPerProducer = 500000;
-
-    std::vector<int> producerThreadCounts = {1, 2, 4, 8, 16, 32};
-
-    runConcurrencyBenchmark(baseConfig,
-                            producerThreadCounts,
-                            entriesPerProducer,
-                            numSpecificFiles,
-                            producerBatchSize);
+    std::cout << "============== Benchmark Results ==============" << std::endl;
+    std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;
+    std::cout << "Total entries appended: " << totalEntries << std::endl;
+    std::cout << "Average entry size: " << averageEntrySize << " bytes" << std::endl;
+    std::cout << "Total data written: " << totalDataSizeGiB << " GiB" << std::endl;
+    std::cout << "Throughput (entries): " << entriesThroughput << " entries/second" << std::endl;
+    std::cout << "Throughput (data): " << dataThroughputGiB << " GiB/second" << std::endl;
+    std::cout << "Final storage size: " << finalStorageSizeGiB << " GiB" << std::endl;
+    std::cout << "Write amplification: " << writeAmplification << " (ratio)" << std::endl;
+    std::cout << "===============================================" << std::endl;
 
     return 0;
 }

@@ -34,7 +34,7 @@ int main()
     config.baseRetryDelay = std::chrono::milliseconds(1);
     config.queueCapacity = 3000000;
     config.batchSize = 8400;
-    config.numWriterThreads = 12;
+    config.numWriterThreads = 32;
     config.appendTimeout = std::chrono::minutes(2);
     config.useEncryption = true;
     // benchmark parameters

@@ -30,15 +30,16 @@ int main()
     config.maxAttempts = 5;
     config.baseRetryDelay = std::chrono::milliseconds(1);
     config.queueCapacity = 3000000;
-    config.batchSize = 6500;
-    config.numWriterThreads = 6;
+    config.batchSize = 8400;
+    config.numWriterThreads = 32;
     config.appendTimeout = std::chrono::minutes(2);
+    config.useEncryption = true;
     // benchmark parameters
     const int numBursts = 5;
     const int numSpecificFiles = 100;
     const int producerBatchSize = config.queueCapacity;
     const int entriesPerBurst = 10 * config.queueCapacity;
-    const int waitBetweenBurstsSec = 10;
+    const int waitBetweenBurstsSec = 3;
 
     cleanupLogDirectory(config.basePath);
 
