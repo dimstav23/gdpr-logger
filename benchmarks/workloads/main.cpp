@@ -36,19 +36,19 @@ int main()
     config.batchSize = 8400;
     config.numWriterThreads = 12;
     config.appendTimeout = std::chrono::minutes(2);
-    config.useEncryption = false;
+    config.useEncryption = true;
     // benchmark parameters
-    const int numProducerThreads = 32;
-    const int entriesPerProducer = 1000000;
     const int numSpecificFiles = 100;
     const int producerBatchSize = 1000;
+    const int numProducers = 32;
+    const int entriesPerProducer = 3000000;
 
     cleanupLogDirectory(config.basePath);
 
     std::cout << "Generating batches with pre-determined destinations...";
     std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
     std::cout << " Done." << std::endl;
-    size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducerThreads);
+    size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducers);
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
     std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes (" << totalDataSizeGiB << " GiB)" << std::endl;
 
@@ -57,7 +57,7 @@ int main()
     auto startTime = std::chrono::high_resolution_clock::now();
 
     std::vector<std::future<void>> futures;
-    for (int i = 0; i < numProducerThreads; i++)
+    for (int i = 0; i < numProducers; i++)
     {
         futures.push_back(std::async(
             std::launch::async,
@@ -81,7 +81,7 @@ int main()
     double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
 
     double elapsedSeconds = elapsed.count();
-    const size_t totalEntries = numProducerThreads * entriesPerProducer;
+    const size_t totalEntries = numProducers * entriesPerProducer;
     double entriesThroughput = totalEntries / elapsedSeconds;
     double dataThroughputGiB = totalDataSizeGiB / elapsedSeconds;
     double averageEntrySize = static_cast<double>(totalDataSizeBytes) / totalEntries;

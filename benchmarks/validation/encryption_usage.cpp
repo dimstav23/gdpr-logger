@@ -99,22 +99,22 @@ int main()
     baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.queueCapacity = 1500000;
-    baseConfig.batchSize = 25;
-    baseConfig.numWriterThreads = 4;
-    baseConfig.appendTimeout = std::chrono::minutes(1);
+    baseConfig.queueCapacity = 3000000;
+    baseConfig.batchSize = 8400;
+    baseConfig.numWriterThreads = 12;
+    baseConfig.appendTimeout = std::chrono::minutes(2);
     // Benchmark parameters
-    const int numProducerThreads = 20;
-    const int entriesPerProducer = 500000;
-    const int numSpecificFiles = 25;
-    const int producerBatchSize = 100;
+    const int numSpecificFiles = 100;
+    const int producerBatchSize = 1000;
+    const int numProducers = 32;
+    const int entriesPerProducer = 3000000;
 
     std::cout << "Generating batches with pre-determined destinations for all threads...";
     std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
     std::cout << " Done." << std::endl;
 
-    BenchmarkResult resultEncrypted = runBenchmark(baseConfig, true, batches, numProducerThreads, entriesPerProducer);
-    BenchmarkResult resultUnencrypted = runBenchmark(baseConfig, false, batches, numProducerThreads, entriesPerProducer);
+    BenchmarkResult resultEncrypted = runBenchmark(baseConfig, true, batches, numProducers, entriesPerProducer);
+    BenchmarkResult resultUnencrypted = runBenchmark(baseConfig, false, batches, numProducers, entriesPerProducer);
 
     std::cout << "\n============== ENCRYPTION BENCHMARK SUMMARY ==============" << std::endl;
     std::cout << std::left << std::setw(15) << "Encryption"
