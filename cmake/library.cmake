@@ -1,7 +1,7 @@
 set(LIBRARY_SOURCES
     src/LogEntry.cpp
     src/LoggingAPI.cpp
-    src/LockFreeQueue.cpp
+    src/BufferQueue.cpp
     src/Compression.cpp
     src/Crypto.cpp
     src/Writer.cpp

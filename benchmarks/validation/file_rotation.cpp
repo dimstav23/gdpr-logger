@@ -165,7 +165,7 @@ int main()
 {
     // system parameters
     LoggingConfig baseConfig;
-    baseConfig.baseFilename = "gdpr_audit";
+    baseConfig.baseFilename = "default";
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 3000000;

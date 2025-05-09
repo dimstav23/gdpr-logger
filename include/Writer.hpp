@@ -6,13 +6,13 @@
 #include <memory>
 #include <vector>
 #include "QueueItem.hpp"
-#include "LockFreeQueue.hpp"
+#include "BufferQueue.hpp"
 #include "SegmentedStorage.hpp"
 
 class Writer
 {
 public:
-    explicit Writer(LockFreeQueue &queue,
+    explicit Writer(BufferQueue &queue,
                     std::shared_ptr<SegmentedStorage> storage,
                     size_t batchSize = 100,
                     bool useEncryption = true);
@@ -26,7 +26,7 @@ public:
 private:
     void processLogEntries();
 
-    LockFreeQueue &m_queue;
+    BufferQueue &m_queue;
     std::shared_ptr<SegmentedStorage> m_storage;
     std::unique_ptr<std::thread> m_writerThread;
     std::atomic<bool> m_running{false};

@@ -1,22 +1,22 @@
-#include "LockFreeQueue.hpp"
+#include "BufferQueue.hpp"
 #include <algorithm>
 #include <thread>
 #include <iostream>
 #include <chrono>
 #include <cmath>
 
-LockFreeQueue::LockFreeQueue(size_t capacity)
+BufferQueue::BufferQueue(size_t capacity)
 {
     // Moodycamel queue has dynamic capacity, but hint the initial size
     m_queue = moodycamel::ConcurrentQueue<QueueItem>(capacity);
 }
 
-LockFreeQueue::~LockFreeQueue()
+BufferQueue::~BufferQueue()
 {
     m_flushCondition.notify_one();
 }
 
-bool LockFreeQueue::enqueue(const QueueItem &item)
+bool BufferQueue::enqueue(const QueueItem &item)
 {
     bool result = m_queue.enqueue(item);
     if (result)
@@ -26,7 +26,7 @@ bool LockFreeQueue::enqueue(const QueueItem &item)
     return result;
 }
 
-bool LockFreeQueue::enqueueBlocking(const QueueItem &item, std::chrono::milliseconds timeout)
+bool BufferQueue::enqueueBlocking(const QueueItem &item, std::chrono::milliseconds timeout)
 {
     auto start = std::chrono::steady_clock::now();
     int backoffMs = 1;
@@ -65,7 +65,7 @@ bool LockFreeQueue::enqueueBlocking(const QueueItem &item, std::chrono::millisec
     }
 }
 
-bool LockFreeQueue::enqueueBatch(const std::vector<QueueItem> &items)
+bool BufferQueue::enqueueBatch(const std::vector<QueueItem> &items)
 {
     bool result = m_queue.enqueue_bulk(items.begin(), items.size());
     if (result)
@@ -75,8 +75,8 @@ bool LockFreeQueue::enqueueBatch(const std::vector<QueueItem> &items)
     return result;
 }
 
-bool LockFreeQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items,
-                                         std::chrono::milliseconds timeout)
+bool BufferQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items,
+                                       std::chrono::milliseconds timeout)
 {
     auto start = std::chrono::steady_clock::now();
     int backoffMs = 1;
@@ -115,7 +115,7 @@ bool LockFreeQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items,
     }
 }
 
-bool LockFreeQueue::dequeue(QueueItem &item)
+bool BufferQueue::dequeue(QueueItem &item)
 {
     if (m_queue.try_dequeue(item))
     {
@@ -126,7 +126,7 @@ bool LockFreeQueue::dequeue(QueueItem &item)
     return false;
 }
 
-size_t LockFreeQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItems)
+size_t BufferQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItems)
 {
     items.clear();
     items.resize(maxItems);
@@ -143,7 +143,7 @@ size_t LockFreeQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItem
     return dequeued;
 }
 
-bool LockFreeQueue::flush()
+bool BufferQueue::flush()
 {
     std::unique_lock<std::mutex> lock(m_flushMutex);
 
@@ -154,7 +154,7 @@ bool LockFreeQueue::flush()
     return true;
 }
 
-size_t LockFreeQueue::size() const
+size_t BufferQueue::size() const
 {
     return m_size.load(std::memory_order_relaxed);
 }

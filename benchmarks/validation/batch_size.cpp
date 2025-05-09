@@ -130,7 +130,7 @@ int main()
 {
     // system parameters
     LoggingConfig baseConfig;
-    baseConfig.baseFilename = "gdpr_audit";
+    baseConfig.baseFilename = "default";
     baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);

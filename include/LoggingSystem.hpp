@@ -3,7 +3,7 @@
 
 #include "Config.hpp"
 #include "LoggingAPI.hpp"
-#include "LockFreeQueue.hpp"
+#include "BufferQueue.hpp"
 #include "SegmentedStorage.hpp"
 #include "Writer.hpp"
 #include "LogEntry.hpp"
@@ -38,7 +38,7 @@ public:
                     std::chrono::system_clock::time_point toTimestamp = std::chrono::system_clock::time_point());
 
 private:
-    std::shared_ptr<LockFreeQueue> m_queue;         // Thread-safe queue for queue items
+    std::shared_ptr<BufferQueue> m_queue;           // Thread-safe queue for queue items
     std::shared_ptr<SegmentedStorage> m_storage;    // Manages append-only log segments
     std::vector<std::unique_ptr<Writer>> m_writers; // Multiple writer threads
     std::atomic<bool> m_running{false};             // System running state

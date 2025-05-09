@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "Writer.hpp"
-#include "LockFreeQueue.hpp"
+#include "BufferQueue.hpp"
 #include "SegmentedStorage.hpp"
 #include <chrono>
 #include <thread>
@@ -15,7 +15,7 @@ protected:
         // Create a temporary directory for test log segments
         testDir = "test_logs";
         std::filesystem::create_directories(testDir);
-        logQueue = std::make_unique<LockFreeQueue>(1024);
+        logQueue = std::make_unique<BufferQueue>(1024);
 
         // Create a SegmentedStorage instance with reduced sizes for testing
         storage = std::make_shared<SegmentedStorage>(
@@ -36,7 +36,7 @@ protected:
         std::filesystem::remove_all(testDir);
     }
 
-    std::unique_ptr<LockFreeQueue> logQueue;
+    std::unique_ptr<BufferQueue> logQueue;
     std::unique_ptr<Writer> writer;
     std::shared_ptr<SegmentedStorage> storage;
     std::string testDir;

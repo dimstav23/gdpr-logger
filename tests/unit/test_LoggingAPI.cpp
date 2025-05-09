@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 #include "LoggingAPI.hpp"
-#include "LockFreeQueue.hpp"
+#include "BufferQueue.hpp"
 #include <chrono>
 #include <thread>
 
@@ -12,8 +12,8 @@ protected:
         // Create a fresh instance for each test
         LoggingAPI::s_instance.reset();
 
-        // Create a LockFreeQueue instance
-        queue = std::make_shared<LockFreeQueue>(1024);
+        // Create a BufferQueue instance
+        queue = std::make_shared<BufferQueue>(1024);
     }
 
     void TearDown() override
@@ -22,7 +22,7 @@ protected:
         LoggingAPI::s_instance.reset();
     }
 
-    std::shared_ptr<LockFreeQueue> queue;
+    std::shared_ptr<BufferQueue> queue;
 };
 
 // Test getInstance returns the same instance
@@ -85,7 +85,7 @@ TEST_F(LoggingAPITest, AppendAfterInitialization2)
 TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    auto smallQueue = std::make_shared<LockFreeQueue>(2);
+    auto smallQueue = std::make_shared<BufferQueue>(2);
     EXPECT_TRUE(api.initialize(smallQueue, std::chrono::milliseconds(1000)));
 
     // Since queue grows dynamically, we'll test timeout instead
@@ -112,7 +112,7 @@ TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 TEST_F(LoggingAPITest, AppendTimeoutBehavior)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    auto queue = std::make_shared<LockFreeQueue>(1024);
+    auto queue = std::make_shared<BufferQueue>(1024);
 
     // Initialize with a very short timeout
     EXPECT_TRUE(api.initialize(queue, std::chrono::milliseconds(50)));

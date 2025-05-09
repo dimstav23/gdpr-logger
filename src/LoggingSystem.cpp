@@ -15,7 +15,7 @@ LoggingSystem::LoggingSystem(const LoggingConfig &config)
         throw std::runtime_error("Failed to create log directory: " + config.basePath);
     }
 
-    m_queue = std::make_shared<LockFreeQueue>(config.queueCapacity);
+    m_queue = std::make_shared<BufferQueue>(config.queueCapacity);
     m_storage = std::make_shared<SegmentedStorage>(
         config.basePath, config.baseFilename,
         config.maxSegmentSize,

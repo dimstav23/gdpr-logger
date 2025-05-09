@@ -5,7 +5,7 @@
 #include <chrono>
 #include <map>
 
-Writer::Writer(LockFreeQueue &queue,
+Writer::Writer(BufferQueue &queue,
                std::shared_ptr<SegmentedStorage> storage,
                size_t batchSize,
                bool useEncryption)

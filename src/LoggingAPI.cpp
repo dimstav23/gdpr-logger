@@ -31,7 +31,7 @@ LoggingAPI::~LoggingAPI()
     }
 }
 
-bool LoggingAPI::initialize(std::shared_ptr<LockFreeQueue> queue,
+bool LoggingAPI::initialize(std::shared_ptr<BufferQueue> queue,
                             std::chrono::milliseconds appendTimeout)
 {
     std::unique_lock<std::shared_mutex> lock(m_apiMutex);

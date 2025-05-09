@@ -1,5 +1,5 @@
 #include <gtest/gtest.h>
-#include "LockFreeQueue.hpp"
+#include "BufferQueue.hpp"
 #include <thread>
 #include <vector>
 #include <atomic>
@@ -8,13 +8,13 @@
 #include <random>
 
 // Basic functionality tests
-class LockFreeQueueBasicTest : public ::testing::Test
+class BufferQueueBasicTest : public ::testing::Test
 {
 protected:
     void SetUp() override
     {
         // Create a new queue for each test
-        queue = std::make_unique<LockFreeQueue>(TEST_QUEUE_SIZE);
+        queue = std::make_unique<BufferQueue>(TEST_QUEUE_SIZE);
     }
 
     void TearDown() override
@@ -43,11 +43,11 @@ protected:
     }
 
     const size_t TEST_QUEUE_SIZE = 16; // Small size for testing
-    std::unique_ptr<LockFreeQueue> queue;
+    std::unique_ptr<BufferQueue> queue;
 };
 
 // Test enqueue and dequeue operations
-TEST_F(LockFreeQueueBasicTest, EnqueueDequeue)
+TEST_F(BufferQueueBasicTest, EnqueueDequeue)
 {
     QueueItem item = createTestItem(1);
     QueueItem retrievedItem;
@@ -72,7 +72,7 @@ TEST_F(LockFreeQueueBasicTest, EnqueueDequeue)
 }
 
 // Test enqueue until full - Modified for dynamic queue
-TEST_F(LockFreeQueueBasicTest, EnqueueUntilFull)
+TEST_F(BufferQueueBasicTest, EnqueueUntilFull)
 {
     // New test focuses on verifying queue doesn't fail under load
     const size_t MANY_ITEMS = TEST_QUEUE_SIZE * 3;
@@ -87,7 +87,7 @@ TEST_F(LockFreeQueueBasicTest, EnqueueUntilFull)
 }
 
 // Test enqueue with consumer thread - Modified for dynamic queue
-TEST_F(LockFreeQueueBasicTest, EnqueueWithConsumer)
+TEST_F(BufferQueueBasicTest, EnqueueWithConsumer)
 {
     // Fill the queue with items
     for (size_t i = 0; i < TEST_QUEUE_SIZE * 2; i++) // More than initial capacity
@@ -124,14 +124,14 @@ TEST_F(LockFreeQueueBasicTest, EnqueueWithConsumer)
 }
 
 // Test dequeue from empty queue
-TEST_F(LockFreeQueueBasicTest, DequeueFromEmpty)
+TEST_F(BufferQueueBasicTest, DequeueFromEmpty)
 {
     QueueItem item;
     EXPECT_FALSE(queue->dequeue(item));
 }
 
 // Test batch dequeue
-TEST_F(LockFreeQueueBasicTest, BatchDequeue)
+TEST_F(BufferQueueBasicTest, BatchDequeue)
 {
     const size_t numEntries = 5;
 
@@ -158,7 +158,7 @@ TEST_F(LockFreeQueueBasicTest, BatchDequeue)
 }
 
 // Test batch dequeue with more items requested than available
-TEST_F(LockFreeQueueBasicTest, BatchDequeuePartial)
+TEST_F(BufferQueueBasicTest, BatchDequeuePartial)
 {
     const size_t numEntries = 3;
     const size_t requestSize = 5;
@@ -180,7 +180,7 @@ TEST_F(LockFreeQueueBasicTest, BatchDequeuePartial)
 }
 
 // Test batch enqueue functionality
-TEST_F(LockFreeQueueBasicTest, BatchEnqueue)
+TEST_F(BufferQueueBasicTest, BatchEnqueue)
 {
     const size_t numEntries = 5;
     std::vector<QueueItem> itemsToEnqueue;
@@ -209,7 +209,7 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueue)
 }
 
 // Test batch enqueue with growing queue - Modified for dynamic queue
-TEST_F(LockFreeQueueBasicTest, BatchEnqueueWhenAlmostFull)
+TEST_F(BufferQueueBasicTest, BatchEnqueueWhenAlmostFull)
 {
     // Fill the queue beyond initial capacity
     for (size_t i = 0; i < TEST_QUEUE_SIZE * 2; i++)
@@ -236,7 +236,7 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueueWhenAlmostFull)
 }
 
 // Test batch enqueue with dynamic growth - Modified for dynamic queue
-TEST_F(LockFreeQueueBasicTest, BatchEnqueueBlocking)
+TEST_F(BufferQueueBasicTest, BatchEnqueueBlocking)
 {
     // Fill the queue with items
     for (size_t i = 0; i < TEST_QUEUE_SIZE + 10; i++)
@@ -268,7 +268,7 @@ TEST_F(LockFreeQueueBasicTest, BatchEnqueueBlocking)
 }
 
 // Test flush method
-TEST_F(LockFreeQueueBasicTest, Flush)
+TEST_F(BufferQueueBasicTest, Flush)
 {
     const size_t numEntries = 5;
 
@@ -293,7 +293,7 @@ TEST_F(LockFreeQueueBasicTest, Flush)
 }
 
 // Test for QueueItem with targetFilename
-TEST_F(LockFreeQueueBasicTest, QueueItemWithTargetFilename)
+TEST_F(BufferQueueBasicTest, QueueItemWithTargetFilename)
 {
     // Create items with target filenames
     QueueItem item1 = createTestItemWithTarget(1, "file1.log");
@@ -323,13 +323,13 @@ TEST_F(LockFreeQueueBasicTest, QueueItemWithTargetFilename)
 }
 
 // Thread safety tests
-class LockFreeQueueThreadTest : public ::testing::Test
+class BufferQueueThreadTest : public ::testing::Test
 {
 protected:
     void SetUp() override
     {
         // Create a new queue for each test with larger capacity
-        queue = std::make_unique<LockFreeQueue>(QUEUE_CAPACITY);
+        queue = std::make_unique<BufferQueue>(QUEUE_CAPACITY);
     }
 
     void TearDown() override
@@ -350,11 +350,11 @@ protected:
     }
 
     const size_t QUEUE_CAPACITY = 4096;
-    std::unique_ptr<LockFreeQueue> queue;
+    std::unique_ptr<BufferQueue> queue;
 };
 
 // Test multiple producers, single consumer
-TEST_F(LockFreeQueueThreadTest, MultipleProducersSingleConsumer)
+TEST_F(BufferQueueThreadTest, MultipleProducersSingleConsumer)
 {
     const int NUM_PRODUCERS = 4;
     const int ENTRIES_PER_PRODUCER = 1000;
@@ -411,7 +411,7 @@ TEST_F(LockFreeQueueThreadTest, MultipleProducersSingleConsumer)
 }
 
 // Test single producer, multiple consumers
-TEST_F(LockFreeQueueThreadTest, SingleProducerMultipleConsumers)
+TEST_F(BufferQueueThreadTest, SingleProducerMultipleConsumers)
 {
     const int NUM_CONSUMERS = 4;
     const int TOTAL_ENTRIES = 10000;
@@ -458,7 +458,7 @@ TEST_F(LockFreeQueueThreadTest, SingleProducerMultipleConsumers)
 }
 
 // Test multiple producers with batch enqueue
-TEST_F(LockFreeQueueThreadTest, MultipleBatchProducers)
+TEST_F(BufferQueueThreadTest, MultipleBatchProducers)
 {
     const int NUM_PRODUCERS = 4;
     const int BATCHES_PER_PRODUCER = 50;
@@ -514,7 +514,7 @@ TEST_F(LockFreeQueueThreadTest, MultipleBatchProducers)
 }
 
 // Test mixed batch and single item operations
-TEST_F(LockFreeQueueThreadTest, MixedBatchOperations)
+TEST_F(BufferQueueThreadTest, MixedBatchOperations)
 {
     const int NUM_THREADS = 6;
     const int OPS_PER_THREAD = 200;
@@ -594,7 +594,7 @@ TEST_F(LockFreeQueueThreadTest, MixedBatchOperations)
 }
 
 // Test batch dequeue with multiple threads
-TEST_F(LockFreeQueueThreadTest, BatchDequeueMultipleThreads)
+TEST_F(BufferQueueThreadTest, BatchDequeueMultipleThreads)
 {
     const int NUM_PRODUCERS = 4;
     const int NUM_CONSUMERS = 2;
@@ -661,7 +661,7 @@ TEST_F(LockFreeQueueThreadTest, BatchDequeueMultipleThreads)
 }
 
 // Stress test with random operations
-TEST_F(LockFreeQueueThreadTest, RandomizedStressTest)
+TEST_F(BufferQueueThreadTest, RandomizedStressTest)
 {
     const int NUM_THREADS = 8;
     const int OPS_PER_THREAD = 5000;
@@ -722,10 +722,10 @@ TEST_F(LockFreeQueueThreadTest, RandomizedStressTest)
 }
 
 // Test dynamic queue growth - Modified for dynamic queue
-TEST_F(LockFreeQueueThreadTest, DynamicQueueGrowth)
+TEST_F(BufferQueueThreadTest, DynamicQueueGrowth)
 {
     const size_t SMALL_CAPACITY = 128;
-    auto smallQueue = std::make_unique<LockFreeQueue>(SMALL_CAPACITY);
+    auto smallQueue = std::make_unique<BufferQueue>(SMALL_CAPACITY);
 
     // Fill the queue well beyond initial capacity
     size_t enqueued = 0;
@@ -745,13 +745,13 @@ TEST_F(LockFreeQueueThreadTest, DynamicQueueGrowth)
 }
 
 // Test timed operations
-class LockFreeQueueTimingTest : public ::testing::Test
+class BufferQueueTimingTest : public ::testing::Test
 {
 protected:
     void SetUp() override
     {
         // Create a new queue for each test
-        queue = std::make_unique<LockFreeQueue>(QUEUE_CAPACITY);
+        queue = std::make_unique<BufferQueue>(QUEUE_CAPACITY);
     }
 
     void TearDown() override
@@ -772,11 +772,11 @@ protected:
     }
 
     const size_t QUEUE_CAPACITY = 1024;
-    std::unique_ptr<LockFreeQueue> queue;
+    std::unique_ptr<BufferQueue> queue;
 };
 
 // Test flush timeout
-TEST_F(LockFreeQueueTimingTest, FlushWithTimeout)
+TEST_F(BufferQueueTimingTest, FlushWithTimeout)
 {
     // Enqueue some items
     for (int i = 0; i < 10; i++)

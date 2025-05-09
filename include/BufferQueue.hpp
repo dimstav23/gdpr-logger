@@ -1,5 +1,5 @@
-#ifndef LOCK_FREE_QUEUE_HPP
-#define LOCK_FREE_QUEUE_HPP
+#ifndef BUFFER_QUEUE_HPP
+#define BUFFER_QUEUE_HPP
 
 #include "QueueItem.hpp"
 #include "concurrentqueue.h"
@@ -10,7 +10,7 @@
 #include <condition_variable>
 #include <chrono>
 
-class LockFreeQueue
+class BufferQueue
 {
 private:
     moodycamel::ConcurrentQueue<QueueItem> m_queue;
@@ -22,8 +22,8 @@ private:
     std::condition_variable m_flushCondition;
 
 public:
-    explicit LockFreeQueue(size_t capacity = 8192);
-    ~LockFreeQueue();
+    explicit BufferQueue(size_t capacity = 8192);
+    ~BufferQueue();
 
     bool enqueueBlocking(const QueueItem &item, std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
     bool enqueueBatchBlocking(const std::vector<QueueItem> &items,
@@ -35,10 +35,10 @@ public:
     bool isEmpty() const { return size() == 0; }
 
     // delete copy/move
-    LockFreeQueue(const LockFreeQueue &) = delete;
-    LockFreeQueue &operator=(const LockFreeQueue &) = delete;
-    LockFreeQueue(LockFreeQueue &&) = delete;
-    LockFreeQueue &operator=(LockFreeQueue &&) = delete;
+    BufferQueue(const BufferQueue &) = delete;
+    BufferQueue &operator=(const BufferQueue &) = delete;
+    BufferQueue(BufferQueue &&) = delete;
+    BufferQueue &operator=(BufferQueue &&) = delete;
 
 private:
     bool enqueue(const QueueItem &item);
