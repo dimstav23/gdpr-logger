@@ -63,10 +63,9 @@ int main()
         }
     }
 
+    loggingSystem.stop(true);
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
-    std::cout << "All bursts finished" << std::endl;
-    loggingSystem.stop(true);
 
     size_t finalStorageSize = calculateDirectorySize(config.basePath);
     double finalStorageSizeGiB = static_cast<double>(finalStorageSize) / (1024 * 1024 * 1024);

@@ -69,9 +69,9 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
         future.wait();
     }
 
+    loggingSystem.stop(true);
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
-    loggingSystem.stop(true);
 
     size_t finalStorageSize = calculateDirectorySize(config.basePath);
     double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;

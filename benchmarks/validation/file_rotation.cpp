@@ -90,10 +90,9 @@ BenchmarkResult runFileRotationBenchmark(
         future.wait();
     }
 
+    loggingSystem.stop(true);
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
-    std::cout << "All log entries processed" << std::endl;
-    loggingSystem.stop(true);
 
     size_t finalStorageSize = calculateDirectorySize(logDir);
     double writeAmplification = static_cast<double>(finalStorageSize) / totalDataSizeBytes;
