@@ -34,22 +34,6 @@ TEST(LogEntryTest2, ParameterizedConstructor_SetsFieldsCorrectly)
                 std::chrono::system_clock::to_time_t(now), 1);
 }
 
-// Test setter methods
-TEST(LogEntryTest3, Setters_UpdateFieldsCorrectly)
-{
-    LogEntry entry;
-
-    entry.setActionType(LogEntry::ActionType::DELETE);
-    entry.setDataLocation("server/logs");
-    entry.setUserId("admin");
-    entry.setDataSubjectId("subject789");
-
-    EXPECT_EQ(entry.getActionType(), LogEntry::ActionType::DELETE);
-    EXPECT_EQ(entry.getDataLocation(), "server/logs");
-    EXPECT_EQ(entry.getUserId(), "admin");
-    EXPECT_EQ(entry.getDataSubjectId(), "subject789");
-}
-
 // Test serialization and deserialization
 TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
 {

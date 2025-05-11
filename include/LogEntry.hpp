@@ -31,19 +31,10 @@ public:
     bool deserialize(const std::vector<uint8_t> &data);
 
     ActionType getActionType() const { return m_actionType; }
-    void setActionType(ActionType actionType) { m_actionType = actionType; }
-
     std::string getDataLocation() const { return m_dataLocation; }
-    void setDataLocation(const std::string &dataLocation) { m_dataLocation = dataLocation; }
-
     std::string getUserId() const { return m_userId; }
-    void setUserId(const std::string &userId) { m_userId = userId; }
-
     std::string getDataSubjectId() const { return m_dataSubjectId; }
-    void setDataSubjectId(const std::string &dataSubjectId) { m_dataSubjectId = dataSubjectId; }
-
     std::chrono::system_clock::time_point getTimestamp() const { return m_timestamp; }
-    void setTimestamp(const std::chrono::system_clock::time_point &timestamp) { m_timestamp = timestamp; }
 
 private:
     // Helper methods for binary serialization
