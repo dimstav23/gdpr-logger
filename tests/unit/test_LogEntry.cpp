@@ -61,3 +61,43 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_NEAR(std::chrono::system_clock::to_time_t(newEntry.getTimestamp()),
                 std::chrono::system_clock::to_time_t(entry.getTimestamp()), 1);
 }
+
+// Test batch serialization and deserialization
+TEST(LogEntryTest5, BatchSerializationDeserialization_WorksCorrectly)
+{
+    // Create a batch of log entries
+    std::vector<LogEntry> originalEntries;
+
+    // Add various entries with different action types and data
+    originalEntries.push_back(LogEntry(LogEntry::ActionType::CREATE, "db/users", "admin1", "user1"));
+    originalEntries.push_back(LogEntry(LogEntry::ActionType::READ, "files/documents", "user2", "doc1"));
+    originalEntries.push_back(LogEntry(LogEntry::ActionType::UPDATE, "cache/profiles", "editor1", "profile5"));
+    originalEntries.push_back(LogEntry(LogEntry::ActionType::DELETE, "archive/logs", "admin2", "log10"));
+
+    // Serialize the batch
+    std::vector<uint8_t> batchData = LogEntry::serializeBatch(originalEntries);
+
+    // Check that the batch has reasonable size
+    EXPECT_GT(batchData.size(), sizeof(uint32_t)); // At least space for entry count
+
+    // Deserialize the batch
+    std::vector<LogEntry> recoveredEntries = LogEntry::deserializeBatch(batchData);
+
+    // Verify the number of entries
+    EXPECT_EQ(recoveredEntries.size(), originalEntries.size());
+
+    // Verify each entry's data
+    for (size_t i = 0; i < originalEntries.size() && i < recoveredEntries.size(); ++i)
+    {
+        EXPECT_EQ(recoveredEntries[i].getActionType(), originalEntries[i].getActionType());
+        EXPECT_EQ(recoveredEntries[i].getDataLocation(), originalEntries[i].getDataLocation());
+        EXPECT_EQ(recoveredEntries[i].getUserId(), originalEntries[i].getUserId());
+        EXPECT_EQ(recoveredEntries[i].getDataSubjectId(), originalEntries[i].getDataSubjectId());
+
+        // Compare timestamps (allowing 1 second difference for potential precision issues)
+        EXPECT_NEAR(
+            std::chrono::system_clock::to_time_t(recoveredEntries[i].getTimestamp()),
+            std::chrono::system_clock::to_time_t(originalEntries[i].getTimestamp()),
+            1);
+    }
+}

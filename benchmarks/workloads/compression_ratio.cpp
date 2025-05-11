@@ -25,11 +25,11 @@ std::string randomString(size_t minLen, size_t maxLen, std::mt19937 &rng)
     return result;
 }
 
-// Generate synthetic LogEntries and serialize them
-std::vector<std::vector<uint8_t>> generateSyntheticEntries(size_t count)
+// Generate synthetic LogEntries
+std::vector<LogEntry> generateSyntheticEntries(size_t count)
 {
-    std::vector<std::vector<uint8_t>> serializedEntries;
-    serializedEntries.reserve(count);
+    std::vector<LogEntry> entries;
+    entries.reserve(count);
 
     std::random_device rd;
     std::mt19937 rng(rd());
@@ -43,10 +43,10 @@ std::vector<std::vector<uint8_t>> generateSyntheticEntries(size_t count)
         std::string dataSubjectId = randomString(8, 12, rng);
 
         LogEntry entry(action, dataLocation, userId, dataSubjectId);
-        serializedEntries.push_back(entry.serialize());
+        entries.push_back(entry);
     }
 
-    return serializedEntries;
+    return entries;
 }
 
 struct Result
@@ -65,15 +65,13 @@ int main()
 
     for (auto n : batchSizes)
     {
-        auto serializedEntries = generateSyntheticEntries(n);
-
-        size_t uncompressedSize = 0;
-        for (const auto &e : serializedEntries)
-            uncompressedSize += e.size();
+        std::vector<LogEntry> entries = generateSyntheticEntries(n);
+        std::vector<uint8_t> serializedEntries = LogEntry::serializeBatch(entries);
+        size_t uncompressedSize = serializedEntries.size();
 
         // Compress and time
         auto start = std::chrono::high_resolution_clock::now();
-        auto compressed = Compression::compressBatch(serializedEntries);
+        std::vector<uint8_t> compressed = Compression::compress(serializedEntries);
         auto end = std::chrono::high_resolution_clock::now();
 
         size_t compressedSize = compressed.size();

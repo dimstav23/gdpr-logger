@@ -1,6 +1,7 @@
 #include "LogEntry.hpp"
 #include <cstring>
 #include <stdexcept>
+#include <iostream>
 
 LogEntry::LogEntry()
     : m_actionType(ActionType::CREATE),
@@ -92,6 +93,99 @@ bool LogEntry::deserialize(const std::vector<uint8_t> &data)
     {
         return false;
     }
+}
+
+std::vector<uint8_t> LogEntry::serializeBatch(const std::vector<LogEntry> &entries)
+{
+    std::vector<uint8_t> batchData;
+
+    // First, store the number of entries
+    uint32_t numEntries = entries.size();
+    batchData.resize(sizeof(numEntries));
+    std::memcpy(batchData.data(), &numEntries, sizeof(numEntries));
+
+    // Then serialize and append each entry
+    for (const auto &entry : entries)
+    {
+        // Get the serialized entry
+        std::vector<uint8_t> entryData = entry.serialize();
+
+        // Store the size of the serialized entry
+        uint32_t entrySize = entryData.size();
+        size_t currentSize = batchData.size();
+        batchData.resize(currentSize + sizeof(entrySize));
+        std::memcpy(batchData.data() + currentSize, &entrySize, sizeof(entrySize));
+
+        // Store the serialized entry
+        currentSize = batchData.size();
+        batchData.resize(currentSize + entryData.size());
+        std::memcpy(batchData.data() + currentSize, entryData.data(), entryData.size());
+    }
+
+    return batchData;
+}
+
+std::vector<LogEntry> LogEntry::deserializeBatch(const std::vector<uint8_t> &batchData)
+{
+    std::vector<LogEntry> entries;
+
+    try
+    {
+        // Read the number of entries
+        if (batchData.size() < sizeof(uint32_t))
+        {
+            throw std::runtime_error("Batch data too small to contain entry count");
+        }
+
+        uint32_t numEntries;
+        std::memcpy(&numEntries, batchData.data(), sizeof(numEntries));
+
+        // Position in the batch data
+        size_t position = sizeof(numEntries);
+
+        // Extract each entry
+        for (uint32_t i = 0; i < numEntries; ++i)
+        {
+            // Check if we have enough data left to read the entry size
+            if (position + sizeof(uint32_t) > batchData.size())
+            {
+                throw std::runtime_error("Unexpected end of batch data");
+            }
+
+            // Read the size of the entry
+            uint32_t entrySize;
+            std::memcpy(&entrySize, batchData.data() + position, sizeof(entrySize));
+            position += sizeof(entrySize);
+
+            // Check if we have enough data left to read the entry
+            if (position + entrySize > batchData.size())
+            {
+                throw std::runtime_error("Unexpected end of batch data");
+            }
+
+            // Extract the entry data
+            std::vector<uint8_t> entryData(batchData.begin() + position,
+                                           batchData.begin() + position + entrySize);
+            position += entrySize;
+
+            // Deserialize the entry
+            LogEntry entry;
+            if (entry.deserialize(entryData))
+            {
+                entries.push_back(entry);
+            }
+            else
+            {
+                throw std::runtime_error("Failed to deserialize log entry");
+            }
+        }
+    }
+    catch (const std::exception &e)
+    {
+        std::cerr << "Error deserializing log batch: " << e.what() << std::endl;
+    }
+
+    return entries;
 }
 
 // Helper method to append data to a vector

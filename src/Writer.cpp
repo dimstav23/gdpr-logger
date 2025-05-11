@@ -8,11 +8,13 @@
 Writer::Writer(BufferQueue &queue,
                std::shared_ptr<SegmentedStorage> storage,
                size_t batchSize,
-               bool useEncryption)
+               bool useEncryption,
+               bool useCompression)
     : m_queue(queue),
       m_storage(std::move(storage)),
       m_batchSize(batchSize),
-      m_useEncryption(useEncryption) {}
+      m_useEncryption(useEncryption),
+      m_useCompression(useCompression) {}
 
 Writer::~Writer()
 {
@@ -62,28 +64,28 @@ void Writer::processLogEntries()
             continue;
         }
 
-        std::map<std::optional<std::string>, std::vector<std::vector<uint8_t>>> groupedSerializedEntries;
-
-        // Serialize all entries first, then group by destination
+        std::map<std::optional<std::string>, std::vector<LogEntry>> groupedEntries;
         for (const auto &item : batch)
         {
-            std::vector<uint8_t> serializedEntry = item.entry.serialize();
-            groupedSerializedEntries[item.targetFilename].push_back(serializedEntry);
+            groupedEntries[item.targetFilename].push_back(item.entry);
         }
 
-        for (const auto &[targetFilename, serializedEntries] : groupedSerializedEntries)
+        for (const auto &[targetFilename, entries] : groupedEntries)
         {
-            std::vector<uint8_t> compressedData = Compression::compressBatch(serializedEntries);
+            std::vector<uint8_t> processedData = LogEntry::serializeBatch(entries);
 
-            std::vector<uint8_t> dataToWrite = m_useEncryption ? crypto.encrypt(compressedData, encryptionKey, dummyIV) : compressedData;
+            // Apply compression only if enabled
+            processedData = m_useCompression ? Compression::compress(processedData) : processedData;
+            // Apply encryption if enabled
+            processedData = m_useEncryption ? crypto.encrypt(processedData, encryptionKey, dummyIV) : processedData;
 
             if (targetFilename)
             {
-                m_storage->writeToFile(*targetFilename, dataToWrite);
+                m_storage->writeToFile(*targetFilename, processedData);
             }
             else
             {
-                m_storage->write(dataToWrite);
+                m_storage->write(processedData);
             }
         }
 

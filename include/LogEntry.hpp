@@ -27,8 +27,10 @@ public:
         const std::string &dataSubjectId);
 
     std::vector<uint8_t> serialize() const;
-
     bool deserialize(const std::vector<uint8_t> &data);
+
+    static std::vector<uint8_t> serializeBatch(const std::vector<LogEntry> &entries);
+    static std::vector<LogEntry> deserializeBatch(const std::vector<uint8_t> &batchData);
 
     ActionType getActionType() const { return m_actionType; }
     std::string getDataLocation() const { return m_dataLocation; }

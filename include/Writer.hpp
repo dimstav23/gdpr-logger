@@ -15,7 +15,8 @@ public:
     explicit Writer(BufferQueue &queue,
                     std::shared_ptr<SegmentedStorage> storage,
                     size_t batchSize = 100,
-                    bool useEncryption = true);
+                    bool useEncryption = true,
+                    bool useCompression = true);
 
     ~Writer();
 
@@ -32,5 +33,6 @@ private:
     std::atomic<bool> m_running{false};
     const size_t m_batchSize;
     const bool m_useEncryption;
+    const bool m_useCompression;
 };
 #endif
