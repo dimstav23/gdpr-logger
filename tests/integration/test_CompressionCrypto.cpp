@@ -40,7 +40,6 @@ protected:
 TEST_F(CompressionCryptoTest, BatchProcessing)
 {
     std::vector<LogEntry> batch = {entry1, entry2, entry3};
-
     std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(batch);
     std::vector<uint8_t> compressed = Compression::compress(serializedBatch);
     ASSERT_GT(compressed.size(), 0);

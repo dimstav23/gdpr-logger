@@ -136,7 +136,8 @@ int main()
     baseConfig.queueCapacity = 3000000;
     baseConfig.batchSize = 8400;
     baseConfig.appendTimeout = std::chrono::minutes(2);
-    baseConfig.useEncryption = true;
+    baseConfig.useEncryption = false;
+    baseConfig.useCompression = false;
     // benchmark parameters
     const int numSpecificFiles = 100;
     const int producerBatchSize = 1000;

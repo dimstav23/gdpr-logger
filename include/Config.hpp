@@ -19,6 +19,7 @@ struct LoggingConfig
     size_t numWriterThreads = 2;
     std::chrono::milliseconds appendTimeout = std::chrono::milliseconds(30000);
     bool useEncryption = true;
+    bool useCompression = true;
 };
 
 #endif

@@ -103,6 +103,7 @@ int main()
     baseConfig.batchSize = 8400;
     baseConfig.numWriterThreads = 12;
     baseConfig.appendTimeout = std::chrono::minutes(2);
+    baseConfig.useCompression = true;
     // Benchmark parameters
     const int numSpecificFiles = 100;
     const int producerBatchSize = 1000;

@@ -34,6 +34,7 @@ int main()
     config.numWriterThreads = 32;
     config.appendTimeout = std::chrono::minutes(2);
     config.useEncryption = true;
+    config.useCompression = true;
     // benchmark parameters
     const int numBursts = 5;
     const int numSpecificFiles = 100;

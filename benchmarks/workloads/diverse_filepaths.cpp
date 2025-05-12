@@ -159,6 +159,7 @@ int main()
     config.numWriterThreads = 32;
     config.appendTimeout = std::chrono::minutes(2);
     config.useEncryption = true;
+    config.useCompression = true;
     // benchmark parameters
     const int numProducers = 25;
     const int entriesPerProducer = 1000000;

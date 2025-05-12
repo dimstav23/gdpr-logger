@@ -7,7 +7,8 @@
 LoggingSystem::LoggingSystem(const LoggingConfig &config)
     : m_numWriterThreads(config.numWriterThreads),
       m_batchSize(config.batchSize),
-      m_useEncryption(config.useEncryption)
+      m_useEncryption(config.useEncryption),
+      m_useCompression(config.useCompression)
 {
     if (!std::filesystem::create_directories(config.basePath) &&
         !std::filesystem::exists(config.basePath))
@@ -48,13 +49,14 @@ bool LoggingSystem::start()
 
     for (size_t i = 0; i < m_numWriterThreads; ++i)
     {
-        auto writer = std::make_unique<Writer>(*m_queue, m_storage, m_batchSize, m_useEncryption);
+        auto writer = std::make_unique<Writer>(*m_queue, m_storage, m_batchSize, m_useEncryption, m_useCompression);
         writer->start();
         m_writers.push_back(std::move(writer));
     }
 
     std::cout << "LoggingSystem: Started " << m_numWriterThreads << " writer threads";
-    std::cout << " (Encryption: " << (m_useEncryption ? "Enabled" : "Disabled") << ")" << std::endl;
+    std::cout << " (Encryption: " << (m_useEncryption ? "Enabled" : "Disabled");
+    std::cout << ", Compression: " << (m_useCompression ? "Enabled" : "Disabled") << ")" << std::endl;
     return true;
 }
 
