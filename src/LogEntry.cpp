@@ -8,26 +8,32 @@ LogEntry::LogEntry()
       m_dataLocation(""),
       m_userId(""),
       m_dataSubjectId(""),
-      m_timestamp(std::chrono::system_clock::now()) {}
+      m_timestamp(std::chrono::system_clock::now()),
+      m_payload() {}
 
 LogEntry::LogEntry(ActionType actionType, const std::string &dataLocation,
-                   const std::string &userId, const std::string &dataSubjectId)
+                   const std::string &userId, const std::string &dataSubjectId,
+                   const std::vector<uint8_t> &payload)
     : m_actionType(actionType),
       m_dataLocation(dataLocation),
       m_userId(userId),
       m_dataSubjectId(dataSubjectId),
-      m_timestamp(std::chrono::system_clock::now()) {}
+      m_timestamp(std::chrono::system_clock::now()),
+      m_payload(payload)
+{
+}
 
 // Fast binary serialization with pre-allocated memory
 std::vector<uint8_t> LogEntry::serialize() const
 {
-    // Calculate required size upfront
+    // Calculate required size upfront (add variable data size)
     size_t totalSize =
         sizeof(int) +                               // ActionType
         sizeof(uint32_t) + m_dataLocation.size() +  // Size + data location
         sizeof(uint32_t) + m_userId.size() +        // Size + user ID
         sizeof(uint32_t) + m_dataSubjectId.size() + // Size + data subject ID
-        sizeof(int64_t);                            // Timestamp
+        sizeof(int64_t) +                           // Timestamp
+        sizeof(uint32_t) + m_payload.size();        // Size + payload data
 
     // Pre-allocate the vector to avoid reallocations
     std::vector<uint8_t> result;
@@ -47,6 +53,14 @@ std::vector<uint8_t> LogEntry::serialize() const
                             m_timestamp.time_since_epoch())
                             .count();
     appendToVector(result, &timestamp, sizeof(timestamp));
+
+    // Push payload with its length
+    uint32_t payloadSize = static_cast<uint32_t>(m_payload.size());
+    appendToVector(result, &payloadSize, sizeof(payloadSize));
+    if (!m_payload.empty())
+    {
+        appendToVector(result, m_payload.data(), m_payload.size());
+    }
 
     return result;
 }
@@ -85,7 +99,27 @@ bool LogEntry::deserialize(const std::vector<uint8_t> &data)
 
         int64_t timestamp;
         std::memcpy(&timestamp, data.data() + offset, sizeof(timestamp));
+        offset += sizeof(timestamp);
         m_timestamp = std::chrono::system_clock::time_point(std::chrono::milliseconds(timestamp));
+
+        // Extract payload
+        if (offset + sizeof(uint32_t) > data.size())
+            return false;
+
+        uint32_t payloadSize;
+        std::memcpy(&payloadSize, data.data() + offset, sizeof(payloadSize));
+        offset += sizeof(payloadSize);
+
+        if (offset + payloadSize > data.size())
+            return false;
+
+        // Copy the payload
+        m_payload.resize(payloadSize);
+        if (payloadSize > 0)
+        {
+            std::memcpy(m_payload.data(), data.data() + offset, payloadSize);
+            offset += payloadSize;
+        }
 
         return true;
     }

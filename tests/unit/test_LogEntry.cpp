@@ -13,6 +13,7 @@ TEST(LogEntryTest1, DefaultConstructor_InitializesCorrectly)
     EXPECT_EQ(entry.getDataLocation(), "");
     EXPECT_EQ(entry.getUserId(), "");
     EXPECT_EQ(entry.getDataSubjectId(), "");
+    EXPECT_EQ(entry.getPayload().size(), 0);
 
     auto now = std::chrono::system_clock::now();
     EXPECT_NEAR(std::chrono::system_clock::to_time_t(entry.getTimestamp()),
@@ -22,19 +23,34 @@ TEST(LogEntryTest1, DefaultConstructor_InitializesCorrectly)
 // Test parameterized constructor
 TEST(LogEntryTest2, ParameterizedConstructor_SetsFieldsCorrectly)
 {
-    LogEntry entry(LogEntry::ActionType::UPDATE, "database/users", "user123", "subject456");
+    std::vector<uint8_t> testPayload(128, 0xAA); // 128 bytes of 0xAA
+    LogEntry entry(LogEntry::ActionType::UPDATE, "database/users", "user123", "subject456", testPayload);
 
     EXPECT_EQ(entry.getActionType(), LogEntry::ActionType::UPDATE);
     EXPECT_EQ(entry.getDataLocation(), "database/users");
     EXPECT_EQ(entry.getUserId(), "user123");
     EXPECT_EQ(entry.getDataSubjectId(), "subject456");
+    EXPECT_EQ(entry.getPayload().size(), testPayload.size());
+
+    // Check content matches
+    const auto &payload = entry.getPayload();
+    bool contentMatches = true;
+    for (size_t i = 0; i < payload.size(); ++i)
+    {
+        if (payload[i] != testPayload[i])
+        {
+            contentMatches = false;
+            break;
+        }
+    }
+    EXPECT_TRUE(contentMatches);
 
     auto now = std::chrono::system_clock::now();
     EXPECT_NEAR(std::chrono::system_clock::to_time_t(entry.getTimestamp()),
                 std::chrono::system_clock::to_time_t(now), 1);
 }
 
-// Test serialization and deserialization
+// Test serialization and deserialization with empty payload
 TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
 {
     LogEntry entry(LogEntry::ActionType::READ, "storage/files", "userABC", "subjectXYZ");
@@ -48,6 +64,7 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_EQ(newEntry.getDataLocation(), "storage/files");
     EXPECT_EQ(newEntry.getUserId(), "userABC");
     EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
+    EXPECT_EQ(newEntry.getPayload().size(), 0); // Payload should still be empty
 
     std::vector<uint8_t> serializedData2 = entry.serialize();
     success = newEntry.deserialize(serializedData2);
@@ -62,17 +79,67 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
                 std::chrono::system_clock::to_time_t(entry.getTimestamp()), 1);
 }
 
-// Test batch serialization and deserialization
+// Test serialization and deserialization with payload
+TEST(LogEntryTest4A, SerializationDeserializationWithPayload_WorksCorrectly)
+{
+    // Create test payload
+    std::vector<uint8_t> testPayload(64);
+    for (size_t i = 0; i < testPayload.size(); ++i)
+    {
+        testPayload[i] = static_cast<uint8_t>(i & 0xFF);
+    }
+
+    LogEntry entry(LogEntry::ActionType::READ, "storage/files", "userABC", "subjectXYZ", testPayload);
+
+    // Serialize and deserialize
+    std::vector<uint8_t> serializedData = entry.serialize();
+    LogEntry newEntry;
+    bool success = newEntry.deserialize(serializedData);
+
+    // Verify deserialization worked
+    EXPECT_TRUE(success);
+    EXPECT_EQ(newEntry.getActionType(), LogEntry::ActionType::READ);
+    EXPECT_EQ(newEntry.getDataLocation(), "storage/files");
+    EXPECT_EQ(newEntry.getUserId(), "userABC");
+    EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
+
+    // Verify payload
+    EXPECT_EQ(newEntry.getPayload().size(), testPayload.size());
+
+    // Check payload content
+    const auto &recoveredPayload = newEntry.getPayload();
+    bool payloadMatches = true;
+    for (size_t i = 0; i < testPayload.size(); ++i)
+    {
+        if (recoveredPayload[i] != testPayload[i])
+        {
+            payloadMatches = false;
+            break;
+        }
+    }
+    EXPECT_TRUE(payloadMatches);
+}
+
+// Test batch serialization and deserialization with payloads
 TEST(LogEntryTest5, BatchSerializationDeserialization_WorksCorrectly)
 {
     // Create a batch of log entries
     std::vector<LogEntry> originalEntries;
 
-    // Add various entries with different action types and data
+    // Entry with no payload
     originalEntries.push_back(LogEntry(LogEntry::ActionType::CREATE, "db/users", "admin1", "user1"));
-    originalEntries.push_back(LogEntry(LogEntry::ActionType::READ, "files/documents", "user2", "doc1"));
-    originalEntries.push_back(LogEntry(LogEntry::ActionType::UPDATE, "cache/profiles", "editor1", "profile5"));
-    originalEntries.push_back(LogEntry(LogEntry::ActionType::DELETE, "archive/logs", "admin2", "log10"));
+
+    // Entry with small payload
+    std::vector<uint8_t> payload2(16, 0x22); // 16 bytes of 0x22
+    originalEntries.push_back(LogEntry(LogEntry::ActionType::READ, "files/documents", "user2", "doc1", payload2));
+
+    // Entry with medium payload
+    std::vector<uint8_t> payload3(128, 0x33); // 128 bytes of 0x33
+    originalEntries.push_back(LogEntry(LogEntry::ActionType::UPDATE, "cache/profiles", "editor1", "profile5", payload3));
+
+    // Entry with large payload
+    std::vector<uint8_t> payload4(1024, 0x44); // 1024 bytes of 0x44
+    originalEntries.push_back(LogEntry(LogEntry::ActionType::DELETE, "archive/logs", "admin2", "log10", payload4));
 
     // Serialize the batch
     std::vector<uint8_t> batchData = LogEntry::serializeBatch(originalEntries);
@@ -93,6 +160,27 @@ TEST(LogEntryTest5, BatchSerializationDeserialization_WorksCorrectly)
         EXPECT_EQ(recoveredEntries[i].getDataLocation(), originalEntries[i].getDataLocation());
         EXPECT_EQ(recoveredEntries[i].getUserId(), originalEntries[i].getUserId());
         EXPECT_EQ(recoveredEntries[i].getDataSubjectId(), originalEntries[i].getDataSubjectId());
+
+        // Verify payload size
+        EXPECT_EQ(recoveredEntries[i].getPayload().size(), originalEntries[i].getPayload().size());
+
+        // Check payload content if it's not empty
+        if (!originalEntries[i].getPayload().empty())
+        {
+            const auto &originalPayload = originalEntries[i].getPayload();
+            const auto &recoveredPayload = recoveredEntries[i].getPayload();
+
+            bool payloadMatches = true;
+            for (size_t j = 0; j < originalPayload.size(); ++j)
+            {
+                if (recoveredPayload[j] != originalPayload[j])
+                {
+                    payloadMatches = false;
+                    break;
+                }
+            }
+            EXPECT_TRUE(payloadMatches) << "Payload mismatch at entry " << i;
+        }
 
         // Compare timestamps (allowing 1 second difference for potential precision issues)
         EXPECT_NEAR(

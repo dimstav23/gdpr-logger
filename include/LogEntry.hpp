@@ -24,7 +24,8 @@ public:
         ActionType actionType,
         const std::string &dataLocation,
         const std::string &userId,
-        const std::string &dataSubjectId);
+        const std::string &dataSubjectId,
+        const std::vector<uint8_t> &payload = std::vector<uint8_t>());
 
     std::vector<uint8_t> serialize() const;
     bool deserialize(const std::vector<uint8_t> &data);
@@ -37,6 +38,7 @@ public:
     std::string getUserId() const { return m_userId; }
     std::string getDataSubjectId() const { return m_dataSubjectId; }
     std::chrono::system_clock::time_point getTimestamp() const { return m_timestamp; }
+    const std::vector<uint8_t> &getPayload() const { return m_payload; }
 
 private:
     // Helper methods for binary serialization
@@ -49,6 +51,7 @@ private:
     std::string m_userId;                              // ID of the user performing the operation
     std::string m_dataSubjectId;                       // ID of the data subject
     std::chrono::system_clock::time_point m_timestamp; // When the operation occurred
+    std::vector<uint8_t> m_payload;                    // optional extra bytes
 };
 
 #endif

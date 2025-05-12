@@ -49,7 +49,8 @@ size_t calculateDirectorySize(const std::string &dirPath)
 std::vector<BatchWithDestination> generateBatches(
     int numEntries,
     int numSpecificFiles,
-    int batchSize)
+    int batchSize,
+    int payloadSize)
 {
     std::vector<BatchWithDestination> batches;
 
@@ -83,7 +84,8 @@ std::vector<BatchWithDestination> generateBatches(
             std::string dataLocation = "database/table/row" + std::to_string(generated + i);
             std::string dataSubjectId = "subject" + std::to_string((generated + i) % 10);
             std::string userId = "user" + std::to_string(generated + i);
-            LogEntry entry(LogEntry::ActionType::CREATE, dataLocation, userId, dataSubjectId);
+            std::vector<uint8_t> payload(payloadSize, 0x22); // payloadSize number of bytes of 0x22
+            LogEntry entry(LogEntry::ActionType::CREATE, dataLocation, userId, dataSubjectId, payload);
             batch.push_back(entry);
         }
 

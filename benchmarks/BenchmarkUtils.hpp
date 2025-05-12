@@ -19,6 +19,7 @@ size_t calculateDirectorySize(const std::string &dirPath);
 std::vector<BatchWithDestination> generateBatches(
     int numEntries,
     int numSpecificFiles,
-    int batchSize);
+    int batchSize,
+    int payloadSize = 0);
 
 #endif
