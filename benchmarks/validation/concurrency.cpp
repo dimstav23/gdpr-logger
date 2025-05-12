@@ -140,7 +140,7 @@ int main()
     baseConfig.useCompression = false;
     // benchmark parameters
     const int numSpecificFiles = 100;
-    const int producerBatchSize = 1000;
+    const int producerBatchSize = 100000;
     const int numProducers = 32;
     const int entriesPerProducer = 3000000;
 

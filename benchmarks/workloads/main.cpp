@@ -36,8 +36,8 @@ int main()
     config.batchSize = 8400;
     config.numWriterThreads = 64;
     config.appendTimeout = std::chrono::minutes(2);
-    config.useEncryption = false;
-    config.useCompression = false;
+    config.useEncryption = true;
+    config.useCompression = true;
     // benchmark parameters
     const int numSpecificFiles = 1000;
     const int producerBatchSize = 12000;
