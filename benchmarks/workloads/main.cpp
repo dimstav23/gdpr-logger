@@ -18,8 +18,6 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
             std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
                       << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
         }
-        // Add a small delay after batch operations to simulate real-world patterns
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
@@ -33,21 +31,22 @@ int main()
     config.maxAttempts = 5;
     config.baseRetryDelay = std::chrono::milliseconds(1);
     config.queueCapacity = 3000000;
-    config.batchSize = 8400;
+    config.batchSize = 850;
     config.numWriterThreads = 64;
     config.appendTimeout = std::chrono::minutes(2);
-    config.useEncryption = true;
-    config.useCompression = true;
+    config.useEncryption = false;
+    config.useCompression = false;
     // benchmark parameters
-    const int numSpecificFiles = 1000;
-    const int producerBatchSize = 12000;
-    const int numProducers = 48;
-    const int entriesPerProducer = 15000000;
+    const int numSpecificFiles = 100;
+    const int producerBatchSize = 1000;
+    const int numProducers = 40;
+    const int entriesPerProducer = 1000000;
+    const int payloadSize = 4096;
 
     cleanupLogDirectory(config.basePath);
 
     std::cout << "Generating batches with pre-determined destinations...";
-    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
     std::cout << " Done." << std::endl;
     size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducers);
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);

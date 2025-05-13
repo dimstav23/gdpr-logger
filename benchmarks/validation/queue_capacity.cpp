@@ -11,6 +11,7 @@
 
 struct BenchmarkResult
 {
+    double elapsedSeconds;
     double throughputEntries;
     double throughputGiB;
     double writeAmplification;
@@ -25,19 +26,16 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
             std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
                       << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
         }
-
-        // Add a small delay after batch operations to simulate real-world patterns
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
 BenchmarkResult runQueueCapacityBenchmark(const LoggingConfig &config, int numProducerThreads,
-                                          int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
+                                          int entriesPerProducer, int numSpecificFiles, int producerBatchSize, int payloadSize)
 {
     cleanupLogDirectory(config.basePath);
 
     std::cout << "Generating batches with pre-determined destinations for all threads...";
-    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
     std::cout << " Done." << std::endl;
 
     size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducerThreads);
@@ -78,6 +76,7 @@ BenchmarkResult runQueueCapacityBenchmark(const LoggingConfig &config, int numPr
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
 
     return BenchmarkResult{
+        elapsedSeconds,
         throughputEntries,
         throughputGiB,
         writeAmplification};
@@ -85,7 +84,7 @@ BenchmarkResult runQueueCapacityBenchmark(const LoggingConfig &config, int numPr
 
 void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vector<int> &queueSizes,
                                 int numProducerThreads,
-                                int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
+                                int entriesPerProducer, int numSpecificFiles, int producerBatchSize, int payloadSize)
 {
     std::vector<BenchmarkResult> results;
 
@@ -97,7 +96,7 @@ void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vect
 
         BenchmarkResult result = runQueueCapacityBenchmark(
             runConfig, numProducerThreads,
-            entriesPerProducer, numSpecificFiles, producerBatchSize);
+            entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
 
         results.push_back(result);
 
@@ -107,6 +106,7 @@ void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vect
 
     std::cout << "\n=========== QUEUE CAPACITY BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(15) << "Queue Capacity"
+              << std::setw(15) << "Time (sec)"
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(25) << "Throughput (GiB/s)"
               << std::setw(20) << "Write Amplification"
@@ -117,6 +117,7 @@ void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vect
     {
         double relativePerf = results[i].throughputEntries / results[0].throughputEntries; // Relative to smallest queue
         std::cout << std::left << std::setw(15) << queueSizes[i]
+                  << std::setw(15) << std::fixed << std::setprecision(2) << results[i].elapsedSeconds
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
                   << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
                   << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
@@ -143,13 +144,15 @@ int main()
     const int producerBatchSize = 1000;
     const int numProducers = 32;
     const int entriesPerProducer = 3000000;
+    const int payloadSize = 2048;
 
     std::vector<int> queueSizes = {10000, 50000, 100000, 200000, 500000, 1000000};
     runQueueCapacityComparison(baseConfig, queueSizes,
                                numProducers,
                                entriesPerProducer,
                                numSpecificFiles,
-                               producerBatchSize);
+                               producerBatchSize,
+                               payloadSize);
 
     return 0;
 }

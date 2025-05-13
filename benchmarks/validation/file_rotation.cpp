@@ -11,6 +11,7 @@
 
 struct BenchmarkResult
 {
+    double elapsedSeconds;
     double throughputEntries;
     double throughputGiB;
     int fileCount;
@@ -26,9 +27,6 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
             std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
                       << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
         }
-
-        // Add a small delay after batch operations to simulate real-world patterns
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
@@ -51,7 +49,8 @@ BenchmarkResult runFileRotationBenchmark(
     int numProducerThreads,
     int entriesPerProducer,
     int numSpecificFiles,
-    int producerBatchSize)
+    int producerBatchSize,
+    int payloadSize)
 {
     std::string logDir = "./logs/rotation_" + std::to_string(maxSegmentSizeKB) + "kb";
 
@@ -62,7 +61,7 @@ BenchmarkResult runFileRotationBenchmark(
     config.maxSegmentSize = maxSegmentSizeKB * 1024; // Convert KB to bytes
 
     std::cout << "Generating batches with pre-determined destinations for all threads...";
-    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
     std::cout << " Done." << std::endl;
 
     size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducerThreads);
@@ -104,6 +103,7 @@ BenchmarkResult runFileRotationBenchmark(
     int fileCount = countLogFiles(logDir);
 
     return BenchmarkResult{
+        elapsedSeconds,
         throughputEntries,
         throughputGiB,
         fileCount,
@@ -116,7 +116,8 @@ void runFileRotationComparison(
     int numProducerThreads,
     int entriesPerProducer,
     int numSpecificFiles,
-    int producerBatchSize)
+    int producerBatchSize,
+    int payloadSize)
 {
     std::vector<BenchmarkResult> results;
 
@@ -128,7 +129,8 @@ void runFileRotationComparison(
             numProducerThreads,
             entriesPerProducer,
             numSpecificFiles,
-            producerBatchSize);
+            producerBatchSize,
+            payloadSize);
 
         results.push_back(result);
 
@@ -138,6 +140,7 @@ void runFileRotationComparison(
 
     std::cout << "\n========================== FILE ROTATION BENCHMARK SUMMARY ==========================" << std::endl;
     std::cout << std::left << std::setw(20) << "Segment Size (KB)"
+              << std::setw(15) << "Time (sec)"
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(25) << "Throughput (GiB/s)"
               << std::setw(20) << "Log Files Created"
@@ -152,6 +155,7 @@ void runFileRotationComparison(
     {
         double relativePerf = results[i].throughputEntries / baselineThroughput;
         std::cout << std::left << std::setw(20) << segmentSizesKB[i]
+                  << std::setw(15) << std::fixed << std::setprecision(2) << results[i].elapsedSeconds
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
                   << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
                   << std::setw(20) << results[i].fileCount
@@ -179,6 +183,7 @@ int main()
     const int producerBatchSize = 1000;
     const int numProducers = 32;
     const int entriesPerProducer = 3000000;
+    const int payloadSize = 2048;
 
     std::vector<int> segmentSizesKB = {100, 500, 1000, 2500, 5000, 10000, 20000};
 
@@ -188,7 +193,8 @@ int main()
         numProducers,
         entriesPerProducer,
         numSpecificFiles,
-        producerBatchSize);
+        producerBatchSize,
+        payloadSize);
 
     return 0;
 }

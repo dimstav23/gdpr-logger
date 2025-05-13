@@ -29,8 +29,6 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
             std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
                       << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
         }
-        // Add a small delay after batch operations to simulate real-world patterns
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
@@ -109,9 +107,10 @@ int main()
     const int producerBatchSize = 1000;
     const int numProducers = 32;
     const int entriesPerProducer = 3000000;
+    const int payloadSize = 2048;
 
     std::cout << "Generating batches with pre-determined destinations for all threads...";
-    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
     std::cout << " Done." << std::endl;
 
     BenchmarkResult resultEncrypted = runBenchmark(baseConfig, true, batches, numProducers, entriesPerProducer);

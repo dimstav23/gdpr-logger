@@ -11,6 +11,7 @@
 
 struct BenchmarkResult
 {
+    double elapsedSeconds;
     double throughputEntries;
     double throughputGiB;
     double writeAmplification;
@@ -25,14 +26,11 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
             std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
                       << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
         }
-
-        // Add a small delay after batch operations to simulate real-world patterns
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
 BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int writerBatchSize, int numProducerThreads,
-                                      int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
+                                      int entriesPerProducer, int numSpecificFiles, int producerBatchSize, int payloadSize)
 {
     LoggingConfig config = baseConfig;
     config.basePath = "./logs/batch_" + std::to_string(writerBatchSize);
@@ -41,7 +39,7 @@ BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int write
     cleanupLogDirectory(config.basePath);
 
     std::cout << "Generating batches with pre-determined destinations for all threads...";
-    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
     std::cout << " Done." << std::endl;
 
     size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducerThreads);
@@ -81,6 +79,7 @@ BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int write
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
 
     return BenchmarkResult{
+        elapsedSeconds,
         throughputEntries,
         throughputGiB,
         writeAmplification};
@@ -88,7 +87,7 @@ BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int write
 
 void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<int> &batchSizes,
                             int numProducerThreads, int entriesPerProducer,
-                            int numSpecificFiles, int producerBatchSize)
+                            int numSpecificFiles, int producerBatchSize, int payloadSize)
 {
     std::vector<BenchmarkResult> results;
 
@@ -98,7 +97,7 @@ void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<i
 
         BenchmarkResult result = runBatchSizeBenchmark(
             baseConfig, batchSize, numProducerThreads,
-            entriesPerProducer, numSpecificFiles, producerBatchSize);
+            entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
 
         results.push_back(result);
 
@@ -108,6 +107,7 @@ void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<i
 
     std::cout << "\n=========== WRITER BATCH SIZE BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(15) << "Batch Size"
+              << std::setw(15) << "Time (sec)"
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(20) << "Throughput (GiB/s)"
               << std::setw(20) << "Relative Perf"
@@ -118,6 +118,7 @@ void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<i
     {
         double relativePerf = results[i].throughputEntries / results[0].throughputEntries;
         std::cout << std::left << std::setw(15) << batchSizes[i]
+                  << std::setw(15) << std::fixed << std::setprecision(2) << results[i].elapsedSeconds
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
                   << std::setw(20) << std::fixed << std::setprecision(3) << results[i].throughputGiB
                   << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf
@@ -135,22 +136,24 @@ int main()
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 3000000;
-    baseConfig.numWriterThreads = 12;
+    baseConfig.numWriterThreads = 64;
     baseConfig.appendTimeout = std::chrono::minutes(2);
     // benchmark parameters
     const int numSpecificFiles = 100;
     const int producerBatchSize = 1000;
     const int numProducers = 32;
-    const int entriesPerProducer = 3000000;
+    const int entriesPerProducer = 2000000;
+    const int payloadSize = 2048;
 
-    std::vector<int> batchSizes = {10, 50, 100, 500, 1000, 2000, 5000, 10000};
+    std::vector<int> batchSizes = {1, 10, 50, 100, 500, 1000, 2000, 5000, 10000, 25000};
 
     runBatchSizeComparison(baseConfig,
                            batchSizes,
                            numProducers,
                            entriesPerProducer,
                            numSpecificFiles,
-                           producerBatchSize);
+                           producerBatchSize,
+                           payloadSize);
 
     return 0;
 }

@@ -11,6 +11,7 @@
 
 struct BenchmarkResult
 {
+    double elapsedSeconds;
     double throughputEntries;
     double throughputGiB;
     double writeAmplification;
@@ -25,14 +26,11 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
             std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
                       << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
         }
-
-        // Add a small delay after batch operations to simulate real-world patterns
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
 BenchmarkResult runFilepathDiversityBenchmark(const LoggingConfig &config, int numSpecificFiles, int numProducerThreads,
-                                              int entriesPerProducer, int producerBatchSize)
+                                              int entriesPerProducer, int producerBatchSize, int payloadSize)
 {
     LoggingConfig runConfig = config;
     runConfig.basePath = "./logs/files_" + std::to_string(numSpecificFiles);
@@ -40,7 +38,7 @@ BenchmarkResult runFilepathDiversityBenchmark(const LoggingConfig &config, int n
     cleanupLogDirectory(runConfig.basePath);
 
     std::cout << "Generating batches with " << numSpecificFiles << " specific files for all threads...";
-    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
     std::cout << " Done." << std::endl;
     size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducerThreads);
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
@@ -80,13 +78,14 @@ BenchmarkResult runFilepathDiversityBenchmark(const LoggingConfig &config, int n
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
 
     return BenchmarkResult{
+        elapsedSeconds,
         throughputEntries,
         throughputGiB,
         writeAmplification};
 }
 
 void runFilepathDiversityComparison(const LoggingConfig &config, const std::vector<int> &numFilesVariants,
-                                    int numProducerThreads, int entriesPerProducer, int producerBatchSize)
+                                    int numProducerThreads, int entriesPerProducer, int producerBatchSize, int payloadSize)
 {
     std::vector<BenchmarkResult> results;
     std::vector<std::string> descriptions;
@@ -115,7 +114,7 @@ void runFilepathDiversityComparison(const LoggingConfig &config, const std::vect
         BenchmarkResult result = runFilepathDiversityBenchmark(
             config,
             fileCount,
-            numProducerThreads, entriesPerProducer, producerBatchSize);
+            numProducerThreads, entriesPerProducer, producerBatchSize, payloadSize);
 
         results.push_back(result);
 
@@ -125,6 +124,7 @@ void runFilepathDiversityComparison(const LoggingConfig &config, const std::vect
 
     std::cout << "\n=========== FILEPATH DIVERSITY BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(30) << "Configuration"
+              << std::setw(15) << "Time (sec)"
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(25) << "Throughput (GiB/s)"
               << std::setw(20) << "Write Amplification"
@@ -138,6 +138,7 @@ void runFilepathDiversityComparison(const LoggingConfig &config, const std::vect
     {
         double relativePerf = results[i].throughputEntries / baseThroughputEntries;
         std::cout << std::left << std::setw(30) << descriptions[i]
+                  << std::setw(15) << std::fixed << std::setprecision(2) << results[i].elapsedSeconds
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
                   << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
                   << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
@@ -164,6 +165,7 @@ int main()
     const int numProducers = 25;
     const int entriesPerProducer = 1000000;
     const int producerBatchSize = 50;
+    const int payloadSize = 2048;
 
     std::vector<int> numFilesVariants = {0, 10, 50, 100, 250, 500, 1000, 5000};
 
@@ -171,7 +173,8 @@ int main()
                                    numFilesVariants,
                                    numProducers,
                                    entriesPerProducer,
-                                   producerBatchSize);
+                                   producerBatchSize,
+                                   payloadSize);
 
     return 0;
 }

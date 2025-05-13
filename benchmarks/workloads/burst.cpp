@@ -13,9 +13,10 @@ void appendLogEntriesBurst(LoggingSystem &loggingSystem, const std::vector<Batch
 {
     for (const auto &batchWithDest : batches)
     {
-        while (!loggingSystem.appendBatch(batchWithDest.first, batchWithDest.second))
+        if (!loggingSystem.appendBatch(batchWithDest.first, batchWithDest.second))
         {
-            std::this_thread::sleep_for(std::chrono::milliseconds(1));
+            std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
+                      << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
         }
     }
 }
@@ -41,11 +42,12 @@ int main()
     const int producerBatchSize = config.queueCapacity;
     const int entriesPerBurst = 10 * config.queueCapacity;
     const int waitBetweenBurstsSec = 3;
+    const int payloadSize = 2048;
 
     cleanupLogDirectory(config.basePath);
 
     std::cout << "Generating burst batches for burst-pattern benchmark...";
-    std::vector<BatchWithDestination> batches = generateBatches(entriesPerBurst, numSpecificFiles, producerBatchSize);
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerBurst, numSpecificFiles, producerBatchSize, payloadSize);
     std::cout << " Done." << std::endl;
     size_t totalDataSizeBytes = calculateTotalDataSize(batches, numBursts);
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);

@@ -26,13 +26,11 @@ void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithD
             std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
                       << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
         }
-        // Add a small delay after batch operations to simulate real-world patterns
-        std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
 }
 
 BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThreads, int numProducerThreads,
-                             int entriesPerProducer, int numSpecificFiles, int producerBatchSize)
+                             int entriesPerProducer, int numSpecificFiles, int producerBatchSize, int payloadSize)
 {
     LoggingConfig config = baseConfig;
     config.basePath = "./logs/writers_" + std::to_string(numWriterThreads);
@@ -41,7 +39,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
     cleanupLogDirectory(config.basePath);
 
     std::cout << "Generating batches with pre-determined destinations for all threads...";
-    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize);
+    std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
     std::cout << " Done." << std::endl;
 
     size_t totalDataSizeBytes = calculateTotalDataSize(batches, numProducerThreads);
@@ -89,7 +87,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
 
 void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<int> &writerThreadCounts,
                              int numProducerThreads, int entriesPerProducer,
-                             int numSpecificFiles, int producerBatchSize)
+                             int numSpecificFiles, int producerBatchSize, int payloadSize)
 {
     std::vector<BenchmarkResult> results;
 
@@ -98,13 +96,14 @@ void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<
         std::cout << "\nRunning benchmark with " << writerCount << " writer thread(s)..." << std::endl;
 
         BenchmarkResult result = runBenchmark(baseConfig, writerCount, numProducerThreads, entriesPerProducer,
-                                              numSpecificFiles, producerBatchSize);
+                                              numSpecificFiles, producerBatchSize, payloadSize);
 
         results.push_back(result);
     }
 
     std::cout << "\n=================== CONCURRENCY BENCHMARK SUMMARY ===================" << std::endl;
     std::cout << std::left << std::setw(20) << "Writer Threads"
+              << std::setw(15) << "Time (sec)"
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(20) << "Throughput (GiB/s)"
               << std::setw(15) << "Speedup vs. 1"
@@ -117,6 +116,7 @@ void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<
     {
         double speedup = results[i].throughputEntries / baselineThroughputEntries;
         std::cout << std::left << std::setw(20) << writerThreadCounts[i]
+                  << std::setw(15) << std::fixed << std::setprecision(2) << results[i].executionTime
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
                   << std::setw(20) << std::fixed << std::setprecision(3) << results[i].throughputGiB
                   << std::setw(15) << std::fixed << std::setprecision(2) << speedup
@@ -134,15 +134,16 @@ int main()
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 3000000;
-    baseConfig.batchSize = 8400;
+    baseConfig.batchSize = 850;
     baseConfig.appendTimeout = std::chrono::minutes(2);
     baseConfig.useEncryption = false;
     baseConfig.useCompression = false;
     // benchmark parameters
     const int numSpecificFiles = 100;
-    const int producerBatchSize = 100000;
-    const int numProducers = 32;
-    const int entriesPerProducer = 3000000;
+    const int producerBatchSize = 1000;
+    const int numProducers = 96;
+    const int entriesPerProducer = 300000;
+    const int payloadSize = 4096;
 
     std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16, 32, 48, 64, 96};
 
@@ -151,7 +152,8 @@ int main()
                             numProducers,
                             entriesPerProducer,
                             numSpecificFiles,
-                            producerBatchSize);
+                            producerBatchSize,
+                            payloadSize);
 
     return 0;
 }
