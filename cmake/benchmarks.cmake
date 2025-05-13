@@ -11,7 +11,7 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/benchmarks)
 set(VALIDATION_BENCHMARKS
     batch_size
     concurrency
-    encryption_usage
+    encryption_compression_usage
     file_rotation
     queue_capacity
 )
