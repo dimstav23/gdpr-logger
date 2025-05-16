@@ -5,9 +5,14 @@
 #include <string>
 #include <cstdint>
 #include <memory>
+#include <openssl/evp.h>
 
 class Crypto
 {
+private:
+    EVP_CIPHER_CTX *m_encryptCtx;
+    EVP_CIPHER_CTX *m_decryptCtx;
+
 public:
     Crypto();
     ~Crypto();

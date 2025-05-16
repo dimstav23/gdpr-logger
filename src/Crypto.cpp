@@ -10,10 +10,33 @@ Crypto::Crypto()
 {
     // Initialize OpenSSL
     OpenSSL_add_all_algorithms();
+    m_encryptCtx = EVP_CIPHER_CTX_new();
+    if (!m_encryptCtx)
+    {
+        throw std::runtime_error("Failed to create encryption context");
+    }
+
+    m_decryptCtx = EVP_CIPHER_CTX_new();
+    if (!m_decryptCtx)
+    {
+        EVP_CIPHER_CTX_free(m_encryptCtx);
+        throw std::runtime_error("Failed to create decryption context");
+    }
 }
 
 Crypto::~Crypto()
 {
+    // Free contexts
+    if (m_encryptCtx)
+    {
+        EVP_CIPHER_CTX_free(m_encryptCtx);
+    }
+
+    if (m_decryptCtx)
+    {
+        EVP_CIPHER_CTX_free(m_decryptCtx);
+    }
+
     // Clean up OpenSSL
     EVP_cleanup();
 }
@@ -30,17 +53,12 @@ std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &plaintext,
     if (iv.size() != GCM_IV_SIZE)
         throw std::runtime_error("Invalid IV size");
 
-    // Initialize OpenSSL cipher context
-    EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-    if (!ctx)
-    {
-        throw std::runtime_error("Failed to create cipher context");
-    }
+    // Reset the existing context instead of creating a new one
+    EVP_CIPHER_CTX_reset(m_encryptCtx);
 
     // Initialize encryption operation
-    if (EVP_EncryptInit_ex(ctx, EVP_aes_256_gcm(), nullptr, key.data(), iv.data()) != 1)
+    if (EVP_EncryptInit_ex(m_encryptCtx, EVP_aes_256_gcm(), nullptr, key.data(), iv.data()) != 1)
     {
-        EVP_CIPHER_CTX_free(ctx);
         throw std::runtime_error("Failed to initialize encryption");
     }
 
@@ -59,38 +77,31 @@ std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &plaintext,
 
     // Perform encryption directly into the result buffer (after the size field)
     int encryptedLen = 0;
-    if (EVP_EncryptUpdate(ctx, result.data() + sizeFieldSize, &encryptedLen,
+    if (EVP_EncryptUpdate(m_encryptCtx, result.data() + sizeFieldSize, &encryptedLen,
                           plaintext.data(), plaintext.size()) != 1)
     {
-        EVP_CIPHER_CTX_free(ctx);
         throw std::runtime_error("Failed during encryption update");
     }
 
     // Finalize encryption (writing to the buffer right after the existing encrypted data)
     int finalLen = 0;
-    if (EVP_EncryptFinal_ex(ctx, result.data() + sizeFieldSize + encryptedLen, &finalLen) != 1)
+    if (EVP_EncryptFinal_ex(m_encryptCtx, result.data() + sizeFieldSize + encryptedLen, &finalLen) != 1)
     {
-        EVP_CIPHER_CTX_free(ctx);
         throw std::runtime_error("Failed to finalize encryption");
     }
 
     // Sanity check: for GCM, encryptedLen + finalLen should equal plaintext.size()
     if (encryptedLen + finalLen != static_cast<int>(plaintext.size()))
     {
-        EVP_CIPHER_CTX_free(ctx);
         throw std::runtime_error("Unexpected encryption output size");
     }
 
     // Get the authentication tag and write it directly to the result buffer
-    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, GCM_TAG_SIZE,
+    if (EVP_CIPHER_CTX_ctrl(m_encryptCtx, EVP_CTRL_GCM_GET_TAG, GCM_TAG_SIZE,
                             result.data() + sizeFieldSize + ciphertextSize) != 1)
     {
-        EVP_CIPHER_CTX_free(ctx);
         throw std::runtime_error("Failed to get authentication tag");
     }
-
-    // Clean up
-    EVP_CIPHER_CTX_free(ctx);
 
     return result;
 }
@@ -150,24 +161,18 @@ std::vector<uint8_t> Crypto::decrypt(const std::vector<uint8_t> &encryptedData,
         std::vector<uint8_t> tag(GCM_TAG_SIZE);
         std::memcpy(tag.data(), encryptedData.data() + position, GCM_TAG_SIZE);
 
-        // Initialize OpenSSL cipher context
-        EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
-        if (!ctx)
-        {
-            throw std::runtime_error("Failed to create cipher context");
-        }
+        // Reset the existing context instead of creating a new one
+        EVP_CIPHER_CTX_reset(m_decryptCtx);
 
         // Initialize decryption operation
-        if (EVP_DecryptInit_ex(ctx, EVP_aes_256_gcm(), nullptr, key.data(), iv.data()) != 1)
+        if (EVP_DecryptInit_ex(m_decryptCtx, EVP_aes_256_gcm(), nullptr, key.data(), iv.data()) != 1)
         {
-            EVP_CIPHER_CTX_free(ctx);
             throw std::runtime_error("Failed to initialize decryption");
         }
 
         // Set expected tag value
-        if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_SET_TAG, GCM_TAG_SIZE, tag.data()) != 1)
+        if (EVP_CIPHER_CTX_ctrl(m_decryptCtx, EVP_CTRL_GCM_SET_TAG, GCM_TAG_SIZE, tag.data()) != 1)
         {
-            EVP_CIPHER_CTX_free(ctx);
             throw std::runtime_error("Failed to set authentication tag");
         }
 
@@ -176,19 +181,15 @@ std::vector<uint8_t> Crypto::decrypt(const std::vector<uint8_t> &encryptedData,
         int decryptedLen = 0;
 
         // Perform decryption
-        if (EVP_DecryptUpdate(ctx, decryptedData.data(), &decryptedLen,
+        if (EVP_DecryptUpdate(m_decryptCtx, decryptedData.data(), &decryptedLen,
                               ciphertext.data(), ciphertext.size()) != 1)
         {
-            EVP_CIPHER_CTX_free(ctx);
             throw std::runtime_error("Failed during decryption update");
         }
 
         // Finalize decryption and verify tag
         int finalLen = 0;
-        int ret = EVP_DecryptFinal_ex(ctx, decryptedData.data() + decryptedLen, &finalLen);
-
-        // Clean up
-        EVP_CIPHER_CTX_free(ctx);
+        int ret = EVP_DecryptFinal_ex(m_decryptCtx, decryptedData.data() + decryptedLen, &finalLen);
 
         if (ret != 1)
         {
