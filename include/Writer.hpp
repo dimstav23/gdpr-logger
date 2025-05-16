@@ -34,5 +34,7 @@ private:
     const size_t m_batchSize;
     const bool m_useEncryption;
     const bool m_useCompression;
+
+    BufferQueue::ConsumerToken m_consumerToken;
 };
 #endif

@@ -55,7 +55,21 @@ bool LoggingAPI::initialize(std::shared_ptr<BufferQueue> queue,
     return true;
 }
 
+BufferQueue::ProducerToken LoggingAPI::createProducerToken()
+{
+    std::shared_lock<std::shared_mutex> lock(m_apiMutex);
+
+    if (!m_initialized)
+    {
+        reportError("LoggingAPI not initialized");
+        throw std::runtime_error("LoggingAPI not initialized");
+    }
+
+    return m_logQueue->createProducerToken();
+}
+
 bool LoggingAPI::append(const LogEntry &entry,
+                        BufferQueue::ProducerToken &token,
                         const std::optional<std::string> &filename)
 {
     std::shared_lock<std::shared_mutex> lock(m_apiMutex);
@@ -67,12 +81,12 @@ bool LoggingAPI::append(const LogEntry &entry,
     }
 
     QueueItem item{entry, filename};
-    return m_logQueue->enqueueBlocking(item, m_appendTimeout);
+    return m_logQueue->enqueueBlocking(item, token, m_appendTimeout);
 }
 
-bool LoggingAPI::appendBatch(
-    const std::vector<LogEntry> &entries,
-    const std::optional<std::string> &filename)
+bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries,
+                             BufferQueue::ProducerToken &token,
+                             const std::optional<std::string> &filename)
 {
     std::shared_lock<std::shared_mutex> lock(m_apiMutex);
 
@@ -93,7 +107,7 @@ bool LoggingAPI::appendBatch(
     {
         batch.push_back({e, filename});
     }
-    return m_logQueue->enqueueBatchBlocking(batch, m_appendTimeout);
+    return m_logQueue->enqueueBatchBlocking(batch, token, m_appendTimeout);
 }
 
 bool LoggingAPI::reset()

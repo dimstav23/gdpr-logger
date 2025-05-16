@@ -10,6 +10,8 @@
 
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
+void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches);
+
 void cleanupLogDirectory(const std::string &logDir);
 
 size_t calculateTotalDataSize(const std::vector<BatchWithDestination> &batches, int numProducers);

@@ -14,7 +14,10 @@ Writer::Writer(BufferQueue &queue,
       m_storage(std::move(storage)),
       m_batchSize(batchSize),
       m_useEncryption(useEncryption),
-      m_useCompression(useCompression) {}
+      m_useCompression(useCompression),
+      m_consumerToken(queue.createConsumerToken())
+{
+}
 
 Writer::~Writer()
 {
@@ -57,7 +60,7 @@ void Writer::processLogEntries()
 
     while (m_running)
     {
-        size_t entriesDequeued = m_queue.dequeueBatch(batch, m_batchSize);
+        size_t entriesDequeued = m_queue.dequeueBatch(batch, m_batchSize, m_consumerToken);
         if (entriesDequeued == 0)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));

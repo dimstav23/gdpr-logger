@@ -102,7 +102,13 @@ bool LoggingSystem::isRunning() const
     return m_running.load(std::memory_order_acquire);
 }
 
+BufferQueue::ProducerToken LoggingSystem::createProducerToken()
+{
+    return LoggingAPI::getInstance().createProducerToken();
+}
+
 bool LoggingSystem::append(const LogEntry &entry,
+                           BufferQueue::ProducerToken &token,
                            const std::optional<std::string> &filename)
 {
     if (!m_acceptingEntries.load(std::memory_order_acquire))
@@ -111,10 +117,11 @@ bool LoggingSystem::append(const LogEntry &entry,
         return false;
     }
 
-    return LoggingAPI::getInstance().append(entry, filename);
+    return LoggingAPI::getInstance().append(entry, token, filename);
 }
 
 bool LoggingSystem::appendBatch(const std::vector<LogEntry> &entries,
+                                BufferQueue::ProducerToken &token,
                                 const std::optional<std::string> &filename)
 {
     if (!m_acceptingEntries.load(std::memory_order_acquire))
@@ -123,7 +130,7 @@ bool LoggingSystem::appendBatch(const std::vector<LogEntry> &entries,
         return false;
     }
 
-    return LoggingAPI::getInstance().appendBatch(entries, filename);
+    return LoggingAPI::getInstance().appendBatch(entries, token, filename);
 }
 
 bool LoggingSystem::exportLogs(

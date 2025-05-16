@@ -9,18 +9,6 @@
 #include <filesystem>
 #include <numeric>
 
-void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
-{
-    for (const auto &batchWithDest : batches)
-    {
-        if (!loggingSystem.appendBatch(batchWithDest.first, batchWithDest.second))
-        {
-            std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
-                      << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
-        }
-    }
-}
-
 int main()
 {
     // system parameters

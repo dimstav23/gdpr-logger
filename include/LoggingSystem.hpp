@@ -28,9 +28,12 @@ public:
 
     bool isRunning() const;
 
+    BufferQueue::ProducerToken createProducerToken();
     bool append(const LogEntry &entry,
+                BufferQueue::ProducerToken &token,
                 const std::optional<std::string> &filename = std::nullopt);
     bool appendBatch(const std::vector<LogEntry> &entries,
+                     BufferQueue::ProducerToken &token,
                      const std::optional<std::string> &filename = std::nullopt);
 
     bool exportLogs(const std::string &outputPath,

@@ -16,9 +16,9 @@ BufferQueue::~BufferQueue()
     m_flushCondition.notify_one();
 }
 
-bool BufferQueue::enqueue(const QueueItem &item)
+bool BufferQueue::enqueue(const QueueItem &item, ProducerToken &token)
 {
-    bool result = m_queue.try_enqueue(item);
+    bool result = m_queue.try_enqueue(token, item);
     if (result)
     {
         m_size.fetch_add(1, std::memory_order_relaxed);
@@ -26,7 +26,7 @@ bool BufferQueue::enqueue(const QueueItem &item)
     return result;
 }
 
-bool BufferQueue::enqueueBlocking(const QueueItem &item, std::chrono::milliseconds timeout)
+bool BufferQueue::enqueueBlocking(const QueueItem &item, ProducerToken &token, std::chrono::milliseconds timeout)
 {
     auto start = std::chrono::steady_clock::now();
     int backoffMs = 1;
@@ -35,7 +35,7 @@ bool BufferQueue::enqueueBlocking(const QueueItem &item, std::chrono::millisecon
 
     while (true)
     {
-        if (enqueue(item))
+        if (enqueue(item, token))
         {
             return true;
         }
@@ -65,9 +65,9 @@ bool BufferQueue::enqueueBlocking(const QueueItem &item, std::chrono::millisecon
     }
 }
 
-bool BufferQueue::enqueueBatch(const std::vector<QueueItem> &items)
+bool BufferQueue::enqueueBatch(const std::vector<QueueItem> &items, ProducerToken &token)
 {
-    bool result = m_queue.try_enqueue_bulk(items.begin(), items.size());
+    bool result = m_queue.try_enqueue_bulk(token, items.begin(), items.size());
     if (result)
     {
         m_size.fetch_add(items.size(), std::memory_order_relaxed);
@@ -75,7 +75,7 @@ bool BufferQueue::enqueueBatch(const std::vector<QueueItem> &items)
     return result;
 }
 
-bool BufferQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items,
+bool BufferQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items, ProducerToken &token,
                                        std::chrono::milliseconds timeout)
 {
     auto start = std::chrono::steady_clock::now();
@@ -85,7 +85,7 @@ bool BufferQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items,
 
     while (true)
     {
-        if (enqueueBatch(items))
+        if (enqueueBatch(items, token))
         {
             return true;
         }
@@ -115,9 +115,9 @@ bool BufferQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items,
     }
 }
 
-bool BufferQueue::dequeue(QueueItem &item)
+bool BufferQueue::dequeue(QueueItem &item, ConsumerToken &token)
 {
-    if (m_queue.try_dequeue(item))
+    if (m_queue.try_dequeue(token, item))
     {
         m_size.fetch_sub(1, std::memory_order_relaxed);
         m_flushCondition.notify_one();
@@ -126,12 +126,12 @@ bool BufferQueue::dequeue(QueueItem &item)
     return false;
 }
 
-size_t BufferQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItems)
+size_t BufferQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItems, ConsumerToken &token)
 {
     items.clear();
     items.resize(maxItems);
 
-    size_t dequeued = m_queue.try_dequeue_bulk(items.begin(), maxItems);
+    size_t dequeued = m_queue.try_dequeue_bulk(token, items.begin(), maxItems);
     items.resize(dequeued);
 
     if (dequeued > 0)

@@ -12,6 +12,10 @@
 
 class BufferQueue
 {
+public:
+    using ProducerToken = moodycamel::ProducerToken;
+    using ConsumerToken = moodycamel::ConsumerToken;
+
 private:
     moodycamel::ConcurrentQueue<QueueItem> m_queue;
 
@@ -25,11 +29,17 @@ public:
     explicit BufferQueue(size_t capacity = 8192);
     ~BufferQueue();
 
-    bool enqueueBlocking(const QueueItem &item, std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
+    ProducerToken createProducerToken() { return ProducerToken(m_queue); }
+    ConsumerToken createConsumerToken() { return ConsumerToken(m_queue); }
+
+    bool enqueueBlocking(const QueueItem &item,
+                         ProducerToken &token,
+                         std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
     bool enqueueBatchBlocking(const std::vector<QueueItem> &items,
+                              ProducerToken &token,
                               std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
-    bool dequeue(QueueItem &item);
-    size_t dequeueBatch(std::vector<QueueItem> &items, size_t maxItems);
+    bool dequeue(QueueItem &item, ConsumerToken &token);
+    size_t dequeueBatch(std::vector<QueueItem> &items, size_t maxItems, ConsumerToken &token);
     bool flush();
     size_t size() const;
     bool isEmpty() const { return size() == 0; }
@@ -41,8 +51,8 @@ public:
     BufferQueue &operator=(BufferQueue &&) = delete;
 
 private:
-    bool enqueue(const QueueItem &item);
-    bool enqueueBatch(const std::vector<QueueItem> &items);
+    bool enqueue(const QueueItem &item, ProducerToken &token);
+    bool enqueueBatch(const std::vector<QueueItem> &items, ProducerToken &token);
 };
 
 #endif

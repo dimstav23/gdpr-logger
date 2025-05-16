@@ -9,18 +9,6 @@
 #include <filesystem>
 #include <numeric>
 
-void appendLogEntriesBurst(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
-{
-    for (const auto &batchWithDest : batches)
-    {
-        if (!loggingSystem.appendBatch(batchWithDest.first, batchWithDest.second))
-        {
-            std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
-                      << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
-        }
-    }
-}
-
 int main()
 {
     // system parameters
@@ -58,7 +46,7 @@ int main()
 
     for (int burst = 0; burst < numBursts; burst++)
     {
-        appendLogEntriesBurst(loggingSystem, batches);
+        appendLogEntries(loggingSystem, batches);
 
         if (burst < numBursts - 1)
         {
