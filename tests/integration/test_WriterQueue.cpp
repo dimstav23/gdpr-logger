@@ -56,10 +56,11 @@ protected:
 // Test basic processing functionality
 TEST_F(WriterIntegrationTest, BasicWriteOperation)
 {
+    BufferQueue::ProducerToken producerToken = logQueue->createProducerToken();
     const int NUM_ENTRIES = 500;
     for (int i = 0; i < NUM_ENTRIES; ++i)
     {
-        ASSERT_TRUE(logQueue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(100)))
+        ASSERT_TRUE(logQueue->enqueueBlocking(createTestItem(i), producerToken, std::chrono::milliseconds(100)))
             << "Failed to enqueue entry " << i;
     }
 
@@ -83,11 +84,12 @@ TEST_F(WriterIntegrationTest, ConcurrentWriteAndProcess)
     // Function to simulate producers adding log entries
     auto producer = [this](int start, int count)
     {
+        BufferQueue::ProducerToken producerToken = logQueue->createProducerToken();
         for (int i = start; i < start + count; ++i)
         {
             // Introduce a small delay to simulate variability
             std::this_thread::sleep_for(std::chrono::milliseconds(rand() % 10));
-            logQueue->enqueueBlocking(createTestItem(i), std::chrono::milliseconds(500));
+            logQueue->enqueueBlocking(createTestItem(i), producerToken, std::chrono::milliseconds(500));
         }
     };
 

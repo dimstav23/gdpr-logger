@@ -74,8 +74,10 @@ TEST_F(WriterTest, ProcessBatchEntries)
         QueueItem{LogEntry{LogEntry::ActionType::CREATE, "location2", "user2", "subject2"}},
         QueueItem{LogEntry{LogEntry::ActionType::UPDATE, "location3", "user3", "subject3"}}};
 
+    BufferQueue::ProducerToken producerToken = queue->createProducerToken();
+
     // Enqueue test entries
-    queue->enqueueBatchBlocking(testItems, std::chrono::milliseconds(100));
+    queue->enqueueBatchBlocking(testItems, producerToken, std::chrono::milliseconds(100));
 
     // Instantiate writer with a batch size equal to number of test items
     writer = std::make_unique<Writer>(*queue, storage, testItems.size());

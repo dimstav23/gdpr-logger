@@ -62,40 +62,54 @@ TEST_F(LoggingAPITest, DoubleInitialization)
     EXPECT_TRUE(api.reset());
 }
 
-// Test appending log entry before initialization
-TEST_F(LoggingAPITest, AppendBeforeInitialization)
+// Test creating producer token
+TEST_F(LoggingAPITest, CreateProducerToken)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
-    EXPECT_FALSE(api.append(entry));
-}
 
-// Test appending log entry after initialization
-TEST_F(LoggingAPITest, AppendAfterInitialization2)
-{
-    LoggingAPI &api = LoggingAPI::getInstance();
+    // Should throw when not initialized
+    EXPECT_THROW(api.createProducerToken(), std::runtime_error);
+
     EXPECT_TRUE(api.initialize(queue));
-    LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
 
-    EXPECT_TRUE(api.append(entry));
+    // Should not throw when initialized
+    EXPECT_NO_THROW({
+        BufferQueue::ProducerToken token = api.createProducerToken();
+    });
+
     EXPECT_TRUE(api.reset());
 }
 
-// Test blocking append with queue eventually emptying - Modified
+// Test appending log entry after initialization
+TEST_F(LoggingAPITest, AppendAfterInitialization)
+{
+    LoggingAPI &api = LoggingAPI::getInstance();
+    EXPECT_TRUE(api.initialize(queue));
+
+    BufferQueue::ProducerToken token = api.createProducerToken();
+    LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
+
+    EXPECT_TRUE(api.append(entry, token));
+    EXPECT_TRUE(api.reset());
+}
+
+// Test blocking append with queue eventually emptying
 TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
     auto smallQueue = std::make_shared<BufferQueue>(2);
     EXPECT_TRUE(api.initialize(smallQueue, std::chrono::milliseconds(1000)));
 
+    BufferQueue::ProducerToken token = api.createProducerToken();
+
     // Since queue grows dynamically, we'll test timeout instead
     LogEntry entry1(LogEntry::ActionType::READ, "location1", "user1", "subject1");
-    EXPECT_TRUE(api.append(entry1));
+    EXPECT_TRUE(api.append(entry1, token));
 
     LogEntry entry2(LogEntry::ActionType::READ, "location2", "user2", "subject2");
     // With dynamic queue, this will succeed immediately
     auto start = std::chrono::steady_clock::now();
-    EXPECT_TRUE(api.append(entry2));
+    EXPECT_TRUE(api.append(entry2, token));
     auto end = std::chrono::steady_clock::now();
 
     // Verify it doesn't block since queue can grow
@@ -117,14 +131,43 @@ TEST_F(LoggingAPITest, AppendTimeoutBehavior)
     // Initialize with a very short timeout
     EXPECT_TRUE(api.initialize(queue, std::chrono::milliseconds(50)));
 
+    BufferQueue::ProducerToken token = api.createProducerToken();
     LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
 
     auto start = std::chrono::steady_clock::now();
-    EXPECT_TRUE(api.append(entry)); // Should succeed immediately since queue grows
+    EXPECT_TRUE(api.append(entry, token)); // Should succeed immediately since queue grows
     auto end = std::chrono::steady_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
     EXPECT_LT(duration, 10); // Very fast operation
+
+    EXPECT_TRUE(api.reset());
+}
+
+// Test batch append functionality
+TEST_F(LoggingAPITest, AppendBatch)
+{
+    LoggingAPI &api = LoggingAPI::getInstance();
+    EXPECT_TRUE(api.initialize(queue));
+
+    BufferQueue::ProducerToken token = api.createProducerToken();
+
+    std::vector<LogEntry> entries;
+    for (int i = 0; i < 5; i++)
+    {
+        entries.emplace_back(
+            LogEntry::ActionType::READ,
+            "location_" + std::to_string(i),
+            "user",
+            "subject_" + std::to_string(i));
+    }
+
+    EXPECT_TRUE(api.appendBatch(entries, token));
+    EXPECT_EQ(queue->size(), 5);
+
+    // Test empty batch
+    std::vector<LogEntry> emptyEntries;
+    EXPECT_TRUE(api.appendBatch(emptyEntries, token));
 
     EXPECT_TRUE(api.reset());
 }
@@ -143,15 +186,17 @@ TEST_F(LoggingAPITest, ShutdownWithWait)
     LoggingAPI &api = LoggingAPI::getInstance();
     EXPECT_TRUE(api.initialize(queue));
 
+    BufferQueue::ProducerToken token = api.createProducerToken();
     LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
-    EXPECT_TRUE(api.append(entry));
+    EXPECT_TRUE(api.append(entry, token));
 
     // Launch an asynchronous consumer that waits briefly before draining the queue.
     std::thread consumer([this]()
                          {
         std::this_thread::sleep_for(std::chrono::milliseconds(500)); // simulate delay
+        BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
         QueueItem dummyItem;
-        while (queue->dequeue(dummyItem))
+        while (queue->dequeue(dummyItem, consumerToken))
         {
         } });
 
@@ -216,6 +261,9 @@ TEST_F(LoggingAPITest, ThreadSafetyOperations)
     {
         threads.emplace_back([&api, i]()
                              {
+                                 // Create producer token for this thread
+                                 BufferQueue::ProducerToken token = api.createProducerToken();
+                                 
                                  // Each thread appends 10 entries
                                  for (int j = 0; j < 10; j++) {
                                      LogEntry entry(
@@ -224,7 +272,7 @@ TEST_F(LoggingAPITest, ThreadSafetyOperations)
                                          "user_" + std::to_string(i),
                                          "subject_" + std::to_string(j)
                                         );
-                                     EXPECT_TRUE(api.append(entry));
+                                     EXPECT_TRUE(api.append(entry, token));
                                  } });
     }
 
