@@ -18,7 +18,7 @@ BufferQueue::~BufferQueue()
 
 bool BufferQueue::enqueue(const QueueItem &item)
 {
-    bool result = m_queue.enqueue(item);
+    bool result = m_queue.try_enqueue(item);
     if (result)
     {
         m_size.fetch_add(1, std::memory_order_relaxed);
@@ -67,7 +67,7 @@ bool BufferQueue::enqueueBlocking(const QueueItem &item, std::chrono::millisecon
 
 bool BufferQueue::enqueueBatch(const std::vector<QueueItem> &items)
 {
-    bool result = m_queue.enqueue_bulk(items.begin(), items.size());
+    bool result = m_queue.try_enqueue_bulk(items.begin(), items.size());
     if (result)
     {
         m_size.fetch_add(items.size(), std::memory_order_relaxed);

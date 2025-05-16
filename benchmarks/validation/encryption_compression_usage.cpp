@@ -103,13 +103,13 @@ int main()
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 3000000;
     baseConfig.batchSize = 8400;
-    baseConfig.numWriterThreads = 12;
+    baseConfig.numWriterThreads = 64;
     baseConfig.appendTimeout = std::chrono::minutes(2);
     // Benchmark parameters
     const int numSpecificFiles = 100;
     const int producerBatchSize = 1000;
-    const int numProducers = 32;
-    const int entriesPerProducer = 3000000;
+    const int numProducers = 96;
+    const int entriesPerProducer = 500000;
     const int payloadSize = 2048;
 
     std::cout << "Generating batches with pre-determined destinations for all threads...";

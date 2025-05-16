@@ -39,8 +39,8 @@ int main()
     // benchmark parameters
     const int numSpecificFiles = 100;
     const int producerBatchSize = 1000;
-    const int numProducers = 40;
-    const int entriesPerProducer = 1000000;
+    const int numProducers = 96;
+    const int entriesPerProducer = 2000000;
     const int payloadSize = 4096;
 
     cleanupLogDirectory(config.basePath);

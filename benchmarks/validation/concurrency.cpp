@@ -135,7 +135,7 @@ int main()
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 3000000;
     baseConfig.batchSize = 850;
-    baseConfig.appendTimeout = std::chrono::minutes(2);
+    baseConfig.appendTimeout = std::chrono::minutes(7);
     baseConfig.useEncryption = false;
     baseConfig.useCompression = false;
     // benchmark parameters
