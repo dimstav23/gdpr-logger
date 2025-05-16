@@ -19,26 +19,16 @@ Crypto::~Crypto()
 }
 
 // Encrypt data using AES-256-GCM with provided IV
-std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &compressedData,
+std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &plaintext,
                                      const std::vector<uint8_t> &key,
                                      const std::vector<uint8_t> &iv)
 {
-    if (compressedData.empty())
-    {
-        return std::vector<uint8_t>();
-    }
-
-    // Validate key size
+    if (plaintext.empty())
+        return {};
     if (key.size() != KEY_SIZE)
-    {
-        throw std::runtime_error("Invalid key size. Expected 32 bytes for AES-256");
-    }
-
-    // Validate IV size
+        throw std::runtime_error("Invalid key size");
     if (iv.size() != GCM_IV_SIZE)
-    {
-        throw std::runtime_error("Invalid IV size. Expected 12 bytes for GCM");
-    }
+        throw std::runtime_error("Invalid IV size");
 
     // Initialize OpenSSL cipher context
     EVP_CIPHER_CTX *ctx = EVP_CIPHER_CTX_new();
@@ -54,30 +44,46 @@ std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &compressedData,
         throw std::runtime_error("Failed to initialize encryption");
     }
 
-    // Prepare output buffer for ciphertext
-    // The encrypted data might be larger than the input data due to padding
-    std::vector<uint8_t> encryptedData(compressedData.size() + EVP_MAX_BLOCK_LENGTH);
-    int encryptedLen = 0;
+    // Calculate the exact output size: size_field + ciphertext + tag
+    // For GCM mode, ciphertext size equals plaintext size (no padding)
+    const size_t sizeFieldSize = sizeof(uint32_t);
+    const size_t ciphertextSize = plaintext.size();
+    const size_t totalSize = sizeFieldSize + ciphertextSize + GCM_TAG_SIZE;
 
-    // Perform encryption
-    if (EVP_EncryptUpdate(ctx, encryptedData.data(), &encryptedLen,
-                          compressedData.data(), compressedData.size()) != 1)
+    // Pre-allocate result buffer with exact final size
+    std::vector<uint8_t> result(totalSize);
+
+    // Reserve space for data size field
+    uint32_t dataSize = ciphertextSize;
+    std::memcpy(result.data(), &dataSize, sizeFieldSize);
+
+    // Perform encryption directly into the result buffer (after the size field)
+    int encryptedLen = 0;
+    if (EVP_EncryptUpdate(ctx, result.data() + sizeFieldSize, &encryptedLen,
+                          plaintext.data(), plaintext.size()) != 1)
     {
         EVP_CIPHER_CTX_free(ctx);
         throw std::runtime_error("Failed during encryption update");
     }
 
-    // Finalize encryption
+    // Finalize encryption (writing to the buffer right after the existing encrypted data)
     int finalLen = 0;
-    if (EVP_EncryptFinal_ex(ctx, encryptedData.data() + encryptedLen, &finalLen) != 1)
+    if (EVP_EncryptFinal_ex(ctx, result.data() + sizeFieldSize + encryptedLen, &finalLen) != 1)
     {
         EVP_CIPHER_CTX_free(ctx);
         throw std::runtime_error("Failed to finalize encryption");
     }
 
-    // Get the authentication tag
-    std::vector<uint8_t> tag(GCM_TAG_SIZE);
-    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, GCM_TAG_SIZE, tag.data()) != 1)
+    // Sanity check: for GCM, encryptedLen + finalLen should equal plaintext.size()
+    if (encryptedLen + finalLen != static_cast<int>(plaintext.size()))
+    {
+        EVP_CIPHER_CTX_free(ctx);
+        throw std::runtime_error("Unexpected encryption output size");
+    }
+
+    // Get the authentication tag and write it directly to the result buffer
+    if (EVP_CIPHER_CTX_ctrl(ctx, EVP_CTRL_GCM_GET_TAG, GCM_TAG_SIZE,
+                            result.data() + sizeFieldSize + ciphertextSize) != 1)
     {
         EVP_CIPHER_CTX_free(ctx);
         throw std::runtime_error("Failed to get authentication tag");
@@ -85,27 +91,6 @@ std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &compressedData,
 
     // Clean up
     EVP_CIPHER_CTX_free(ctx);
-
-    // Resize the encrypted data to the actual length
-    encryptedData.resize(encryptedLen + finalLen);
-
-    // Format the output: Ciphertext + Tag (no IV)
-    std::vector<uint8_t> result;
-
-    // Store the encrypted data size
-    uint32_t dataSize = encryptedData.size();
-    result.resize(sizeof(dataSize));
-    std::memcpy(result.data(), &dataSize, sizeof(dataSize));
-
-    // Store the encrypted data
-    size_t currentSize = result.size();
-    result.resize(currentSize + encryptedData.size());
-    std::memcpy(result.data() + currentSize, encryptedData.data(), encryptedData.size());
-
-    // Store the tag
-    currentSize = result.size();
-    result.resize(currentSize + tag.size());
-    std::memcpy(result.data() + currentSize, tag.data(), tag.size());
 
     return result;
 }
