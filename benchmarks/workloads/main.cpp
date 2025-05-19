@@ -19,14 +19,15 @@ int main()
     config.maxAttempts = 5;
     config.baseRetryDelay = std::chrono::milliseconds(1);
     config.queueCapacity = 3000000;
-    config.batchSize = 850;
+    config.maxExplicitProducers = 96;
+    config.batchSize = 8192;
     config.numWriterThreads = 64;
     config.appendTimeout = std::chrono::minutes(2);
     config.useEncryption = false;
     config.useCompression = false;
     // benchmark parameters
-    const int numSpecificFiles = 100;
-    const int producerBatchSize = 1000;
+    const int numSpecificFiles = 256;
+    const int producerBatchSize = 256;
     const int numProducers = 96;
     const int entriesPerProducer = 2000000;
     const int payloadSize = 4096;

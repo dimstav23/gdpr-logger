@@ -13,7 +13,7 @@ protected:
         LoggingAPI::s_instance.reset();
 
         // Create a BufferQueue instance
-        queue = std::make_shared<BufferQueue>(1024);
+        queue = std::make_shared<BufferQueue>(1024, 10);
     }
 
     void TearDown() override
@@ -97,7 +97,7 @@ TEST_F(LoggingAPITest, AppendAfterInitialization)
 TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    auto smallQueue = std::make_shared<BufferQueue>(2);
+    auto smallQueue = std::make_shared<BufferQueue>(2, 1);
     EXPECT_TRUE(api.initialize(smallQueue, std::chrono::milliseconds(1000)));
 
     BufferQueue::ProducerToken token = api.createProducerToken();
@@ -126,7 +126,7 @@ TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 TEST_F(LoggingAPITest, AppendTimeoutBehavior)
 {
     LoggingAPI &api = LoggingAPI::getInstance();
-    auto queue = std::make_shared<BufferQueue>(1024);
+    auto queue = std::make_shared<BufferQueue>(1024, 1);
 
     // Initialize with a very short timeout
     EXPECT_TRUE(api.initialize(queue, std::chrono::milliseconds(50)));

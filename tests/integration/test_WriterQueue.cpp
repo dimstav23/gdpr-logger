@@ -15,7 +15,7 @@ protected:
         // Create a temporary directory for test log segments
         testDir = "test_logs";
         std::filesystem::create_directories(testDir);
-        logQueue = std::make_unique<BufferQueue>(1024);
+        logQueue = std::make_unique<BufferQueue>(1024, 4);
 
         // Create a SegmentedStorage instance with reduced sizes for testing
         storage = std::make_shared<SegmentedStorage>(

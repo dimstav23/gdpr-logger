@@ -133,7 +133,7 @@ int main()
     const int entriesPerProducer = 2000000;
     const int payloadSize = 2048;
 
-    std::vector<int> batchSizes = {1, 10, 50, 100, 500, 1000, 2000, 5000, 10000, 25000};
+    std::vector<int> batchSizes = {1, 32, 64, 128, 512, 1024, 2048, 4096, 8192, 16384};
 
     runBatchSizeComparison(baseConfig,
                            batchSizes,

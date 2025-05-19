@@ -21,7 +21,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
                              int entriesPerProducer, int numSpecificFiles, int producerBatchSize, int payloadSize)
 {
     LoggingConfig config = baseConfig;
-    config.basePath = "./logs/writers_" + std::to_string(numWriterThreads);
+    config.basePath = "./logs_writers";
     config.numWriterThreads = numWriterThreads;
 
     cleanupLogDirectory(config.basePath);
@@ -118,22 +118,22 @@ int main()
     // system parameters
     LoggingConfig baseConfig;
     baseConfig.baseFilename = "default";
-    baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+    baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 100 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.queueCapacity = 3000000;
-    baseConfig.batchSize = 850;
+    baseConfig.queueCapacity = 4500000;
+    baseConfig.batchSize = 864;
     baseConfig.appendTimeout = std::chrono::minutes(7);
     baseConfig.useEncryption = false;
     baseConfig.useCompression = false;
     // benchmark parameters
     const int numSpecificFiles = 100;
-    const int producerBatchSize = 1000;
-    const int numProducers = 96;
-    const int entriesPerProducer = 300000;
+    const int producerBatchSize = 960;
+    const int numProducers = 8;
+    const int entriesPerProducer = 200000;
     const int payloadSize = 4096;
 
-    std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16, 32, 48, 64, 96};
+    std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16, 32 /*,48, 64, 96*/};
 
     runConcurrencyBenchmark(baseConfig,
                             writerThreadCounts,

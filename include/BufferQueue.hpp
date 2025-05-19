@@ -20,10 +20,9 @@ private:
     moodycamel::ConcurrentQueue<QueueItem> m_queue;
 
     mutable std::mutex m_flushMutex;
-    std::condition_variable m_flushCondition;
 
 public:
-    explicit BufferQueue(size_t capacity = 8192);
+    explicit BufferQueue(size_t capacity, size_t maxExplicitProducers);
     ~BufferQueue();
 
     ProducerToken createProducerToken() { return ProducerToken(m_queue); }

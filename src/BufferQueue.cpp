@@ -5,14 +5,13 @@
 #include <chrono>
 #include <cmath>
 
-BufferQueue::BufferQueue(size_t capacity)
+BufferQueue::BufferQueue(size_t capacity, size_t maxExplicitProducers)
 {
-    m_queue = moodycamel::ConcurrentQueue<QueueItem>(capacity);
+    m_queue = moodycamel::ConcurrentQueue<QueueItem>(capacity, maxExplicitProducers, 0);
 }
 
 BufferQueue::~BufferQueue()
 {
-    m_flushCondition.notify_one();
 }
 
 bool BufferQueue::enqueue(const QueueItem &item, ProducerToken &token)
@@ -108,7 +107,6 @@ bool BufferQueue::dequeue(QueueItem &item, ConsumerToken &token)
 {
     if (m_queue.try_dequeue(token, item))
     {
-        m_flushCondition.notify_one();
         return true;
     }
     return false;
@@ -122,11 +120,6 @@ size_t BufferQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItems,
     size_t dequeued = m_queue.try_dequeue_bulk(token, items.begin(), maxItems);
     items.resize(dequeued);
 
-    if (dequeued > 0)
-    {
-        m_flushCondition.notify_one();
-    }
-
     return dequeued;
 }
 
@@ -134,10 +127,10 @@ bool BufferQueue::flush()
 {
     std::unique_lock<std::mutex> lock(m_flushMutex);
 
-    std::this_thread::sleep_for(std::chrono::milliseconds(500));
-    // Wait until the queue is empty
-    m_flushCondition.wait(lock, [this]
-                          { return m_queue.size_approx() == 0; });
+    do
+    {
+        std::this_thread::sleep_for(std::chrono::milliseconds(500));
+    } while (m_queue.size_approx() != 0);
 
     return true;
 }

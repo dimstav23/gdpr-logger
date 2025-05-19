@@ -14,6 +14,7 @@ struct LoggingConfig
     std::chrono::milliseconds baseRetryDelay = std::chrono::milliseconds(1);
     // queue
     size_t queueCapacity = 8192;
+    size_t maxExplicitProducers = 16; // maximum number of producers creating a producer token
     // writers
     size_t batchSize = 100;
     size_t numWriterThreads = 2;

@@ -14,7 +14,7 @@ protected:
     void SetUp() override
     {
         // Create a new queue for each test
-        queue = std::make_unique<BufferQueue>(TEST_QUEUE_SIZE);
+        queue = std::make_unique<BufferQueue>(QUEUE_SIZE, 1);
     }
 
     void TearDown() override
@@ -42,7 +42,9 @@ protected:
         return item;
     }
 
-    const size_t TEST_QUEUE_SIZE = 32; // Small size for testing
+    const size_t QUEUE_SIZE = 1; // leads to capacity being block_size
+    const size_t QUEUE_BLOCK_SIZE = 64;
+    const size_t QUEUE_CAPACITY = QUEUE_BLOCK_SIZE;
     std::unique_ptr<BufferQueue> queue;
 };
 
@@ -80,21 +82,21 @@ TEST_F(BufferQueueBasicTest, EnqueueUntilFull)
     BufferQueue::ProducerToken producerToken = queue->createProducerToken();
 
     // Fill the queue up to capacity
-    for (size_t i = 0; i < TEST_QUEUE_SIZE; i++)
+    for (size_t i = 0; i < QUEUE_CAPACITY; i++)
     {
         EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), producerToken, std::chrono::milliseconds(100)));
     }
 
     // Queue should be full now
-    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE);
+    EXPECT_EQ(queue->size(), QUEUE_CAPACITY);
 
     // Testing that enqueue fails
-    EXPECT_FALSE(queue->enqueueBlocking(createTestItem(TEST_QUEUE_SIZE), producerToken));
+    EXPECT_FALSE(queue->enqueueBlocking(createTestItem(123), producerToken));
 
     // With longer timeout, enqueue should block and eventually fail too since no consumer
     auto start = std::chrono::steady_clock::now();
     auto timeout = std::chrono::milliseconds(50);
-    EXPECT_FALSE(queue->enqueueBlocking(createTestItem(TEST_QUEUE_SIZE), producerToken, timeout));
+    EXPECT_FALSE(queue->enqueueBlocking(createTestItem(123), producerToken, timeout));
     auto elapsed = std::chrono::steady_clock::now() - start;
     EXPECT_GE(elapsed, timeout); // Verify that it blocked for at least the timeout period
 }
@@ -105,15 +107,15 @@ TEST_F(BufferQueueBasicTest, EnqueueWithConsumer)
     BufferQueue::ProducerToken producerToken = queue->createProducerToken();
 
     // Fill the queue to capacity
-    for (size_t i = 0; i < TEST_QUEUE_SIZE; i++)
+    for (size_t i = 0; i < QUEUE_CAPACITY; i++)
     {
         EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), producerToken, std::chrono::milliseconds(100)));
     }
 
-    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE);
+    EXPECT_EQ(queue->size(), QUEUE_CAPACITY);
 
     // Testing that enqueue fails
-    EXPECT_FALSE(queue->enqueueBlocking(createTestItem(TEST_QUEUE_SIZE), producerToken));
+    EXPECT_FALSE(queue->enqueueBlocking(createTestItem(123), producerToken));
 
     BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
     QueueItem retrievedItem;
@@ -121,17 +123,17 @@ TEST_F(BufferQueueBasicTest, EnqueueWithConsumer)
     EXPECT_EQ(retrievedItem.entry.getActionType(), LogEntry::ActionType::READ);
     EXPECT_EQ(retrievedItem.entry.getDataLocation(), "data/location/0");
 
-    // block of size 32 only becomes free again after entire block has been dequeued.
+    // block of size 64 only becomes free again after entire block has been dequeued.
     EXPECT_FALSE(queue->enqueueBlocking(createTestItem(99999), producerToken, std::chrono::seconds(1)));
 
-    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE - 1);
+    EXPECT_EQ(queue->size(), QUEUE_CAPACITY - 1);
 
     // Batch dequeue
     std::vector<QueueItem> items;
-    size_t count = queue->dequeueBatch(items, TEST_QUEUE_SIZE - 1, consumerToken);
+    size_t count = queue->dequeueBatch(items, QUEUE_CAPACITY - 1, consumerToken);
     // Verify we got all items
-    EXPECT_EQ(count, TEST_QUEUE_SIZE - 1);
-    EXPECT_EQ(items.size(), TEST_QUEUE_SIZE - 1);
+    EXPECT_EQ(count, QUEUE_CAPACITY - 1);
+    EXPECT_EQ(items.size(), QUEUE_CAPACITY - 1);
     EXPECT_EQ(queue->size(), 0);
 
     // now enqueue should work again after entire block has been freed
@@ -239,7 +241,7 @@ TEST_F(BufferQueueBasicTest, BatchEnqueueWhenAlmostFull)
     BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
 
     // Fill most of the queue
-    for (size_t i = 0; i < TEST_QUEUE_SIZE - 3; i++)
+    for (size_t i = 0; i < QUEUE_CAPACITY - 3; i++)
     {
         EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), producerToken, std::chrono::milliseconds(100)));
     }
@@ -253,7 +255,7 @@ TEST_F(BufferQueueBasicTest, BatchEnqueueWhenAlmostFull)
 
     // This should succeed (exactly fits available space)
     EXPECT_TRUE(queue->enqueueBatchBlocking(smallBatch, producerToken));
-    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE);
+    EXPECT_EQ(queue->size(), QUEUE_CAPACITY);
 
     // Create a batch larger than available space
     std::vector<QueueItem> largeBatch;
@@ -267,8 +269,8 @@ TEST_F(BufferQueueBasicTest, BatchEnqueueWhenAlmostFull)
 
     // Remove ALL items to make space (to free the entire block)
     std::vector<QueueItem> retrievedItems;
-    size_t removed = queue->dequeueBatch(retrievedItems, TEST_QUEUE_SIZE, consumerToken);
-    EXPECT_EQ(removed, TEST_QUEUE_SIZE);
+    size_t removed = queue->dequeueBatch(retrievedItems, QUEUE_CAPACITY, consumerToken);
+    EXPECT_EQ(removed, QUEUE_CAPACITY);
     EXPECT_EQ(queue->size(), 0);
 
     // Now batch enqueue should succeed
@@ -281,11 +283,11 @@ TEST_F(BufferQueueBasicTest, BatchEnqueueBlocking)
     BufferQueue::ProducerToken producerToken = queue->createProducerToken();
 
     // Fill the queue to capacity
-    for (size_t i = 0; i < TEST_QUEUE_SIZE; i++)
+    for (size_t i = 0; i < QUEUE_CAPACITY; i++)
     {
         EXPECT_TRUE(queue->enqueueBlocking(createTestItem(i), producerToken, std::chrono::milliseconds(100)));
     }
-    EXPECT_EQ(queue->size(), TEST_QUEUE_SIZE);
+    EXPECT_EQ(queue->size(), QUEUE_CAPACITY);
 
     std::vector<QueueItem> batch;
     for (size_t i = 0; i < 3; i++)
@@ -315,7 +317,7 @@ TEST_F(BufferQueueBasicTest, BatchEnqueueBlocking)
         BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
         std::vector<QueueItem> items;
         // Dequeue all items to free the entire block
-        queue->dequeueBatch(items, TEST_QUEUE_SIZE, consumerToken); });
+        queue->dequeueBatch(items, QUEUE_CAPACITY, consumerToken); });
 
     // Wait for both threads
     consumerThread.join();
@@ -392,7 +394,7 @@ protected:
     void SetUp() override
     {
         // Create a new queue for each test with larger capacity
-        queue = std::make_unique<BufferQueue>(QUEUE_CAPACITY);
+        queue = std::make_unique<BufferQueue>(QUEUE_CAPACITY - 1, 8);
     }
 
     void TearDown() override
@@ -412,6 +414,7 @@ protected:
         return item;
     }
 
+    const size_t QUEUE_BLOCK_SIZE = 64;
     const size_t QUEUE_CAPACITY = 4096;
     std::unique_ptr<BufferQueue> queue;
 };
@@ -419,10 +422,8 @@ protected:
 // Test dynamic queue behavior - Modified for non-growing queue
 TEST_F(BufferQueueThreadTest, QueueCapacityTest)
 {
-    BufferQueue::ProducerToken producerToken = queue->createProducerToken();
-
     const size_t SMALL_CAPACITY = 128;
-    auto smallQueue = std::make_unique<BufferQueue>(SMALL_CAPACITY);
+    auto smallQueue = std::make_unique<BufferQueue>(SMALL_CAPACITY - QUEUE_BLOCK_SIZE, 1);
     BufferQueue::ProducerToken smallQueueProducer = smallQueue->createProducerToken();
     BufferQueue::ConsumerToken smallQueueConsumer = smallQueue->createConsumerToken();
 
@@ -841,7 +842,7 @@ protected:
     void SetUp() override
     {
         // Create a new queue for each test
-        queue = std::make_unique<BufferQueue>(QUEUE_CAPACITY);
+        queue = std::make_unique<BufferQueue>(QUEUE_CAPACITY, 1);
     }
 
     void TearDown() override
