@@ -7,7 +7,6 @@
 
 BufferQueue::BufferQueue(size_t capacity)
 {
-    // Moodycamel queue has dynamic capacity, but hint the initial size
     m_queue = moodycamel::ConcurrentQueue<QueueItem>(capacity);
 }
 
@@ -18,12 +17,7 @@ BufferQueue::~BufferQueue()
 
 bool BufferQueue::enqueue(const QueueItem &item, ProducerToken &token)
 {
-    bool result = m_queue.try_enqueue(token, item);
-    if (result)
-    {
-        m_size.fetch_add(1, std::memory_order_relaxed);
-    }
-    return result;
+    return m_queue.try_enqueue(token, item);
 }
 
 bool BufferQueue::enqueueBlocking(const QueueItem &item, ProducerToken &token, std::chrono::milliseconds timeout)
@@ -67,12 +61,7 @@ bool BufferQueue::enqueueBlocking(const QueueItem &item, ProducerToken &token, s
 
 bool BufferQueue::enqueueBatch(const std::vector<QueueItem> &items, ProducerToken &token)
 {
-    bool result = m_queue.try_enqueue_bulk(token, items.begin(), items.size());
-    if (result)
-    {
-        m_size.fetch_add(items.size(), std::memory_order_relaxed);
-    }
-    return result;
+    return m_queue.try_enqueue_bulk(token, items.begin(), items.size());
 }
 
 bool BufferQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items, ProducerToken &token,
@@ -119,7 +108,6 @@ bool BufferQueue::dequeue(QueueItem &item, ConsumerToken &token)
 {
     if (m_queue.try_dequeue(token, item))
     {
-        m_size.fetch_sub(1, std::memory_order_relaxed);
         m_flushCondition.notify_one();
         return true;
     }
@@ -136,7 +124,6 @@ size_t BufferQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItems,
 
     if (dequeued > 0)
     {
-        m_size.fetch_sub(dequeued, std::memory_order_relaxed);
         m_flushCondition.notify_one();
     }
 
@@ -147,14 +134,15 @@ bool BufferQueue::flush()
 {
     std::unique_lock<std::mutex> lock(m_flushMutex);
 
+    std::this_thread::sleep_for(std::chrono::milliseconds(500));
     // Wait until the queue is empty
     m_flushCondition.wait(lock, [this]
-                          { return m_size.load(std::memory_order_acquire) == 0; });
+                          { return m_queue.size_approx() == 0; });
 
     return true;
 }
 
 size_t BufferQueue::size() const
 {
-    return m_size.load(std::memory_order_relaxed);
+    return m_queue.size_approx();
 }

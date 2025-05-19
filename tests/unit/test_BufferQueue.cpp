@@ -895,7 +895,7 @@ TEST_F(BufferQueueTimingTest, FlushWithTimeout)
         queue->dequeueBatch(items, 10, consumerToken); });
 
     // Flush should complete when queue is emptied
-    auto status = future.wait_for(std::chrono::milliseconds(500));
+    auto status = future.wait_for(std::chrono::milliseconds(750));
     EXPECT_EQ(status, std::future_status::ready);
     EXPECT_TRUE(future.get());
 

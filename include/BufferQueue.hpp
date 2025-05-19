@@ -19,9 +19,6 @@ public:
 private:
     moodycamel::ConcurrentQueue<QueueItem> m_queue;
 
-    // Atomic size counter (Moodycamel queue size() is approximate)
-    std::atomic<size_t> m_size{0};
-
     mutable std::mutex m_flushMutex;
     std::condition_variable m_flushCondition;
 
@@ -42,7 +39,6 @@ public:
     size_t dequeueBatch(std::vector<QueueItem> &items, size_t maxItems, ConsumerToken &token);
     bool flush();
     size_t size() const;
-    bool isEmpty() const { return size() == 0; }
 
     // delete copy/move
     BufferQueue(const BufferQueue &) = delete;

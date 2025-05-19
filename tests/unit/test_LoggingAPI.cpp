@@ -202,7 +202,7 @@ TEST_F(LoggingAPITest, ShutdownWithWait)
 
     EXPECT_TRUE(api.reset());
     consumer.join();
-    EXPECT_TRUE(queue->isEmpty());
+    EXPECT_TRUE(queue->size() == 0);
 }
 
 // Test export logs without initialization
