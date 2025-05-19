@@ -122,6 +122,7 @@ int main()
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 4500000;
+    baseConfig.maxExplicitProducers = 8;
     baseConfig.batchSize = 864;
     baseConfig.appendTimeout = std::chrono::minutes(7);
     baseConfig.useEncryption = false;

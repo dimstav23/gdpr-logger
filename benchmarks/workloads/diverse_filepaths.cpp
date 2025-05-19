@@ -144,6 +144,7 @@ int main()
     config.maxAttempts = 10;
     config.baseRetryDelay = std::chrono::milliseconds(2);
     config.queueCapacity = 3000000;
+    config.maxExplicitProducers = 25;
     config.batchSize = 8400;
     config.numWriterThreads = 32;
     config.appendTimeout = std::chrono::minutes(2);

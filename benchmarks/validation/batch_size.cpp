@@ -124,6 +124,7 @@ int main()
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 3000000;
+    baseConfig.maxExplicitProducers = 32;
     baseConfig.numWriterThreads = 64;
     baseConfig.appendTimeout = std::chrono::minutes(2);
     // benchmark parameters

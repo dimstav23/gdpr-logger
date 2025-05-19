@@ -123,6 +123,7 @@ int main()
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.batchSize = 8400;
+    baseConfig.maxExplicitProducers = 32;
     baseConfig.numWriterThreads = 12;
     baseConfig.appendTimeout = std::chrono::minutes(2);
     baseConfig.useEncryption = true;
