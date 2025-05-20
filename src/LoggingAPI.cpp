@@ -34,8 +34,6 @@ LoggingAPI::~LoggingAPI()
 bool LoggingAPI::initialize(std::shared_ptr<BufferQueue> queue,
                             std::chrono::milliseconds appendTimeout)
 {
-    std::unique_lock<std::shared_mutex> lock(m_apiMutex);
-
     if (m_initialized)
     {
         reportError("LoggingAPI already initialized");
@@ -57,8 +55,6 @@ bool LoggingAPI::initialize(std::shared_ptr<BufferQueue> queue,
 
 BufferQueue::ProducerToken LoggingAPI::createProducerToken()
 {
-    std::shared_lock<std::shared_mutex> lock(m_apiMutex);
-
     if (!m_initialized)
     {
         reportError("LoggingAPI not initialized");
@@ -72,8 +68,6 @@ bool LoggingAPI::append(const LogEntry &entry,
                         BufferQueue::ProducerToken &token,
                         const std::optional<std::string> &filename)
 {
-    std::shared_lock<std::shared_mutex> lock(m_apiMutex);
-
     if (!m_initialized)
     {
         reportError("LoggingAPI not initialized");
@@ -88,8 +82,6 @@ bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries,
                              BufferQueue::ProducerToken &token,
                              const std::optional<std::string> &filename)
 {
-    std::shared_lock<std::shared_mutex> lock(m_apiMutex);
-
     if (!m_initialized)
     {
         reportError("LoggingAPI not initialized");
@@ -112,8 +104,6 @@ bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries,
 
 bool LoggingAPI::reset()
 {
-    std::unique_lock<std::shared_mutex> lock(m_apiMutex);
-
     if (!m_initialized)
     {
         return false;
@@ -131,8 +121,6 @@ bool LoggingAPI::exportLogs(
     std::chrono::system_clock::time_point fromTimestamp,
     std::chrono::system_clock::time_point toTimestamp)
 {
-    std::shared_lock<std::shared_mutex> lock(m_apiMutex);
-
     if (!m_initialized)
     {
         reportError("LoggingAPI not initialized");

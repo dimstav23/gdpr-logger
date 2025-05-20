@@ -80,7 +80,7 @@ void Writer::processLogEntries()
             // Apply compression only if enabled
             processedData = m_useCompression ? Compression::compress(processedData) : processedData;
             // Apply encryption if enabled
-            processedData = m_useEncryption ? crypto.encrypt(processedData, encryptionKey, dummyIV) : processedData;
+            processedData = m_useEncryption ? crypto.encrypt(std::move(processedData), encryptionKey, dummyIV) : processedData;
 
             if (targetFilename)
             {

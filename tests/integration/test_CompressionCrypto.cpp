@@ -44,7 +44,7 @@ TEST_F(CompressionCryptoTest, BatchProcessing)
     std::vector<uint8_t> compressed = Compression::compress(serializedBatch);
     ASSERT_GT(compressed.size(), 0);
 
-    std::vector<uint8_t> encrypted = crypto.encrypt(compressed, key, dummyIV);
+    std::vector<uint8_t> encrypted = crypto.encrypt(std::move(compressed), key, dummyIV);
     ASSERT_GT(encrypted.size(), 0);
     EXPECT_NE(encrypted, compressed);
 
@@ -66,7 +66,7 @@ TEST_F(CompressionCryptoTest, BatchProcessing)
     std::vector<LogEntry> emptyBatch;
     std::vector<uint8_t> emptySerializedBatch = LogEntry::serializeBatch(emptyBatch);
     std::vector<uint8_t> emptyCompressed = Compression::compress(emptySerializedBatch);
-    std::vector<uint8_t> emptyEncrypted = crypto.encrypt(emptyCompressed, key, dummyIV);
+    std::vector<uint8_t> emptyEncrypted = crypto.encrypt(std::move(emptyCompressed), key, dummyIV);
     std::vector<uint8_t> emptyDecrypted = crypto.decrypt(emptyEncrypted, key, dummyIV);
     std::vector<uint8_t> emptyDecompressed = Compression::decompress(emptyDecrypted);
     std::vector<LogEntry> emptyRecovered = LogEntry::deserializeBatch(emptyDecompressed);
@@ -76,7 +76,7 @@ TEST_F(CompressionCryptoTest, BatchProcessing)
     std::vector<LogEntry> singleBatch = {entry1};
     std::vector<uint8_t> singleSerializedBatch = LogEntry::serializeBatch(singleBatch);
     std::vector<uint8_t> singleCompressed = Compression::compress(singleSerializedBatch);
-    std::vector<uint8_t> singleEncrypted = crypto.encrypt(singleCompressed, key, dummyIV);
+    std::vector<uint8_t> singleEncrypted = crypto.encrypt(std::move(singleCompressed), key, dummyIV);
     std::vector<uint8_t> singleDecrypted = crypto.decrypt(singleEncrypted, key, dummyIV);
     std::vector<uint8_t> singleDecompressed = Compression::decompress(singleDecrypted);
     std::vector<LogEntry> singleRecovered = LogEntry::deserializeBatch(singleDecompressed);

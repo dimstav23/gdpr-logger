@@ -53,7 +53,7 @@ TEST_F(CryptoTest, EmptyData)
     std::vector<uint8_t> iv = createDummyIV();
 
     // Encrypt empty data
-    std::vector<uint8_t> encrypted = crypto.encrypt(emptyData, key, iv);
+    std::vector<uint8_t> encrypted = crypto.encrypt(std::move(emptyData), key, iv);
     EXPECT_TRUE(encrypted.empty());
 
     // Decrypt empty data
@@ -70,7 +70,7 @@ TEST_F(CryptoTest, BasicEncryptDecrypt)
     std::vector<uint8_t> iv = createDummyIV();
 
     // Encrypt the data
-    std::vector<uint8_t> encrypted = crypto.encrypt(data, key, iv);
+    std::vector<uint8_t> encrypted = crypto.encrypt(std::move(data), key, iv);
     EXPECT_FALSE(encrypted.empty());
 
     // The encrypted data should be different from the original
@@ -101,7 +101,7 @@ TEST_F(CryptoTest, VariousDataSizes)
         }
 
         // Encrypt the data
-        std::vector<uint8_t> encrypted = crypto.encrypt(data, key, iv);
+        std::vector<uint8_t> encrypted = crypto.encrypt(std::move(data), key, iv);
         EXPECT_FALSE(encrypted.empty());
 
         // Decrypt the data
@@ -124,10 +124,10 @@ TEST_F(CryptoTest, InvalidKeySize)
     std::vector<uint8_t> longKey(64);  // Too long
 
     // Encryption with short key should throw
-    EXPECT_THROW(crypto.encrypt(data, shortKey, iv), std::runtime_error);
+    EXPECT_THROW(crypto.encrypt(std::move(data), shortKey, iv), std::runtime_error);
 
     // Encryption with long key should throw
-    EXPECT_THROW(crypto.encrypt(data, longKey, iv), std::runtime_error);
+    EXPECT_THROW(crypto.encrypt(std::move(data), longKey, iv), std::runtime_error);
 }
 
 // Test encryption with invalid IV size
@@ -142,10 +142,10 @@ TEST_F(CryptoTest, InvalidIVSize)
     std::vector<uint8_t> longIV(16); // Too long
 
     // Encryption with short IV should throw
-    EXPECT_THROW(crypto.encrypt(data, key, shortIV), std::runtime_error);
+    EXPECT_THROW(crypto.encrypt(std::move(data), key, shortIV), std::runtime_error);
 
     // Encryption with long IV should throw
-    EXPECT_THROW(crypto.encrypt(data, key, longIV), std::runtime_error);
+    EXPECT_THROW(crypto.encrypt(std::move(data), key, longIV), std::runtime_error);
 }
 
 // Test decryption with wrong key
@@ -163,7 +163,7 @@ TEST_F(CryptoTest, WrongKey)
     ASSERT_NE(correctKey, wrongKey);
 
     // Encrypt with the correct key
-    std::vector<uint8_t> encrypted = crypto.encrypt(data, correctKey, iv);
+    std::vector<uint8_t> encrypted = crypto.encrypt(std::move(data), correctKey, iv);
 
     // Attempt to decrypt with the wrong key
     std::vector<uint8_t> decrypted = crypto.decrypt(encrypted, wrongKey, iv);
@@ -188,7 +188,7 @@ TEST_F(CryptoTest, WrongIV)
     ASSERT_NE(correctIV, wrongIV);
 
     // Encrypt with the correct IV
-    std::vector<uint8_t> encrypted = crypto.encrypt(data, key, correctIV);
+    std::vector<uint8_t> encrypted = crypto.encrypt(std::move(data), key, correctIV);
 
     // Attempt to decrypt with the wrong IV
     std::vector<uint8_t> decrypted = crypto.decrypt(encrypted, key, wrongIV);
@@ -207,7 +207,7 @@ TEST_F(CryptoTest, TamperingDetection)
     std::vector<uint8_t> iv = createDummyIV();
 
     // Encrypt the data
-    std::vector<uint8_t> encrypted = crypto.encrypt(data, key, iv);
+    std::vector<uint8_t> encrypted = crypto.encrypt(std::move(data), key, iv);
     ASSERT_FALSE(encrypted.empty());
 
     // Tamper with the encrypted data (modify a byte in the middle)
@@ -235,7 +235,7 @@ TEST_F(CryptoTest, BinaryData)
     std::vector<uint8_t> iv = createDummyIV();
 
     // Encrypt the binary data
-    std::vector<uint8_t> encrypted = crypto.encrypt(binaryData, key, iv);
+    std::vector<uint8_t> encrypted = crypto.encrypt(std::move(binaryData), key, iv);
     EXPECT_FALSE(encrypted.empty());
 
     // Decrypt the data
@@ -260,7 +260,7 @@ TEST_F(CryptoTest, LargeData)
     std::vector<uint8_t> iv = createDummyIV();
 
     // Encrypt the large data
-    std::vector<uint8_t> encrypted = crypto.encrypt(largeData, key, iv);
+    std::vector<uint8_t> encrypted = crypto.encrypt(std::move(largeData), key, iv);
     EXPECT_FALSE(encrypted.empty());
 
     // Decrypt the data
@@ -281,7 +281,7 @@ TEST_F(CryptoTest, FixedKeyAndIV)
     std::vector<uint8_t> fixedIV(Crypto::GCM_IV_SIZE, 0x24); // Fill with the value 0x24
 
     // Encrypt with the fixed key and IV
-    std::vector<uint8_t> encrypted1 = crypto.encrypt(data, fixedKey, fixedIV);
+    std::vector<uint8_t> encrypted1 = crypto.encrypt(std::move(data), fixedKey, fixedIV);
     EXPECT_FALSE(encrypted1.empty());
 
     // Decrypt with the same key and IV
@@ -290,7 +290,7 @@ TEST_F(CryptoTest, FixedKeyAndIV)
 
     // The same data encrypted with the same key and IV should produce the same ciphertexts
     // unlike the previous version with random IVs
-    std::vector<uint8_t> encrypted2 = crypto.encrypt(data, fixedKey, fixedIV);
+    std::vector<uint8_t> encrypted2 = crypto.encrypt(std::move(data), fixedKey, fixedIV);
     EXPECT_EQ(encrypted1, encrypted2); // This test should now PASS with fixed IV
 }
 
@@ -306,8 +306,8 @@ TEST_F(CryptoTest, DifferentIVs)
     std::vector<uint8_t> iv2(Crypto::GCM_IV_SIZE, 0x42);
 
     // Encrypt with different IVs
-    std::vector<uint8_t> encrypted1 = crypto.encrypt(data, key, iv1);
-    std::vector<uint8_t> encrypted2 = crypto.encrypt(data, key, iv2);
+    std::vector<uint8_t> encrypted1 = crypto.encrypt(std::move(data), key, iv1);
+    std::vector<uint8_t> encrypted2 = crypto.encrypt(std::move(data), key, iv2);
 
     // The ciphertexts should be different
     EXPECT_NE(encrypted1, encrypted2);

@@ -42,7 +42,7 @@ Crypto::~Crypto()
 }
 
 // Encrypt data using AES-256-GCM with provided IV
-std::vector<uint8_t> Crypto::encrypt(const std::vector<uint8_t> &plaintext,
+std::vector<uint8_t> Crypto::encrypt(std::vector<uint8_t> &&plaintext,
                                      const std::vector<uint8_t> &key,
                                      const std::vector<uint8_t> &iv)
 {

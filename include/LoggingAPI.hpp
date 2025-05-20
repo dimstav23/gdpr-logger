@@ -51,7 +51,6 @@ private:
 
     // State tracking
     bool m_initialized;
-    std::shared_mutex m_apiMutex;
 
     // Helper to report errors
     void reportError(const std::string &message);
