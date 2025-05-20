@@ -17,6 +17,7 @@ struct BenchmarkResult
     size_t totalEntries;
     double throughputEntries;
     size_t totalDataSizeBytes;
+    size_t finalStorageSize;
     double throughputGiB;
     double writeAmplification;
 };
@@ -77,6 +78,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
         totalEntries,
         throughputEntries,
         totalDataSizeBytes,
+        finalStorageSize,
         throughputGiB,
         writeAmplification};
 }
@@ -115,10 +117,12 @@ int main()
     std::cout << std::left << std::setw(12) << "Encryption"
               << std::setw(12) << "Compression"
               << std::setw(20) << "Execution Time (s)"
+              << std::setw(25) << "Input Size (bytes)"
+              << std::setw(25) << "Storage Size (bytes)"
+              << std::setw(20) << "Write Amplification"
               << std::setw(25) << "Throughput (entries/s)"
-              << std::setw(20) << "Throughput (GiB/s)"
-              << std::setw(20) << "Write Amplification" << std::endl;
-    std::cout << "-----------------------------------------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Throughput (GiB/s)" << std::endl;
+    std::cout << "---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------" << std::endl;
 
     // Display results for each configuration
     auto printResult = [](const BenchmarkResult &result)
@@ -126,9 +130,11 @@ int main()
         std::cout << std::left << std::setw(12) << (result.useEncryption ? "True" : "False")
                   << std::setw(12) << (result.useCompression ? "True" : "False")
                   << std::fixed << std::setprecision(3) << std::setw(20) << result.executionTime
+                  << std::setw(25) << result.totalDataSizeBytes
+                  << std::setw(25) << result.finalStorageSize
+                  << std::fixed << std::setprecision(3) << std::setw(20) << result.writeAmplification
                   << std::fixed << std::setprecision(3) << std::setw(25) << result.throughputEntries
-                  << std::fixed << std::setprecision(3) << std::setw(20) << result.throughputGiB
-                  << std::fixed << std::setprecision(3) << std::setw(20) << result.writeAmplification << std::endl;
+                  << std::fixed << std::setprecision(3) << std::setw(20) << result.throughputGiB << std::endl;
     };
 
     printResult(resultNoEncryptionNoCompression);
@@ -136,7 +142,7 @@ int main()
     printResult(resultWithEncryptionNoCompression);
     printResult(resultWithEncryptionWithCompression);
 
-    std::cout << "=================================================================================" << std::endl;
+    std::cout << "======================================================================================================================================================" << std::endl;
 
     return 0;
 }

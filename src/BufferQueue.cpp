@@ -10,10 +10,6 @@ BufferQueue::BufferQueue(size_t capacity, size_t maxExplicitProducers)
     m_queue = moodycamel::ConcurrentQueue<QueueItem>(capacity, maxExplicitProducers, 0);
 }
 
-BufferQueue::~BufferQueue()
-{
-}
-
 bool BufferQueue::enqueue(const QueueItem &item, ProducerToken &token)
 {
     return m_queue.try_enqueue(token, item);

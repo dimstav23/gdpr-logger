@@ -79,10 +79,10 @@ int main()
     std::cout << "Total entries appended: " << totalEntries << std::endl;
     std::cout << "Average entry size: " << averageEntrySize << " bytes" << std::endl;
     std::cout << "Total data written: " << totalDataSizeGiB << " GiB" << std::endl;
-    std::cout << "Throughput (entries): " << entriesThroughput << " entries/second" << std::endl;
-    std::cout << "Throughput (data): " << dataThroughputGiB << " GiB/second" << std::endl;
     std::cout << "Final storage size: " << finalStorageSizeGiB << " GiB" << std::endl;
     std::cout << "Write amplification: " << writeAmplification << " (ratio)" << std::endl;
+    std::cout << "Throughput (entries): " << entriesThroughput << " entries/second" << std::endl;
+    std::cout << "Throughput (data): " << dataThroughputGiB << " GiB/second" << std::endl;
     std::cout << "===============================================" << std::endl;
 
     return 0;

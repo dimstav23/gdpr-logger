@@ -14,6 +14,8 @@ struct BenchmarkResult
     double executionTime;
     double throughputEntries;
     double throughputGiB;
+    size_t inputDataSizeBytes;
+    size_t outputDataSizeBytes;
     double writeAmplification;
 };
 
@@ -70,6 +72,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
         elapsedSeconds,
         throughputEntries,
         throughputGiB,
+        totalDataSizeBytes,
+        finalStorageSize,
         writeAmplification};
 }
 
@@ -94,9 +98,11 @@ void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<
               << std::setw(15) << "Time (sec)"
               << std::setw(25) << "Throughput (entries/s)"
               << std::setw(20) << "Throughput (GiB/s)"
-              << std::setw(15) << "Speedup vs. 1"
-              << std::setw(20) << "Write Amplification" << std::endl;
-    std::cout << "-----------------------------------------------------------------------------------------------------------" << std::endl;
+              << std::setw(25) << "Input Size (bytes)"
+              << std::setw(25) << "Storage Size (bytes)"
+              << std::setw(20) << "Write Amplification"
+              << std::setw(15) << "Speedup vs. 1" << std::endl;
+    std::cout << "----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------" << std::endl;
 
     double baselineThroughputEntries = results[0].throughputEntries;
 
@@ -107,10 +113,12 @@ void runConcurrencyBenchmark(const LoggingConfig &baseConfig, const std::vector<
                   << std::setw(15) << std::fixed << std::setprecision(2) << results[i].executionTime
                   << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
                   << std::setw(20) << std::fixed << std::setprecision(3) << results[i].throughputGiB
-                  << std::setw(15) << std::fixed << std::setprecision(2) << speedup
-                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification << std::endl;
+                  << std::setw(25) << results[i].inputDataSizeBytes
+                  << std::setw(25) << results[i].outputDataSizeBytes
+                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
+                  << std::setw(15) << std::fixed << std::setprecision(2) << speedup << std::endl;
     }
-    std::cout << "==========================================================================================================" << std::endl;
+    std::cout << "===============================================================================================================================================================================================" << std::endl;
 }
 
 int main()
@@ -121,18 +129,18 @@ int main()
     baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 100 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.queueCapacity = 4500000;
-    baseConfig.maxExplicitProducers = 8;
-    baseConfig.batchSize = 864;
-    baseConfig.appendTimeout = std::chrono::minutes(7);
-    baseConfig.useEncryption = false;
-    baseConfig.useCompression = false;
+    baseConfig.queueCapacity = 3000000;
+    baseConfig.maxExplicitProducers = 16;
+    baseConfig.batchSize = 8192;
+    baseConfig.appendTimeout = std::chrono::minutes(5);
+    baseConfig.useEncryption = true;
+    baseConfig.useCompression = true;
     // benchmark parameters
-    const int numSpecificFiles = 100;
-    const int producerBatchSize = 960;
-    const int numProducers = 8;
-    const int entriesPerProducer = 200000;
-    const int payloadSize = 4096;
+    const int numSpecificFiles = 256;
+    const int producerBatchSize = 512;
+    const int numProducers = 16;
+    const int entriesPerProducer = 2000000;
+    const int payloadSize = 2048;
 
     std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16, 32 /*,48, 64, 96*/};
 
