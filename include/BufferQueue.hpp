@@ -23,7 +23,6 @@ private:
 
 public:
     explicit BufferQueue(size_t capacity, size_t maxExplicitProducers);
-    ~BufferQueue();
 
     ProducerToken createProducerToken() { return ProducerToken(m_queue); }
     ConsumerToken createConsumerToken() { return ConsumerToken(m_queue); }
