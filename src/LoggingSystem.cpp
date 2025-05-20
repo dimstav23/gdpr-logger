@@ -30,8 +30,7 @@ LoggingSystem::LoggingSystem(const LoggingConfig &config)
 
 LoggingSystem::~LoggingSystem()
 {
-    // Ensure system is stopped before destroying
-    stop(true);
+    stop();
 }
 
 bool LoggingSystem::start()
@@ -60,7 +59,7 @@ bool LoggingSystem::start()
     return true;
 }
 
-bool LoggingSystem::stop(bool waitForCompletion)
+bool LoggingSystem::stop()
 {
     std::lock_guard<std::mutex> lock(m_systemMutex);
 
@@ -71,7 +70,7 @@ bool LoggingSystem::stop(bool waitForCompletion)
 
     m_acceptingEntries.store(false, std::memory_order_release);
 
-    if (waitForCompletion && m_queue)
+    if (m_queue)
     {
         std::cout << "LoggingSystem: Waiting for queue to empty..." << std::endl;
         m_queue->flush();

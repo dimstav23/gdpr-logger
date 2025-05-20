@@ -22,9 +22,7 @@ public:
     ~LoggingSystem();
 
     bool start();
-
-    // Stop, optionally waiting for queue drainage
-    bool stop(bool waitForCompletion = true);
+    bool stop();
 
     bool isRunning() const;
 
