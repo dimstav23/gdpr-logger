@@ -56,7 +56,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
         future.wait();
     }
 
-    loggingSystem.stop(true);
+    loggingSystem.stop();
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
 
@@ -67,6 +67,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughputEntries = totalEntries / elapsedSeconds;
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
+
+    cleanupLogDirectory(config.basePath);
 
     return BenchmarkResult{
         elapsedSeconds,

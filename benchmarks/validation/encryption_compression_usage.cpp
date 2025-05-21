@@ -59,7 +59,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
         future.wait();
     }
 
-    loggingSystem.stop(true);
+    loggingSystem.stop();
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
 
@@ -70,6 +70,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughputEntries = totalEntries / elapsedSeconds;
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
+
+    cleanupLogDirectory(config.basePath);
 
     return BenchmarkResult{
         useEncryption,

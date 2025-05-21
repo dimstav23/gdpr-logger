@@ -60,7 +60,7 @@ int main()
         future.wait();
     }
 
-    loggingSystem.stop(true);
+    loggingSystem.stop();
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
 
@@ -73,6 +73,8 @@ int main()
     double entriesThroughput = totalEntries / elapsedSeconds;
     double dataThroughputGiB = totalDataSizeGiB / elapsedSeconds;
     double averageEntrySize = static_cast<double>(totalDataSizeBytes) / totalEntries;
+
+    cleanupLogDirectory(config.basePath);
 
     std::cout << "============== Benchmark Results ==============" << std::endl;
     std::cout << "Execution time: " << elapsedSeconds << " seconds" << std::endl;

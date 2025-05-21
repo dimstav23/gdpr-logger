@@ -77,7 +77,7 @@ BenchmarkResult runFileRotationBenchmark(
         future.wait();
     }
 
-    loggingSystem.stop(true);
+    loggingSystem.stop();
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
 
@@ -89,6 +89,8 @@ BenchmarkResult runFileRotationBenchmark(
     double throughputEntries = totalEntries / elapsedSeconds;
     double throughputGiB = totalDataSizeGiB / elapsedSeconds;
     int fileCount = countLogFiles(logDir);
+
+    cleanupLogDirectory(logDir);
 
     return BenchmarkResult{
         elapsedSeconds,
