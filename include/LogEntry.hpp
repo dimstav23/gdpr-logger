@@ -20,12 +20,11 @@ public:
 
     LogEntry();
 
-    LogEntry(
-        ActionType actionType,
-        const std::string &dataLocation,
-        const std::string &userId,
-        const std::string &dataSubjectId,
-        const std::vector<uint8_t> &payload = std::vector<uint8_t>());
+    LogEntry(ActionType actionType,
+             std::string dataLocation,
+             std::string userId,
+             std::string dataSubjectId,
+             std::vector<uint8_t> payload = std::vector<uint8_t>());
 
     std::vector<uint8_t> serialize() const;
     bool deserialize(const std::vector<uint8_t> &data);

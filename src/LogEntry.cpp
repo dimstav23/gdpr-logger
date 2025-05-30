@@ -11,15 +11,17 @@ LogEntry::LogEntry()
       m_timestamp(std::chrono::system_clock::now()),
       m_payload() {}
 
-LogEntry::LogEntry(ActionType actionType, const std::string &dataLocation,
-                   const std::string &userId, const std::string &dataSubjectId,
-                   const std::vector<uint8_t> &payload)
+LogEntry::LogEntry(ActionType actionType,
+                   std::string dataLocation,
+                   std::string userId,
+                   std::string dataSubjectId,
+                   std::vector<uint8_t> payload)
     : m_actionType(actionType),
-      m_dataLocation(dataLocation),
-      m_userId(userId),
-      m_dataSubjectId(dataSubjectId),
+      m_dataLocation(std::move(dataLocation)),
+      m_userId(std::move(userId)),
+      m_dataSubjectId(std::move(dataSubjectId)),
       m_timestamp(std::chrono::system_clock::now()),
-      m_payload(payload)
+      m_payload(std::move(payload))
 {
 }
 
