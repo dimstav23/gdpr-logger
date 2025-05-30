@@ -66,12 +66,12 @@ int main()
     for (auto n : batchSizes)
     {
         std::vector<LogEntry> entries = generateSyntheticEntries(n);
-        std::vector<uint8_t> serializedEntries = LogEntry::serializeBatch(entries);
+        std::vector<uint8_t> serializedEntries = LogEntry::serializeBatch(std::move(entries));
         size_t uncompressedSize = serializedEntries.size();
 
         // Compress and time
         auto start = std::chrono::high_resolution_clock::now();
-        std::vector<uint8_t> compressed = Compression::compress(serializedEntries);
+        std::vector<uint8_t> compressed = Compression::compress(std::move(serializedEntries));
         auto end = std::chrono::high_resolution_clock::now();
 
         size_t compressedSize = compressed.size();

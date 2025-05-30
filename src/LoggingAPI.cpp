@@ -64,7 +64,7 @@ BufferQueue::ProducerToken LoggingAPI::createProducerToken()
     return m_logQueue->createProducerToken();
 }
 
-bool LoggingAPI::append(const LogEntry &entry,
+bool LoggingAPI::append(LogEntry entry,
                         BufferQueue::ProducerToken &token,
                         const std::optional<std::string> &filename)
 {
@@ -74,11 +74,11 @@ bool LoggingAPI::append(const LogEntry &entry,
         return false;
     }
 
-    QueueItem item{entry, filename};
-    return m_logQueue->enqueueBlocking(item, token, m_appendTimeout);
+    QueueItem item{std::move(entry), filename};
+    return m_logQueue->enqueueBlocking(std::move(item), token, m_appendTimeout);
 }
 
-bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries,
+bool LoggingAPI::appendBatch(std::vector<LogEntry> entries,
                              BufferQueue::ProducerToken &token,
                              const std::optional<std::string> &filename)
 {
@@ -95,11 +95,11 @@ bool LoggingAPI::appendBatch(const std::vector<LogEntry> &entries,
 
     std::vector<QueueItem> batch;
     batch.reserve(entries.size());
-    for (auto const &e : entries)
+    for (auto &entry : entries)
     {
-        batch.push_back({e, filename});
+        batch.emplace_back(std::move(entry), filename);
     }
-    return m_logQueue->enqueueBatchBlocking(batch, token, m_appendTimeout);
+    return m_logQueue->enqueueBatchBlocking(std::move(batch), token, m_appendTimeout);
 }
 
 bool LoggingAPI::reset()

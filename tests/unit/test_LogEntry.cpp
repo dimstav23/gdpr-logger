@@ -57,7 +57,7 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
 
     std::vector<uint8_t> serializedData = entry.serialize();
     LogEntry newEntry;
-    bool success = newEntry.deserialize(serializedData);
+    bool success = newEntry.deserialize(std::move(serializedData));
 
     EXPECT_TRUE(success);
     EXPECT_EQ(newEntry.getActionType(), LogEntry::ActionType::READ);
@@ -67,7 +67,7 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_EQ(newEntry.getPayload().size(), 0); // Payload should still be empty
 
     std::vector<uint8_t> serializedData2 = entry.serialize();
-    success = newEntry.deserialize(serializedData2);
+    success = newEntry.deserialize(std::move(serializedData2));
 
     EXPECT_TRUE(success);
 
@@ -94,7 +94,7 @@ TEST(LogEntryTest4A, SerializationDeserializationWithPayload_WorksCorrectly)
     // Serialize and deserialize
     std::vector<uint8_t> serializedData = entry.serialize();
     LogEntry newEntry;
-    bool success = newEntry.deserialize(serializedData);
+    bool success = newEntry.deserialize(std::move(serializedData));
 
     // Verify deserialization worked
     EXPECT_TRUE(success);
@@ -142,13 +142,13 @@ TEST(LogEntryTest5, BatchSerializationDeserialization_WorksCorrectly)
     originalEntries.push_back(LogEntry(LogEntry::ActionType::DELETE, "archive/logs", "admin2", "log10", payload4));
 
     // Serialize the batch
-    std::vector<uint8_t> batchData = LogEntry::serializeBatch(originalEntries);
+    std::vector<uint8_t> batchData = LogEntry::serializeBatch(std::move(originalEntries));
 
     // Check that the batch has reasonable size
     EXPECT_GT(batchData.size(), sizeof(uint32_t)); // At least space for entry count
 
     // Deserialize the batch
-    std::vector<LogEntry> recoveredEntries = LogEntry::deserializeBatch(batchData);
+    std::vector<LogEntry> recoveredEntries = LogEntry::deserializeBatch(std::move(batchData));
 
     // Verify the number of entries
     EXPECT_EQ(recoveredEntries.size(), originalEntries.size());

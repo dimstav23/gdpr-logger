@@ -25,10 +25,10 @@ LogEntry::LogEntry(ActionType actionType,
 {
 }
 
-// Fast binary serialization with pre-allocated memory
-std::vector<uint8_t> LogEntry::serialize() const
+// Move version that consumes the LogEntry
+std::vector<uint8_t> LogEntry::serialize() &&
 {
-    // Calculate required size upfront (add variable data size)
+    // Calculate required size upfront
     size_t totalSize =
         sizeof(int) +                               // ActionType
         sizeof(uint32_t) + m_dataLocation.size() +  // Size + data location
@@ -37,7 +37,7 @@ std::vector<uint8_t> LogEntry::serialize() const
         sizeof(int64_t) +                           // Timestamp
         sizeof(uint32_t) + m_payload.size();        // Size + payload data
 
-    // Pre-allocate the vector to avoid reallocations
+    // Pre-allocate the vector
     std::vector<uint8_t> result;
     result.reserve(totalSize);
 
@@ -45,7 +45,51 @@ std::vector<uint8_t> LogEntry::serialize() const
     int actionType = static_cast<int>(m_actionType);
     appendToVector(result, &actionType, sizeof(actionType));
 
-    // Push strings with their lengths
+    // Move strings
+    appendStringToVector(result, std::move(m_dataLocation));
+    appendStringToVector(result, std::move(m_userId));
+    appendStringToVector(result, std::move(m_dataSubjectId));
+
+    // Push timestamp
+    int64_t timestamp = std::chrono::duration_cast<std::chrono::milliseconds>(
+                            m_timestamp.time_since_epoch())
+                            .count();
+    appendToVector(result, &timestamp, sizeof(timestamp));
+
+    // Move payload
+    uint32_t payloadSize = static_cast<uint32_t>(m_payload.size());
+    appendToVector(result, &payloadSize, sizeof(payloadSize));
+    if (!m_payload.empty())
+    {
+        result.insert(result.end(),
+                      std::make_move_iterator(m_payload.begin()),
+                      std::make_move_iterator(m_payload.end()));
+    }
+
+    return result;
+}
+
+// Const version for when you need to keep the LogEntry
+std::vector<uint8_t> LogEntry::serialize() const &
+{
+    // Calculate required size upfront
+    size_t totalSize =
+        sizeof(int) +                               // ActionType
+        sizeof(uint32_t) + m_dataLocation.size() +  // Size + data location
+        sizeof(uint32_t) + m_userId.size() +        // Size + user ID
+        sizeof(uint32_t) + m_dataSubjectId.size() + // Size + data subject ID
+        sizeof(int64_t) +                           // Timestamp
+        sizeof(uint32_t) + m_payload.size();        // Size + payload data
+
+    // Pre-allocate the vector
+    std::vector<uint8_t> result;
+    result.reserve(totalSize);
+
+    // Push ActionType
+    int actionType = static_cast<int>(m_actionType);
+    appendToVector(result, &actionType, sizeof(actionType));
+
+    // Copy strings
     appendStringToVector(result, m_dataLocation);
     appendStringToVector(result, m_userId);
     appendStringToVector(result, m_dataSubjectId);
@@ -56,7 +100,7 @@ std::vector<uint8_t> LogEntry::serialize() const
                             .count();
     appendToVector(result, &timestamp, sizeof(timestamp));
 
-    // Push payload with its length
+    // Copy payload
     uint32_t payloadSize = static_cast<uint32_t>(m_payload.size());
     appendToVector(result, &payloadSize, sizeof(payloadSize));
     if (!m_payload.empty())
@@ -67,7 +111,7 @@ std::vector<uint8_t> LogEntry::serialize() const
     return result;
 }
 
-bool LogEntry::deserialize(const std::vector<uint8_t> &data)
+bool LogEntry::deserialize(std::vector<uint8_t> &&data)
 {
     try
     {
@@ -115,12 +159,20 @@ bool LogEntry::deserialize(const std::vector<uint8_t> &data)
         if (offset + payloadSize > data.size())
             return false;
 
-        // Copy the payload
-        m_payload.resize(payloadSize);
         if (payloadSize > 0)
         {
-            std::memcpy(m_payload.data(), data.data() + offset, payloadSize);
+            m_payload.clear();
+            m_payload.reserve(payloadSize);
+
+            auto start_it = data.begin() + offset;
+            auto end_it = start_it + payloadSize;
+            m_payload.assign(std::make_move_iterator(start_it),
+                             std::make_move_iterator(end_it));
             offset += payloadSize;
+        }
+        else
+        {
+            m_payload.clear();
         }
 
         return true;
@@ -131,37 +183,63 @@ bool LogEntry::deserialize(const std::vector<uint8_t> &data)
     }
 }
 
-std::vector<uint8_t> LogEntry::serializeBatch(const std::vector<LogEntry> &entries)
+std::vector<uint8_t> LogEntry::serializeBatch(std::vector<LogEntry> &&entries)
 {
-    std::vector<uint8_t> batchData;
+    if (entries.empty())
+    {
+        // Just return a vector with count = 0
+        std::vector<uint8_t> batchData(sizeof(uint32_t));
+        uint32_t numEntries = 0;
+        std::memcpy(batchData.data(), &numEntries, sizeof(numEntries));
+        return batchData;
+    }
 
-    // First, store the number of entries
-    uint32_t numEntries = entries.size();
+    // Pre-calculate approximate total size to minimize reallocations
+    size_t estimatedSize = sizeof(uint32_t); // Number of entries
+    for (const auto &entry : entries)
+    {
+        // Rough estimate: header size + string sizes + payload size
+        estimatedSize += sizeof(uint32_t) +     // Entry size field
+                         sizeof(int) +          // ActionType
+                         3 * sizeof(uint32_t) + // 3 string length fields
+                         entry.getDataLocation().size() +
+                         entry.getUserId().size() +
+                         entry.getDataSubjectId().size() +
+                         sizeof(int64_t) +  // Timestamp
+                         sizeof(uint32_t) + // Payload size
+                         entry.getPayload().size();
+    }
+
+    std::vector<uint8_t> batchData;
+    batchData.reserve(estimatedSize);
+
+    // Store the number of entries
+    uint32_t numEntries = static_cast<uint32_t>(entries.size());
     batchData.resize(sizeof(numEntries));
     std::memcpy(batchData.data(), &numEntries, sizeof(numEntries));
 
-    // Then serialize and append each entry
-    for (const auto &entry : entries)
+    // Serialize and append each entry using move semantics
+    for (auto &entry : entries)
     {
-        // Get the serialized entry
-        std::vector<uint8_t> entryData = entry.serialize();
+        // Move-serialize the entry
+        std::vector<uint8_t> entryData = std::move(entry).serialize();
 
         // Store the size of the serialized entry
-        uint32_t entrySize = entryData.size();
+        uint32_t entrySize = static_cast<uint32_t>(entryData.size());
         size_t currentSize = batchData.size();
         batchData.resize(currentSize + sizeof(entrySize));
         std::memcpy(batchData.data() + currentSize, &entrySize, sizeof(entrySize));
 
-        // Store the serialized entry
-        currentSize = batchData.size();
-        batchData.resize(currentSize + entryData.size());
-        std::memcpy(batchData.data() + currentSize, entryData.data(), entryData.size());
+        // Move the serialized entry data
+        batchData.insert(batchData.end(),
+                         std::make_move_iterator(entryData.begin()),
+                         std::make_move_iterator(entryData.end()));
     }
 
     return batchData;
 }
 
-std::vector<LogEntry> LogEntry::deserializeBatch(const std::vector<uint8_t> &batchData)
+std::vector<LogEntry> LogEntry::deserializeBatch(std::vector<uint8_t> &&batchData)
 {
     std::vector<LogEntry> entries;
 
@@ -175,6 +253,9 @@ std::vector<LogEntry> LogEntry::deserializeBatch(const std::vector<uint8_t> &bat
 
         uint32_t numEntries;
         std::memcpy(&numEntries, batchData.data(), sizeof(numEntries));
+
+        // Reserve space for entries to avoid reallocations
+        entries.reserve(numEntries);
 
         // Position in the batch data
         size_t position = sizeof(numEntries);
@@ -199,16 +280,21 @@ std::vector<LogEntry> LogEntry::deserializeBatch(const std::vector<uint8_t> &bat
                 throw std::runtime_error("Unexpected end of batch data");
             }
 
-            // Extract the entry data
-            std::vector<uint8_t> entryData(batchData.begin() + position,
-                                           batchData.begin() + position + entrySize);
+            // Create entry data by moving a slice from the batch data
+            std::vector<uint8_t> entryData;
+            entryData.reserve(entrySize);
+
+            auto start_it = batchData.begin() + position;
+            auto end_it = start_it + entrySize;
+            entryData.assign(std::make_move_iterator(start_it),
+                             std::make_move_iterator(end_it));
             position += entrySize;
 
-            // Deserialize the entry
+            // Deserialize the entry using move semantics
             LogEntry entry;
-            if (entry.deserialize(entryData))
+            if (entry.deserialize(std::move(entryData)))
             {
-                entries.push_back(entry);
+                entries.emplace_back(std::move(entry));
             }
             else
             {
@@ -231,7 +317,7 @@ void LogEntry::appendToVector(std::vector<uint8_t> &vec, const void *data, size_
     vec.insert(vec.end(), bytes, bytes + size);
 }
 
-// Helper method to append a string with its length
+// Helper method to append a string with its length (const version)
 void LogEntry::appendStringToVector(std::vector<uint8_t> &vec, const std::string &str) const
 {
     uint32_t length = static_cast<uint32_t>(str.size());
@@ -243,8 +329,20 @@ void LogEntry::appendStringToVector(std::vector<uint8_t> &vec, const std::string
     }
 }
 
+// Helper method to append a string with its length (move version)
+void LogEntry::appendStringToVector(std::vector<uint8_t> &vec, std::string &&str)
+{
+    uint32_t length = static_cast<uint32_t>(str.size());
+    appendToVector(vec, &length, sizeof(length));
+
+    if (length > 0)
+    {
+        vec.insert(vec.end(), str.begin(), str.end());
+    }
+}
+
 // Helper method to extract a string from a vector
-bool LogEntry::extractStringFromVector(const std::vector<uint8_t> &vec, size_t &offset, std::string &str)
+bool LogEntry::extractStringFromVector(std::vector<uint8_t> &vec, size_t &offset, std::string &str)
 {
     // Check if we have enough data for the string length
     if (offset + sizeof(uint32_t) > vec.size())

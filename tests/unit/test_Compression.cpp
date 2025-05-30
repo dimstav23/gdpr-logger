@@ -34,14 +34,14 @@ bool LogEntriesEqual(const LogEntry &a, const LogEntry &b)
 TEST_F(CompressionTest, CompressDecompressBatch)
 {
     std::vector<LogEntry> batch = {entry1, entry2, entry3, entry4};
-    std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(batch);
-    std::vector<uint8_t> compressed = Compression::compress(serializedBatch);
+    std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(std::move(batch));
+    std::vector<uint8_t> compressed = Compression::compress(std::move(serializedBatch));
 
     // Make sure compression produced data
     ASSERT_GT(compressed.size(), 0);
 
-    std::vector<uint8_t> decompressed = Compression::decompress(compressed);
-    std::vector<LogEntry> recoveredBatch = LogEntry::deserializeBatch(decompressed);
+    std::vector<uint8_t> decompressed = Compression::decompress(std::move(compressed));
+    std::vector<LogEntry> recoveredBatch = LogEntry::deserializeBatch(std::move(decompressed));
 
     // Verify we got back the same number of entries
     ASSERT_EQ(batch.size(), recoveredBatch.size());
@@ -59,11 +59,11 @@ TEST_F(CompressionTest, EmptyBatch)
 {
     // Create an empty batch
     std::vector<LogEntry> emptyBatch;
-    std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(emptyBatch);
-    std::vector<uint8_t> compressed = Compression::compress(serializedBatch);
+    std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(std::move(emptyBatch));
+    std::vector<uint8_t> compressed = Compression::compress(std::move(serializedBatch));
 
-    std::vector<uint8_t> decompressed = Compression::decompress(compressed);
-    std::vector<LogEntry> recoveredBatch = LogEntry::deserializeBatch(decompressed);
+    std::vector<uint8_t> decompressed = Compression::decompress(std::move(compressed));
+    std::vector<LogEntry> recoveredBatch = LogEntry::deserializeBatch(std::move(decompressed));
 
     // Verify we still have an empty vector
     EXPECT_TRUE(recoveredBatch.empty());
@@ -77,7 +77,7 @@ TEST_F(CompressionTest, InvalidCompressedData)
 
     // Verify that decompression failed
     EXPECT_THROW(
-        Compression::decompress(invalidData),
+        Compression::decompress(std::move(invalidData)),
         std::runtime_error);
 }
 
@@ -90,15 +90,15 @@ TEST_F(CompressionTest, BatchCompressionRatio)
     LogEntry repetitiveEntry(LogEntry::ActionType::CREATE, repetitiveData, repetitiveData, repetitiveData);
 
     std::vector<LogEntry> repetitiveBatch(batchSize, repetitiveEntry);
-    std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(repetitiveBatch);
-    std::vector<uint8_t> compressed = Compression::compress(serializedBatch);
+    std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(std::move(repetitiveBatch));
+    std::vector<uint8_t> compressed = Compression::compress(std::move(serializedBatch));
 
     // Check that batch compression significantly reduced the size
     double compressionRatio = static_cast<double>(compressed.size()) / static_cast<double>(serializedBatch.size());
     EXPECT_LT(compressionRatio, 0.05); // Expect at least 95% compression for batch
 
-    std::vector<uint8_t> decompressed = Compression::decompress(compressed);
-    std::vector<LogEntry> recoveredBatch = LogEntry::deserializeBatch(decompressed);
+    std::vector<uint8_t> decompressed = Compression::decompress(std::move(compressed));
+    std::vector<LogEntry> recoveredBatch = LogEntry::deserializeBatch(std::move(decompressed));
     // Verify the correct number of entries and their content
     ASSERT_EQ(repetitiveBatch.size(), recoveredBatch.size());
     for (size_t i = 0; i < repetitiveBatch.size(); i++)
@@ -111,10 +111,10 @@ TEST_F(CompressionTest, BatchCompressionRatio)
 TEST_F(CompressionTest, LargeBatch)
 {
     std::vector<LogEntry> largeBatch(100, entry1);
-    std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(largeBatch);
-    std::vector<uint8_t> compressed = Compression::compress(serializedBatch);
-    std::vector<uint8_t> decompressed = Compression::decompress(compressed);
-    std::vector<LogEntry> recoveredBatch = LogEntry::deserializeBatch(decompressed);
+    std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(std::move(largeBatch));
+    std::vector<uint8_t> compressed = Compression::compress(std::move(serializedBatch));
+    std::vector<uint8_t> decompressed = Compression::decompress(std::move(compressed));
+    std::vector<LogEntry> recoveredBatch = LogEntry::deserializeBatch(std::move(decompressed));
 
     // Verify the correct number of entries
     ASSERT_EQ(largeBatch.size(), recoveredBatch.size());

@@ -5,7 +5,7 @@
 #include <iostream>
 
 // Helper function to compress raw data using zlib
-std::vector<uint8_t> Compression::compress(const std::vector<uint8_t> &data)
+std::vector<uint8_t> Compression::compress(std::vector<uint8_t> &&data)
 {
     if (data.empty())
     {
@@ -54,7 +54,7 @@ std::vector<uint8_t> Compression::compress(const std::vector<uint8_t> &data)
 }
 
 // Helper function to decompress raw data using zlib
-std::vector<uint8_t> Compression::decompress(const std::vector<uint8_t> &compressedData)
+std::vector<uint8_t> Compression::decompress(std::vector<uint8_t> &&compressedData)
 {
     if (compressedData.empty())
     {

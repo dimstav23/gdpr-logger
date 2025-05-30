@@ -106,7 +106,7 @@ BufferQueue::ProducerToken LoggingSystem::createProducerToken()
     return LoggingAPI::getInstance().createProducerToken();
 }
 
-bool LoggingSystem::append(const LogEntry &entry,
+bool LoggingSystem::append(LogEntry entry,
                            BufferQueue::ProducerToken &token,
                            const std::optional<std::string> &filename)
 {
@@ -116,10 +116,10 @@ bool LoggingSystem::append(const LogEntry &entry,
         return false;
     }
 
-    return LoggingAPI::getInstance().append(entry, token, filename);
+    return LoggingAPI::getInstance().append(std::move(entry), token, filename);
 }
 
-bool LoggingSystem::appendBatch(const std::vector<LogEntry> &entries,
+bool LoggingSystem::appendBatch(std::vector<LogEntry> entries,
                                 BufferQueue::ProducerToken &token,
                                 const std::optional<std::string> &filename)
 {
@@ -129,7 +129,7 @@ bool LoggingSystem::appendBatch(const std::vector<LogEntry> &entries,
         return false;
     }
 
-    return LoggingAPI::getInstance().appendBatch(entries, token, filename);
+    return LoggingAPI::getInstance().appendBatch(std::move(entries), token, filename);
 }
 
 bool LoggingSystem::exportLogs(

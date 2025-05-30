@@ -68,27 +68,33 @@ void Writer::processLogEntries()
         }
 
         std::map<std::optional<std::string>, std::vector<LogEntry>> groupedEntries;
-        for (const auto &item : batch)
+        for (auto &item : batch)
         {
-            groupedEntries[item.targetFilename].push_back(item.entry);
+            groupedEntries[item.targetFilename].emplace_back(std::move(item.entry));
         }
 
-        for (const auto &[targetFilename, entries] : groupedEntries)
+        for (auto &[targetFilename, entries] : groupedEntries)
         {
-            std::vector<uint8_t> processedData = LogEntry::serializeBatch(entries);
+            std::vector<uint8_t> processedData = LogEntry::serializeBatch(std::move(entries));
 
-            // Apply compression only if enabled
-            processedData = m_useCompression ? Compression::compress(processedData) : processedData;
+            // Apply compression if enabled
+            if (m_useCompression)
+            {
+                processedData = Compression::compress(std::move(processedData));
+            }
             // Apply encryption if enabled
-            processedData = m_useEncryption ? crypto.encrypt(std::move(processedData), encryptionKey, dummyIV) : processedData;
+            if (m_useEncryption)
+            {
+                processedData = crypto.encrypt(std::move(processedData), encryptionKey, dummyIV);
+            }
 
             if (targetFilename)
             {
-                m_storage->writeToFile(*targetFilename, processedData);
+                m_storage->writeToFile(*targetFilename, std::move(processedData));
             }
             else
             {
-                m_storage->write(processedData);
+                m_storage->write(std::move(processedData));
             }
         }
 

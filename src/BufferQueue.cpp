@@ -10,12 +10,12 @@ BufferQueue::BufferQueue(size_t capacity, size_t maxExplicitProducers)
     m_queue = moodycamel::ConcurrentQueue<QueueItem>(capacity, maxExplicitProducers, 0);
 }
 
-bool BufferQueue::enqueue(const QueueItem &item, ProducerToken &token)
+bool BufferQueue::enqueue(QueueItem item, ProducerToken &token)
 {
-    return m_queue.try_enqueue(token, item);
+    return m_queue.try_enqueue(token, std::move(item));
 }
 
-bool BufferQueue::enqueueBlocking(const QueueItem &item, ProducerToken &token, std::chrono::milliseconds timeout)
+bool BufferQueue::enqueueBlocking(QueueItem item, ProducerToken &token, std::chrono::milliseconds timeout)
 {
     auto start = std::chrono::steady_clock::now();
     int backoffMs = 1;
@@ -24,7 +24,8 @@ bool BufferQueue::enqueueBlocking(const QueueItem &item, ProducerToken &token, s
 
     while (true)
     {
-        if (enqueue(item, token))
+        QueueItem itemCopy = item;
+        if (enqueue(std::move(itemCopy), token))
         {
             return true;
         }
@@ -54,12 +55,12 @@ bool BufferQueue::enqueueBlocking(const QueueItem &item, ProducerToken &token, s
     }
 }
 
-bool BufferQueue::enqueueBatch(const std::vector<QueueItem> &items, ProducerToken &token)
+bool BufferQueue::enqueueBatch(std::vector<QueueItem> items, ProducerToken &token)
 {
-    return m_queue.try_enqueue_bulk(token, items.begin(), items.size());
+    return m_queue.try_enqueue_bulk(token, std::make_move_iterator(items.begin()), items.size());
 }
 
-bool BufferQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items, ProducerToken &token,
+bool BufferQueue::enqueueBatchBlocking(std::vector<QueueItem> items, ProducerToken &token,
                                        std::chrono::milliseconds timeout)
 {
     auto start = std::chrono::steady_clock::now();
@@ -69,7 +70,8 @@ bool BufferQueue::enqueueBatchBlocking(const std::vector<QueueItem> &items, Prod
 
     while (true)
     {
-        if (enqueueBatch(items, token))
+        std::vector<QueueItem> itemsCopy = items;
+        if (enqueueBatch(std::move(itemsCopy), token))
         {
             return true;
         }

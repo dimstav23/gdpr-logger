@@ -27,10 +27,10 @@ public:
     ProducerToken createProducerToken() { return ProducerToken(m_queue); }
     ConsumerToken createConsumerToken() { return ConsumerToken(m_queue); }
 
-    bool enqueueBlocking(const QueueItem &item,
+    bool enqueueBlocking(QueueItem item,
                          ProducerToken &token,
                          std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
-    bool enqueueBatchBlocking(const std::vector<QueueItem> &items,
+    bool enqueueBatchBlocking(std::vector<QueueItem> items,
                               ProducerToken &token,
                               std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
     bool dequeue(QueueItem &item, ConsumerToken &token);
@@ -45,8 +45,8 @@ public:
     BufferQueue &operator=(BufferQueue &&) = delete;
 
 private:
-    bool enqueue(const QueueItem &item, ProducerToken &token);
-    bool enqueueBatch(const std::vector<QueueItem> &items, ProducerToken &token);
+    bool enqueue(QueueItem item, ProducerToken &token);
+    bool enqueueBatch(std::vector<QueueItem> items, ProducerToken &token);
 };
 
 #endif

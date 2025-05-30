@@ -89,7 +89,7 @@ TEST_F(LoggingAPITest, AppendAfterInitialization)
     BufferQueue::ProducerToken token = api.createProducerToken();
     LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
 
-    EXPECT_TRUE(api.append(entry, token));
+    EXPECT_TRUE(api.append(std::move(entry), token));
     EXPECT_TRUE(api.reset());
 }
 
@@ -104,12 +104,12 @@ TEST_F(LoggingAPITest, BlockingAppendWithConsumption)
 
     // Since queue grows dynamically, we'll test timeout instead
     LogEntry entry1(LogEntry::ActionType::READ, "location1", "user1", "subject1");
-    EXPECT_TRUE(api.append(entry1, token));
+    EXPECT_TRUE(api.append(std::move(entry1), token));
 
     LogEntry entry2(LogEntry::ActionType::READ, "location2", "user2", "subject2");
     // With dynamic queue, this will succeed immediately
     auto start = std::chrono::steady_clock::now();
-    EXPECT_TRUE(api.append(entry2, token));
+    EXPECT_TRUE(api.append(std::move(entry2), token));
     auto end = std::chrono::steady_clock::now();
 
     // Verify it doesn't block since queue can grow
@@ -135,7 +135,7 @@ TEST_F(LoggingAPITest, AppendTimeoutBehavior)
     LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
 
     auto start = std::chrono::steady_clock::now();
-    EXPECT_TRUE(api.append(entry, token)); // Should succeed immediately since queue grows
+    EXPECT_TRUE(api.append(std::move(entry), token)); // Should succeed immediately since queue grows
     auto end = std::chrono::steady_clock::now();
 
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
@@ -162,12 +162,12 @@ TEST_F(LoggingAPITest, AppendBatch)
             "subject_" + std::to_string(i));
     }
 
-    EXPECT_TRUE(api.appendBatch(entries, token));
+    EXPECT_TRUE(api.appendBatch(std::move(entries), token));
     EXPECT_EQ(queue->size(), 5);
 
     // Test empty batch
     std::vector<LogEntry> emptyEntries;
-    EXPECT_TRUE(api.appendBatch(emptyEntries, token));
+    EXPECT_TRUE(api.appendBatch(std::move(emptyEntries), token));
 
     EXPECT_TRUE(api.reset());
 }
@@ -188,7 +188,7 @@ TEST_F(LoggingAPITest, ShutdownWithWait)
 
     BufferQueue::ProducerToken token = api.createProducerToken();
     LogEntry entry(LogEntry::ActionType::READ, "location", "user", "subject");
-    EXPECT_TRUE(api.append(entry, token));
+    EXPECT_TRUE(api.append(std::move(entry), token));
 
     // Launch an asynchronous consumer that waits briefly before draining the queue.
     std::thread consumer([this]()
@@ -272,7 +272,7 @@ TEST_F(LoggingAPITest, ThreadSafetyOperations)
                                          "user_" + std::to_string(i),
                                          "subject_" + std::to_string(j)
                                         );
-                                     EXPECT_TRUE(api.append(entry, token));
+                                     EXPECT_TRUE(api.append(std::move(entry), token));
                                  } });
     }
 

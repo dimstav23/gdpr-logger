@@ -96,9 +96,11 @@ TEST_F(SegmentedStorageTest, BasicWriteTest)
     SegmentedStorage storage(testPath, baseFilename);
 
     std::vector<uint8_t> data = {'H', 'e', 'l', 'l', 'o', ',', ' ', 'W', 'o', 'r', 'l', 'd', '!'};
-    size_t bytesWritten = storage.write(data);
+    // Keep a copy for verification
+    std::vector<uint8_t> dataCopy = data;
+    size_t bytesWritten = storage.write(std::move(data));
 
-    ASSERT_EQ(bytesWritten, data.size());
+    ASSERT_EQ(bytesWritten, dataCopy.size());
 
     storage.flush();
 
@@ -106,41 +108,38 @@ TEST_F(SegmentedStorageTest, BasicWriteTest)
     ASSERT_EQ(files.size(), 1) << "Only one file should be created";
 
     auto fileContents = readFile(files[0]);
-    ASSERT_EQ(fileContents.size(), data.size());
-    ASSERT_TRUE(std::equal(data.begin(), data.end(), fileContents.begin()));
+    ASSERT_EQ(fileContents.size(), dataCopy.size());
+    ASSERT_TRUE(std::equal(dataCopy.begin(), dataCopy.end(), fileContents.begin()));
 }
 
 // Test segment rotation based on size limit
 TEST_F(SegmentedStorageTest, SegmentRotationTest)
 {
-    size_t maxSegmentSize = 1024; // Small size to force rotation
+    size_t maxSegmentSize = 1024;
     SegmentedStorage storage(testPath, baseFilename, maxSegmentSize);
 
-    // Write data slightly less than the max size
     std::vector<uint8_t> data1 = generateRandomData(maxSegmentSize - 100);
-    size_t bytesWritten1 = storage.write(data1);
-    ASSERT_EQ(bytesWritten1, data1.size());
+    std::vector<uint8_t> data1Copy = data1; // Copy for verification
+    size_t bytesWritten1 = storage.write(std::move(data1));
+    ASSERT_EQ(bytesWritten1, data1Copy.size());
 
-    // Write more data to cause rotation
     std::vector<uint8_t> data2 = generateRandomData(200);
-    size_t bytesWritten2 = storage.write(data2);
-    ASSERT_EQ(bytesWritten2, data2.size());
+    std::vector<uint8_t> data2Copy = data2; // Copy for verification
+    size_t bytesWritten2 = storage.write(std::move(data2));
+    ASSERT_EQ(bytesWritten2, data2Copy.size());
 
-    // Make sure to flush the data to disk before checking
     storage.flush();
 
     auto files = getSegmentFiles(testPath, baseFilename);
     ASSERT_EQ(files.size(), 2) << "Two files should be created due to rotation";
 
-    // Verify first file contents
     auto file1Contents = readFile(files[0]);
-    ASSERT_EQ(file1Contents.size(), data1.size());
-    ASSERT_TRUE(std::equal(data1.begin(), data1.end(), file1Contents.begin()));
+    ASSERT_EQ(file1Contents.size(), data1Copy.size());
+    ASSERT_TRUE(std::equal(data1Copy.begin(), data1Copy.end(), file1Contents.begin()));
 
-    // Verify second file contents
     auto file2Contents = readFile(files[1]);
-    ASSERT_EQ(file2Contents.size(), data2.size());
-    ASSERT_TRUE(std::equal(data2.begin(), data2.end(), file2Contents.begin()));
+    ASSERT_EQ(file2Contents.size(), data2Copy.size());
+    ASSERT_TRUE(std::equal(data2Copy.begin(), data2Copy.end(), file2Contents.begin()));
 }
 
 // Test writing to a specific file
@@ -150,19 +149,18 @@ TEST_F(SegmentedStorageTest, WriteToSpecificFileTest)
 
     std::string customFilename = "custom_file";
     std::vector<uint8_t> data = {'C', 'u', 's', 't', 'o', 'm', ' ', 'F', 'i', 'l', 'e'};
+    std::vector<uint8_t> dataCopy = data; // Copy for verification
+    size_t bytesWritten = storage.writeToFile(customFilename, std::move(data));
+    ASSERT_EQ(bytesWritten, dataCopy.size());
 
-    size_t bytesWritten = storage.writeToFile(customFilename, data);
-    ASSERT_EQ(bytesWritten, data.size());
-
-    // Make sure to flush the data to disk before checking
     storage.flush();
 
     auto files = getSegmentFiles(testPath, customFilename);
     ASSERT_EQ(files.size(), 1) << "One custom file should be created";
 
     auto fileContents = readFile(files[0]);
-    ASSERT_EQ(fileContents.size(), data.size());
-    ASSERT_TRUE(std::equal(data.begin(), data.end(), fileContents.begin()));
+    ASSERT_EQ(fileContents.size(), dataCopy.size());
+    ASSERT_TRUE(std::equal(dataCopy.begin(), dataCopy.end(), fileContents.begin()));
 }
 
 // Test concurrent writing to the same file
@@ -177,24 +175,20 @@ TEST_F(SegmentedStorageTest, ConcurrentWriteTest)
     std::vector<std::thread> threads;
     std::vector<std::vector<uint8_t>> dataBlocks;
 
-    // Create data blocks and threads
     for (size_t i = 0; i < numThreads; i++)
     {
         dataBlocks.push_back(generateRandomData(dataSize));
         threads.emplace_back([&storage, &dataBlocks, i]()
-                             { storage.write(dataBlocks[i]); });
+                             { storage.write(std::move(dataBlocks[i])); });
     }
 
-    // Wait for all threads to complete
     for (auto &t : threads)
     {
         t.join();
     }
 
-    // Make sure to flush all data to disk
     storage.flush();
 
-    // Verify file content size
     auto files = getSegmentFiles(testPath, baseFilename);
     ASSERT_EQ(files.size(), 1) << "Only one file should be created";
 
@@ -205,7 +199,7 @@ TEST_F(SegmentedStorageTest, ConcurrentWriteTest)
 // Test concurrent writing with rotation
 TEST_F(SegmentedStorageTest, ConcurrentWriteWithRotationTest)
 {
-    size_t maxSegmentSize = 5000; // Small segment size to force rotation
+    size_t maxSegmentSize = 5000;
     SegmentedStorage storage(testPath, baseFilename, maxSegmentSize);
 
     size_t numThreads = 20;
@@ -214,28 +208,23 @@ TEST_F(SegmentedStorageTest, ConcurrentWriteWithRotationTest)
     std::vector<std::thread> threads;
     std::vector<std::vector<uint8_t>> dataBlocks;
 
-    // Create data blocks and threads
     for (size_t i = 0; i < numThreads; i++)
     {
         dataBlocks.push_back(generateRandomData(dataSize));
         threads.emplace_back([&storage, &dataBlocks, i]()
-                             { storage.write(dataBlocks[i]); });
+                             { storage.write(std::move(dataBlocks[i])); });
     }
 
-    // Wait for all threads to complete
     for (auto &t : threads)
     {
         t.join();
     }
 
-    // Make sure to flush all data to disk
     storage.flush();
 
-    // Verify files were created and rotated
     auto files = getSegmentFiles(testPath, baseFilename);
     ASSERT_GT(files.size(), 1) << "Multiple files should be created due to rotation";
 
-    // Calculate total file sizes
     size_t totalFileSize = 0;
     for (const auto &file : files)
     {
@@ -251,18 +240,17 @@ TEST_F(SegmentedStorageTest, FlushTest)
     SegmentedStorage storage(testPath, baseFilename);
 
     std::vector<uint8_t> data = generateRandomData(1000);
-    storage.write(data);
+    std::vector<uint8_t> dataCopy = data; // Copy for verification
+    storage.write(std::move(data));
 
-    // Explicitly flush
     storage.flush();
 
-    // Verify data was written to disk
     auto files = getSegmentFiles(testPath, baseFilename);
     ASSERT_EQ(files.size(), 1);
 
     auto fileContents = readFile(files[0]);
-    ASSERT_EQ(fileContents.size(), data.size());
-    ASSERT_TRUE(std::equal(data.begin(), data.end(), fileContents.begin()));
+    ASSERT_EQ(fileContents.size(), dataCopy.size());
+    ASSERT_TRUE(std::equal(dataCopy.begin(), dataCopy.end(), fileContents.begin()));
 }
 
 // Test multiple segment files with the same base path
@@ -277,20 +265,20 @@ TEST_F(SegmentedStorageTest, MultipleSegmentFilesTest)
     std::vector<uint8_t> data1 = {'F', 'i', 'l', 'e', '1'};
     std::vector<uint8_t> data2 = {'F', 'i', 'l', 'e', '2'};
     std::vector<uint8_t> data3 = {'F', 'i', 'l', 'e', '3'};
+    std::vector<uint8_t> data1Copy = data1; // Copies for verification
+    std::vector<uint8_t> data2Copy = data2;
+    std::vector<uint8_t> data3Copy = data3;
 
-    storage.writeToFile(file1, data1);
-    storage.writeToFile(file2, data2);
-    storage.writeToFile(file3, data3);
+    storage.writeToFile(file1, std::move(data1));
+    storage.writeToFile(file2, std::move(data2));
+    storage.writeToFile(file3, std::move(data3));
 
-    // Make sure to flush the data to disk before checking
     storage.flush();
 
-    // Verify files created correctly
     ASSERT_EQ(getSegmentFiles(testPath, file1).size(), 1);
     ASSERT_EQ(getSegmentFiles(testPath, file2).size(), 1);
     ASSERT_EQ(getSegmentFiles(testPath, file3).size(), 1);
 
-    // Verify contents
     auto files1 = getSegmentFiles(testPath, file1);
     auto files2 = getSegmentFiles(testPath, file2);
     auto files3 = getSegmentFiles(testPath, file3);
@@ -299,9 +287,9 @@ TEST_F(SegmentedStorageTest, MultipleSegmentFilesTest)
     auto content2 = readFile(files2[0]);
     auto content3 = readFile(files3[0]);
 
-    ASSERT_TRUE(std::equal(data1.begin(), data1.end(), content1.begin()));
-    ASSERT_TRUE(std::equal(data2.begin(), data2.end(), content2.begin()));
-    ASSERT_TRUE(std::equal(data3.begin(), data3.end(), content3.begin()));
+    ASSERT_TRUE(std::equal(data1Copy.begin(), data1Copy.end(), content1.begin()));
+    ASSERT_TRUE(std::equal(data2Copy.begin(), data2Copy.end(), content2.begin()));
+    ASSERT_TRUE(std::equal(data3Copy.begin(), data3Copy.end(), content3.begin()));
 }
 
 // Test large files
@@ -309,14 +297,11 @@ TEST_F(SegmentedStorageTest, LargeFileTest)
 {
     SegmentedStorage storage(testPath, baseFilename);
 
-    // Create a 5MB file
     size_t dataSize = 5 * 1024 * 1024;
     std::vector<uint8_t> largeData = generateRandomData(dataSize);
-
-    size_t bytesWritten = storage.write(largeData);
+    size_t bytesWritten = storage.write(std::move(largeData));
     ASSERT_EQ(bytesWritten, dataSize);
 
-    // Make sure to flush the data to disk before checking
     storage.flush();
 
     auto files = getSegmentFiles(testPath, baseFilename);
@@ -332,13 +317,11 @@ TEST_F(SegmentedStorageTest, DestructorTest)
     {
         SegmentedStorage storage(testPath, baseFilename);
         std::vector<uint8_t> data = {'T', 'e', 's', 't'};
-        storage.write(data);
-        // Explicitly flush before destruction to ensure data is written
+        std::vector<uint8_t> dataCopy = data; // Copy for verification
+        storage.write(std::move(data));
         storage.flush();
-        // Storage will be destroyed here when going out of scope
     }
 
-    // Verify file was written correctly
     auto files = getSegmentFiles(testPath, baseFilename);
     ASSERT_EQ(files.size(), 1);
 
@@ -353,25 +336,24 @@ TEST_F(SegmentedStorageTest, DestructorTest)
 // Test exact rotation boundary case
 TEST_F(SegmentedStorageTest, ExactRotationBoundaryTest)
 {
-    size_t maxSegmentSize = 1000; // Exact size for rotation test
+    size_t maxSegmentSize = 1000;
     SegmentedStorage storage(testPath, baseFilename, maxSegmentSize);
 
-    // Write exactly to the boundary
     std::vector<uint8_t> data1 = generateRandomData(maxSegmentSize);
-    size_t bytesWritten1 = storage.write(data1);
-    ASSERT_EQ(bytesWritten1, data1.size());
+    std::vector<uint8_t> data1Copy = data1; // Copy for verification
+    size_t bytesWritten1 = storage.write(std::move(data1));
+    ASSERT_EQ(bytesWritten1, data1Copy.size());
 
-    // Write one more byte to trigger rotation
-    std::vector<uint8_t> data2 = {42}; // Single byte
-    size_t bytesWritten2 = storage.write(data2);
-    ASSERT_EQ(bytesWritten2, data2.size());
+    std::vector<uint8_t> data2 = {42};
+    std::vector<uint8_t> data2Copy = data2; // Copy for verification
+    size_t bytesWritten2 = storage.write(std::move(data2));
+    ASSERT_EQ(bytesWritten2, data2Copy.size());
 
     storage.flush();
 
     auto files = getSegmentFiles(testPath, baseFilename);
     ASSERT_EQ(files.size(), 2) << "Two files should be created with exact boundary";
 
-    // Verify file sizes
     ASSERT_EQ(getFileSize(files[0]), maxSegmentSize);
     ASSERT_EQ(getFileSize(files[1]), 1);
 }
@@ -379,24 +361,22 @@ TEST_F(SegmentedStorageTest, ExactRotationBoundaryTest)
 // Test concurrent writing with realistic thread count at rotation boundaries
 TEST_F(SegmentedStorageTest, RealisticConcurrencyRotationTest)
 {
-    size_t maxSegmentSize = 1000; // Small segment size to force rotation
+    size_t maxSegmentSize = 1000;
     SegmentedStorage storage(testPath, baseFilename, maxSegmentSize);
 
-    size_t numThreads = 8; // Realistic thread count for production
-    size_t dataSize = 200; // Slightly larger data chunks
+    size_t numThreads = 8;
+    size_t dataSize = 200;
 
     std::vector<std::thread> threads;
     std::vector<std::vector<uint8_t>> dataBlocks;
 
-    // Create data blocks and threads
     for (size_t i = 0; i < numThreads; i++)
     {
         dataBlocks.push_back(generateRandomData(dataSize));
         threads.emplace_back([&storage, &dataBlocks, i]()
-                             { storage.write(dataBlocks[i]); });
+                             { storage.write(std::move(dataBlocks[i])); });
     }
 
-    // Wait for all threads to complete
     for (auto &t : threads)
     {
         t.join();
@@ -404,7 +384,6 @@ TEST_F(SegmentedStorageTest, RealisticConcurrencyRotationTest)
 
     storage.flush();
 
-    // Verify total data written
     auto files = getSegmentFiles(testPath, baseFilename);
     ASSERT_GT(files.size(), 1) << "Multiple files should be created due to rotation";
 
@@ -423,26 +402,23 @@ TEST_F(SegmentedStorageTest, RealisticRotationBoundaryTest)
     size_t maxSegmentSize = 1000;
     SegmentedStorage storage(testPath, baseFilename, maxSegmentSize);
 
-    size_t numThreads = 6;                 // Realistic thread count
-    size_t dataSize = maxSegmentSize - 50; // Close to segment size to trigger rotations
+    size_t numThreads = 6;
+    size_t dataSize = maxSegmentSize - 50;
 
     std::vector<std::thread> threads;
     std::vector<std::vector<uint8_t>> dataBlocks;
 
-    // Generate all data blocks before creating threads
     for (size_t i = 0; i < numThreads; i++)
     {
         dataBlocks.push_back(generateRandomData(dataSize));
     }
 
-    // Create threads that each write data that will likely cause rotation
     for (size_t i = 0; i < numThreads; i++)
     {
         threads.emplace_back([&storage, &dataBlocks, i]()
-                             { storage.write(dataBlocks[i]); });
+                             { storage.write(std::move(dataBlocks[i])); });
     }
 
-    // Wait for all threads to complete
     for (auto &t : threads)
     {
         t.join();
@@ -450,10 +426,7 @@ TEST_F(SegmentedStorageTest, RealisticRotationBoundaryTest)
 
     storage.flush();
 
-    // Verify total data written
     auto files = getSegmentFiles(testPath, baseFilename);
-
-    // We should have multiple files due to rotations
     ASSERT_GT(files.size(), 1) << "Multiple files should be created due to rotation";
 
     size_t totalFileSize = 0;
@@ -471,7 +444,7 @@ TEST_F(SegmentedStorageTest, ZeroByteWriteTest)
     SegmentedStorage storage(testPath, baseFilename);
 
     std::vector<uint8_t> emptyData;
-    size_t bytesWritten = storage.write(emptyData);
+    size_t bytesWritten = storage.write(std::move(emptyData));
 
     ASSERT_EQ(bytesWritten, 0) << "Zero bytes should be written for empty data";
 
@@ -495,30 +468,26 @@ TEST_F(SegmentedStorageTest, ConcurrentMultiFileWriteTest)
     std::vector<std::string> filenames;
     std::vector<std::vector<uint8_t>> dataBlocks;
 
-    // Create file names
     for (size_t i = 0; i < numFiles; i++)
     {
         filenames.push_back("file_" + std::to_string(i));
     }
 
-    // Generate all data blocks before creating threads
     for (size_t i = 0; i < numFiles * threadsPerFile; i++)
     {
         dataBlocks.push_back(generateRandomData(dataSize));
     }
 
-    // Create threads for each file
     for (size_t i = 0; i < numFiles; i++)
     {
         for (size_t j = 0; j < threadsPerFile; j++)
         {
             size_t dataIndex = i * threadsPerFile + j;
             threads.emplace_back([&storage, &filenames, &dataBlocks, i, dataIndex]()
-                                 { storage.writeToFile(filenames[i], dataBlocks[dataIndex]); });
+                                 { storage.writeToFile(filenames[i], std::move(dataBlocks[dataIndex])); });
         }
     }
 
-    // Wait for all threads to complete
     for (auto &t : threads)
     {
         t.join();
@@ -526,7 +495,6 @@ TEST_F(SegmentedStorageTest, ConcurrentMultiFileWriteTest)
 
     storage.flush();
 
-    // Verify all files were created and have the right size
     for (const auto &filename : filenames)
     {
         auto files = getSegmentFiles(testPath, filename);
@@ -543,11 +511,10 @@ TEST_F(SegmentedStorageTest, RapidWritesNearRotationTest)
     size_t maxSegmentSize = 1000;
     SegmentedStorage storage(testPath, baseFilename, maxSegmentSize);
 
-    // First, fill up to near the boundary
     std::vector<uint8_t> initialData = generateRandomData(maxSegmentSize - 100);
-    storage.write(initialData);
+    size_t initialSize = initialData.size();
+    storage.write(std::move(initialData));
 
-    // Now rapidly write small chunks that will collectively trigger rotation
     size_t numWrites = 20;
     size_t smallChunkSize = 10;
 
@@ -557,15 +524,13 @@ TEST_F(SegmentedStorageTest, RapidWritesNearRotationTest)
         dataChunks.push_back(generateRandomData(smallChunkSize));
     }
 
-    // Write all chunks in rapid succession
-    for (const auto &chunk : dataChunks)
+    for (auto &chunk : dataChunks)
     {
-        storage.write(chunk);
+        storage.write(std::move(chunk));
     }
 
     storage.flush();
 
-    // Verify rotation occurred correctly
     auto files = getSegmentFiles(testPath, baseFilename);
     ASSERT_GE(files.size(), 2) << "At least two files should be created due to rotation";
 
@@ -575,40 +540,35 @@ TEST_F(SegmentedStorageTest, RapidWritesNearRotationTest)
         totalFileSize += getFileSize(file);
     }
 
-    size_t expectedTotalSize = initialData.size() + (numWrites * smallChunkSize);
+    size_t expectedTotalSize = initialSize + (numWrites * smallChunkSize);
     ASSERT_EQ(totalFileSize, expectedTotalSize) << "Total file sizes should match total written data";
 }
 
 // Test with extremely small segment size to force frequent rotations
 TEST_F(SegmentedStorageTest, FrequentRotationTest)
 {
-    // Force rotation after every 50 bytes
     size_t maxSegmentSize = 50;
     SegmentedStorage storage(testPath, baseFilename, maxSegmentSize);
 
     size_t numWrites = 20;
-    size_t dataSize = 30; // Less than segment size
+    size_t dataSize = 30;
 
     std::vector<std::vector<uint8_t>> dataBlocks;
     for (size_t i = 0; i < numWrites; i++)
     {
         dataBlocks.push_back(generateRandomData(dataSize));
-        storage.write(dataBlocks[i]);
+        storage.write(std::move(dataBlocks[i]));
     }
 
     storage.flush();
 
     auto files = getSegmentFiles(testPath, baseFilename);
-
-    // We should have many files due to frequent rotation
-    // Each file should contain at most one write (or 2 very small ones)
     ASSERT_GE(files.size(), numWrites / 2) << "Many files should be created due to frequent rotation";
 
     size_t totalFileSize = 0;
     for (const auto &file : files)
     {
         totalFileSize += getFileSize(file);
-        // Each file should be small (approximately one data block)
         ASSERT_LE(getFileSize(file), maxSegmentSize);
     }
 
@@ -618,20 +578,15 @@ TEST_F(SegmentedStorageTest, FrequentRotationTest)
 // Test recovery after write failure
 TEST_F(SegmentedStorageTest, WriteErrorRecoveryTest)
 {
-    // This test requires a custom mock of pwrite to simulate failures
-    // Since we can't easily do that without modifying the class, this is a placeholder
-    // In a real implementation, you might use dependency injection or mocks
-
-    // For now, we'll just verify basic functionality after an exception might have occurred
     SegmentedStorage storage(testPath, baseFilename);
 
-    // Write initial data
     std::vector<uint8_t> data1 = {'I', 'n', 'i', 't', 'i', 'a', 'l'};
-    storage.write(data1);
+    std::vector<uint8_t> data1Copy = data1; // Copy for verification
+    storage.write(std::move(data1));
 
-    // Simulate recovery after an error by writing more data
     std::vector<uint8_t> data2 = {'R', 'e', 'c', 'o', 'v', 'e', 'r', 'y'};
-    storage.write(data2);
+    std::vector<uint8_t> data2Copy = data2; // Copy for verification
+    storage.write(std::move(data2));
 
     storage.flush();
 
@@ -639,17 +594,16 @@ TEST_F(SegmentedStorageTest, WriteErrorRecoveryTest)
     ASSERT_EQ(files.size(), 1);
 
     auto fileContents = readFile(files[0]);
-    ASSERT_EQ(fileContents.size(), data1.size() + data2.size());
+    ASSERT_EQ(fileContents.size(), data1Copy.size() + data2Copy.size());
 
-    // Verify both data pieces were written
-    for (size_t i = 0; i < data1.size(); i++)
+    for (size_t i = 0; i < data1Copy.size(); i++)
     {
-        ASSERT_EQ(fileContents[i], data1[i]);
+        ASSERT_EQ(fileContents[i], data1Copy[i]);
     }
 
-    for (size_t i = 0; i < data2.size(); i++)
+    for (size_t i = 0; i < data2Copy.size(); i++)
     {
-        ASSERT_EQ(fileContents[data1.size() + i], data2[i]);
+        ASSERT_EQ(fileContents[data1Copy.size() + i], data2Copy[i]);
     }
 }
 
@@ -659,11 +613,10 @@ TEST_F(SegmentedStorageTest, MultiSegmentBoundaryTest)
     size_t maxSegmentSize = 100;
     SegmentedStorage storage(testPath, baseFilename, maxSegmentSize);
 
-    // Fill exactly 3 segments
     for (int i = 0; i < 3; i++)
     {
         auto data = generateRandomData(maxSegmentSize);
-        storage.write(data);
+        storage.write(std::move(data));
     }
 
     storage.flush();
@@ -671,14 +624,12 @@ TEST_F(SegmentedStorageTest, MultiSegmentBoundaryTest)
     auto files = getSegmentFiles(testPath, baseFilename);
     ASSERT_EQ(files.size(), 3) << "Should have exactly 3 segments";
 
-    // Each file should be exactly segment size
     for (const auto &file : files)
     {
         ASSERT_EQ(getFileSize(file), maxSegmentSize);
     }
 }
 
-// Main function to run the tests
 int main(int argc, char **argv)
 {
     ::testing::InitGoogleTest(&argc, argv);

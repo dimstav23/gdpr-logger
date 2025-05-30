@@ -23,10 +23,10 @@ public:
                     std::chrono::milliseconds appendTimeout = std::chrono::milliseconds::max());
 
     BufferQueue::ProducerToken createProducerToken();
-    bool append(const LogEntry &entry,
+    bool append(LogEntry entry,
                 BufferQueue::ProducerToken &token,
                 const std::optional<std::string> &filename = std::nullopt);
-    bool appendBatch(const std::vector<LogEntry> &entries,
+    bool appendBatch(std::vector<LogEntry> entries,
                      BufferQueue::ProducerToken &token,
                      const std::optional<std::string> &filename = std::nullopt);
 

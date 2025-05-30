@@ -26,11 +26,12 @@ public:
              std::string dataSubjectId,
              std::vector<uint8_t> payload = std::vector<uint8_t>());
 
-    std::vector<uint8_t> serialize() const;
-    bool deserialize(const std::vector<uint8_t> &data);
+    std::vector<uint8_t> serialize() &&;
+    std::vector<uint8_t> serialize() const &;
+    bool deserialize(std::vector<uint8_t> &&data);
 
-    static std::vector<uint8_t> serializeBatch(const std::vector<LogEntry> &entries);
-    static std::vector<LogEntry> deserializeBatch(const std::vector<uint8_t> &batchData);
+    static std::vector<uint8_t> serializeBatch(std::vector<LogEntry> &&entries);
+    static std::vector<LogEntry> deserializeBatch(std::vector<uint8_t> &&batchData);
 
     ActionType getActionType() const { return m_actionType; }
     std::string getDataLocation() const { return m_dataLocation; }
@@ -43,7 +44,8 @@ private:
     // Helper methods for binary serialization
     void appendToVector(std::vector<uint8_t> &vec, const void *data, size_t size) const;
     void appendStringToVector(std::vector<uint8_t> &vec, const std::string &str) const;
-    bool extractStringFromVector(const std::vector<uint8_t> &vec, size_t &offset, std::string &str);
+    void appendStringToVector(std::vector<uint8_t> &vec, std::string &&str);
+    bool extractStringFromVector(std::vector<uint8_t> &vec, size_t &offset, std::string &str);
 
     ActionType m_actionType;                           // Type of GDPR operation
     std::string m_dataLocation;                        // Location of the data being operated on

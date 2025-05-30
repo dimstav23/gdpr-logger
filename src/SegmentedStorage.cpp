@@ -30,12 +30,12 @@ SegmentedStorage::~SegmentedStorage()
     }
 }
 
-size_t SegmentedStorage::write(const std::vector<uint8_t> &data)
+size_t SegmentedStorage::write(std::vector<uint8_t> &&data)
 {
-    return writeToFile(m_baseFilename, data);
+    return writeToFile(m_baseFilename, std::move(data));
 }
 
-size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vector<uint8_t> &data)
+size_t SegmentedStorage::writeToFile(const std::string &filename, std::vector<uint8_t> &&data)
 {
     size_t size = data.size();
     if (size == 0)
@@ -93,7 +93,7 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, const std::vec
         if (segment->fd != currentFd)
         {
             // If rotation happened during this time, retry the write
-            return writeToFile(filename, data);
+            return writeToFile(filename, std::move(data));
         }
 
         pwriteFull(currentFd, data.data(), size, static_cast<off_t>(writeOffset));

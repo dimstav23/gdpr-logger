@@ -26,8 +26,8 @@ public:
 
     ~SegmentedStorage();
 
-    size_t write(const std::vector<uint8_t> &data);
-    size_t writeToFile(const std::string &filename, const std::vector<uint8_t> &data);
+    size_t write(std::vector<uint8_t> &&data);
+    size_t writeToFile(const std::string &filename, std::vector<uint8_t> &&data);
     void flush();
 
 private:
