@@ -20,10 +20,7 @@ void cleanupLogDirectory(const std::string &logDir)
     {
         if (std::filesystem::exists(logDir))
         {
-            for (const auto &entry : std::filesystem::directory_iterator(logDir))
-            {
-                std::filesystem::remove_all(entry.path());
-            }
+            std::filesystem::remove_all(logDir);
         }
     }
     catch (const std::exception &e)
