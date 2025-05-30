@@ -102,8 +102,8 @@ int main()
     const int numSpecificFiles = 256;
     const int producerBatchSize = 512;
     const int numProducers = 96;
-    const int entriesPerProducer = 1000000;
-    const int payloadSize = 2048;
+    const int entriesPerProducer = 360000;
+    const int payloadSize = 4096;
 
     std::cout << "Generating batches with pre-determined destinations for all threads...";
     std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);

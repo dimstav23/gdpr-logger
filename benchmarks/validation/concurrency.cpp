@@ -144,7 +144,7 @@ int main()
     const int entriesPerProducer = 2000000;
     const int payloadSize = 2048;
 
-    std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16, 32 /*,48, 64, 96*/};
+    std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16, 32, 64};
 
     runConcurrencyBenchmark(baseConfig,
                             writerThreadCounts,
