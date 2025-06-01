@@ -142,23 +142,23 @@ int main()
     // system parameters
     LoggingConfig config;
     config.baseFilename = "default";
-    config.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+    config.maxSegmentSize = 500 * 1024 * 1024; // 50 MB
     config.maxAttempts = 10;
     config.baseRetryDelay = std::chrono::milliseconds(2);
     config.queueCapacity = 3000000;
-    config.maxExplicitProducers = 25;
-    config.batchSize = 8400;
-    config.numWriterThreads = 32;
+    config.maxExplicitProducers = 32;
+    config.batchSize = 8192;
+    config.numWriterThreads = 64;
     config.appendTimeout = std::chrono::minutes(2);
-    config.useEncryption = true;
-    config.useCompression = true;
+    config.useEncryption = false;
+    config.useCompression = false;
     // benchmark parameters
-    const int numProducers = 25;
-    const int entriesPerProducer = 1000000;
-    const int producerBatchSize = 50;
-    const int payloadSize = 2048;
+    const int numProducers = 32;
+    const int entriesPerProducer = 400000;
+    const int producerBatchSize = 8192;
+    const int payloadSize = 4096;
 
-    std::vector<int> numFilesVariants = {0, 10, 50, 100, 250, 500, 1000, 5000};
+    std::vector<int> numFilesVariants = {64, 1024, 4096};
 
     runFilepathDiversityComparison(config,
                                    numFilesVariants,
