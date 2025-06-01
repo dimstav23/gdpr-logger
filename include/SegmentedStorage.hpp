@@ -24,7 +24,7 @@ public:
                      size_t maxSegmentSize = 100 * 1024 * 1024, // 100 MB default
                      size_t maxAttempts = 5,
                      std::chrono::milliseconds baseRetryDelay = std::chrono::milliseconds(1),
-                     size_t maxOpenFiles = 512); // New parameter for max open files
+                     size_t maxOpenFiles = 512);
 
     ~SegmentedStorage();
 

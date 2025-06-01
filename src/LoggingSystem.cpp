@@ -21,7 +21,8 @@ LoggingSystem::LoggingSystem(const LoggingConfig &config)
         config.basePath, config.baseFilename,
         config.maxSegmentSize,
         config.maxAttempts,
-        config.baseRetryDelay);
+        config.baseRetryDelay,
+        config.maxOpenFiles);
 
     LoggingAPI::getInstance().initialize(m_queue, config.appendTimeout);
 
