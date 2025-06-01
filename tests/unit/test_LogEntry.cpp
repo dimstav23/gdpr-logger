@@ -11,7 +11,7 @@ TEST(LogEntryTest1, DefaultConstructor_InitializesCorrectly)
 
     EXPECT_EQ(entry.getActionType(), LogEntry::ActionType::CREATE);
     EXPECT_EQ(entry.getDataLocation(), "");
-    EXPECT_EQ(entry.getUserId(), "");
+    EXPECT_EQ(entry.getDataControllerId(), "");
     EXPECT_EQ(entry.getDataSubjectId(), "");
     EXPECT_EQ(entry.getPayload().size(), 0);
 
@@ -28,7 +28,7 @@ TEST(LogEntryTest2, ParameterizedConstructor_SetsFieldsCorrectly)
 
     EXPECT_EQ(entry.getActionType(), LogEntry::ActionType::UPDATE);
     EXPECT_EQ(entry.getDataLocation(), "database/users");
-    EXPECT_EQ(entry.getUserId(), "user123");
+    EXPECT_EQ(entry.getDataControllerId(), "user123");
     EXPECT_EQ(entry.getDataSubjectId(), "subject456");
     EXPECT_EQ(entry.getPayload().size(), testPayload.size());
 
@@ -62,7 +62,7 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
     EXPECT_TRUE(success);
     EXPECT_EQ(newEntry.getActionType(), LogEntry::ActionType::READ);
     EXPECT_EQ(newEntry.getDataLocation(), "storage/files");
-    EXPECT_EQ(newEntry.getUserId(), "userABC");
+    EXPECT_EQ(newEntry.getDataControllerId(), "userABC");
     EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
     EXPECT_EQ(newEntry.getPayload().size(), 0); // Payload should still be empty
 
@@ -73,7 +73,7 @@ TEST(LogEntryTest4, SerializationDeserialization_WorksCorrectly)
 
     EXPECT_EQ(newEntry.getActionType(), LogEntry::ActionType::READ);
     EXPECT_EQ(newEntry.getDataLocation(), "storage/files");
-    EXPECT_EQ(newEntry.getUserId(), "userABC");
+    EXPECT_EQ(newEntry.getDataControllerId(), "userABC");
     EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
     EXPECT_NEAR(std::chrono::system_clock::to_time_t(newEntry.getTimestamp()),
                 std::chrono::system_clock::to_time_t(entry.getTimestamp()), 1);
@@ -100,7 +100,7 @@ TEST(LogEntryTest4A, SerializationDeserializationWithPayload_WorksCorrectly)
     EXPECT_TRUE(success);
     EXPECT_EQ(newEntry.getActionType(), LogEntry::ActionType::READ);
     EXPECT_EQ(newEntry.getDataLocation(), "storage/files");
-    EXPECT_EQ(newEntry.getUserId(), "userABC");
+    EXPECT_EQ(newEntry.getDataControllerId(), "userABC");
     EXPECT_EQ(newEntry.getDataSubjectId(), "subjectXYZ");
 
     // Verify payload
@@ -158,7 +158,7 @@ TEST(LogEntryTest5, BatchSerializationDeserialization_WorksCorrectly)
     {
         EXPECT_EQ(recoveredEntries[i].getActionType(), originalEntries[i].getActionType());
         EXPECT_EQ(recoveredEntries[i].getDataLocation(), originalEntries[i].getDataLocation());
-        EXPECT_EQ(recoveredEntries[i].getUserId(), originalEntries[i].getUserId());
+        EXPECT_EQ(recoveredEntries[i].getDataControllerId(), originalEntries[i].getDataControllerId());
         EXPECT_EQ(recoveredEntries[i].getDataSubjectId(), originalEntries[i].getDataSubjectId());
 
         // Verify payload size

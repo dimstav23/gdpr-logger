@@ -24,8 +24,6 @@ public:
     bool start();
     bool stop();
 
-    bool isRunning() const;
-
     BufferQueue::ProducerToken createProducerToken();
     bool append(LogEntry entry,
                 BufferQueue::ProducerToken &token,

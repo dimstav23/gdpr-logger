@@ -69,7 +69,7 @@ TEST_F(BufferQueueBasicTest, EnqueueDequeue)
     EXPECT_EQ(queue->size(), 0);
 
     // Verify the item matches
-    EXPECT_EQ(retrievedItem.entry.getUserId(), item.entry.getUserId());
+    EXPECT_EQ(retrievedItem.entry.getDataControllerId(), item.entry.getDataControllerId());
     EXPECT_EQ(retrievedItem.entry.getDataLocation(), item.entry.getDataLocation());
     EXPECT_EQ(retrievedItem.entry.getDataSubjectId(), item.entry.getDataSubjectId());
     EXPECT_EQ(retrievedItem.entry.getActionType(), item.entry.getActionType());
@@ -229,7 +229,7 @@ TEST_F(BufferQueueBasicTest, BatchEnqueue)
     for (size_t i = 0; i < numEntries; i++)
     {
         EXPECT_EQ(retrievedItems[i].entry.getDataLocation(), itemsToEnqueue[i].entry.getDataLocation());
-        EXPECT_EQ(retrievedItems[i].entry.getUserId(), itemsToEnqueue[i].entry.getUserId());
+        EXPECT_EQ(retrievedItems[i].entry.getDataControllerId(), itemsToEnqueue[i].entry.getDataControllerId());
     }
 
     EXPECT_EQ(queue->size(), 0);

@@ -97,11 +97,6 @@ bool LoggingSystem::stop()
     return true;
 }
 
-bool LoggingSystem::isRunning() const
-{
-    return m_running.load(std::memory_order_acquire);
-}
-
 BufferQueue::ProducerToken LoggingSystem::createProducerToken()
 {
     return LoggingAPI::getInstance().createProducerToken();

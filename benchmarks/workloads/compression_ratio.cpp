@@ -39,10 +39,10 @@ std::vector<LogEntry> generateSyntheticEntries(size_t count)
     {
         auto action = static_cast<LogEntry::ActionType>(actionDist(rng));
         std::string dataLocation = randomString(20, 50, rng);
-        std::string userId = randomString(8, 12, rng);
+        std::string dataControllerId = randomString(8, 12, rng);
         std::string dataSubjectId = randomString(8, 12, rng);
 
-        LogEntry entry(action, dataLocation, userId, dataSubjectId);
+        LogEntry entry(action, dataLocation, dataControllerId, dataSubjectId);
         entries.push_back(entry);
     }
 
