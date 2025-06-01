@@ -117,8 +117,6 @@ size_t BufferQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItems,
 
 bool BufferQueue::flush()
 {
-    std::unique_lock<std::mutex> lock(m_flushMutex);
-
     do
     {
         std::this_thread::sleep_for(std::chrono::milliseconds(500));

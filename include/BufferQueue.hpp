@@ -6,7 +6,6 @@
 #include <atomic>
 #include <vector>
 #include <memory>
-#include <mutex>
 #include <condition_variable>
 #include <chrono>
 
@@ -18,8 +17,6 @@ public:
 
 private:
     moodycamel::ConcurrentQueue<QueueItem> m_queue;
-
-    mutable std::mutex m_flushMutex;
 
 public:
     explicit BufferQueue(size_t capacity, size_t maxExplicitProducers);
