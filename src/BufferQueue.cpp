@@ -20,7 +20,6 @@ bool BufferQueue::enqueueBlocking(QueueItem item, ProducerToken &token, std::chr
     auto start = std::chrono::steady_clock::now();
     int backoffMs = 1;
     const int maxBackoffMs = 100;
-    const double jitterFactor = 0.2;
 
     while (true)
     {
@@ -36,9 +35,7 @@ bool BufferQueue::enqueueBlocking(QueueItem item, ProducerToken &token, std::chr
             return false;
         }
 
-        // Add some random jitter to prevent synchronized retries (thundering herd problems)
-        int jitter = static_cast<int>(backoffMs * jitterFactor * (static_cast<double>(rand()) / RAND_MAX));
-        int sleepTime = backoffMs + jitter;
+        int sleepTime = backoffMs;
 
         // Make sure we don't sleep longer than our remaining timeout
         if (timeout != std::chrono::milliseconds::max())
@@ -66,7 +63,6 @@ bool BufferQueue::enqueueBatchBlocking(std::vector<QueueItem> items, ProducerTok
     auto start = std::chrono::steady_clock::now();
     int backoffMs = 1;
     const int maxBackoffMs = 100;
-    const double jitterFactor = 0.2;
 
     while (true)
     {
@@ -82,9 +78,7 @@ bool BufferQueue::enqueueBatchBlocking(std::vector<QueueItem> items, ProducerTok
             return false;
         }
 
-        // Add some random jitter to prevent synchronized retries
-        int jitter = static_cast<int>(backoffMs * jitterFactor * (static_cast<double>(rand()) / RAND_MAX));
-        int sleepTime = backoffMs + jitter;
+        int sleepTime = backoffMs;
 
         // Make sure we don't sleep longer than our remaining timeout
         if (timeout != std::chrono::milliseconds::max())
