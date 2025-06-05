@@ -30,8 +30,8 @@ public:
     bool enqueueBatchBlocking(std::vector<QueueItem> items,
                               ProducerToken &token,
                               std::chrono::milliseconds timeout = std::chrono::milliseconds::max());
-    bool dequeue(QueueItem &item, ConsumerToken &token);
-    size_t dequeueBatch(std::vector<QueueItem> &items, size_t maxItems, ConsumerToken &token);
+    bool tryDequeue(QueueItem &item, ConsumerToken &token);
+    size_t tryDequeueBatch(std::vector<QueueItem> &items, size_t maxItems, ConsumerToken &token);
     bool flush();
     size_t size() const;
 

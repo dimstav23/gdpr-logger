@@ -95,7 +95,7 @@ bool BufferQueue::enqueueBatchBlocking(std::vector<QueueItem> items, ProducerTok
     }
 }
 
-bool BufferQueue::dequeue(QueueItem &item, ConsumerToken &token)
+bool BufferQueue::tryDequeue(QueueItem &item, ConsumerToken &token)
 {
     if (m_queue.try_dequeue(token, item))
     {
@@ -104,7 +104,7 @@ bool BufferQueue::dequeue(QueueItem &item, ConsumerToken &token)
     return false;
 }
 
-size_t BufferQueue::dequeueBatch(std::vector<QueueItem> &items, size_t maxItems, ConsumerToken &token)
+size_t BufferQueue::tryDequeueBatch(std::vector<QueueItem> &items, size_t maxItems, ConsumerToken &token)
 {
     items.clear();
     items.resize(maxItems);

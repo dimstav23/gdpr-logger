@@ -65,7 +65,7 @@ TEST_F(BufferQueueBasicTest, EnqueueDequeue)
     EXPECT_EQ(queue->size(), 1);
 
     // Dequeue the item
-    EXPECT_TRUE(queue->dequeue(retrievedItem, consumerToken));
+    EXPECT_TRUE(queue->tryDequeue(retrievedItem, consumerToken));
     EXPECT_EQ(queue->size(), 0);
 
     // Verify the item matches
@@ -119,7 +119,7 @@ TEST_F(BufferQueueBasicTest, EnqueueWithConsumer)
 
     BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
     QueueItem retrievedItem;
-    EXPECT_TRUE(queue->dequeue(retrievedItem, consumerToken));
+    EXPECT_TRUE(queue->tryDequeue(retrievedItem, consumerToken));
     EXPECT_EQ(retrievedItem.entry.getActionType(), LogEntry::ActionType::READ);
     EXPECT_EQ(retrievedItem.entry.getDataLocation(), "data/location/0");
 
@@ -130,7 +130,7 @@ TEST_F(BufferQueueBasicTest, EnqueueWithConsumer)
 
     // Batch dequeue
     std::vector<QueueItem> items;
-    size_t count = queue->dequeueBatch(items, QUEUE_CAPACITY - 1, consumerToken);
+    size_t count = queue->tryDequeueBatch(items, QUEUE_CAPACITY - 1, consumerToken);
     // Verify we got all items
     EXPECT_EQ(count, QUEUE_CAPACITY - 1);
     EXPECT_EQ(items.size(), QUEUE_CAPACITY - 1);
@@ -145,7 +145,7 @@ TEST_F(BufferQueueBasicTest, DequeueFromEmpty)
 {
     BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
     QueueItem item;
-    EXPECT_FALSE(queue->dequeue(item, consumerToken));
+    EXPECT_FALSE(queue->tryDequeue(item, consumerToken));
 }
 
 // Test batch dequeue
@@ -164,7 +164,7 @@ TEST_F(BufferQueueBasicTest, BatchDequeue)
 
     // Batch dequeue
     std::vector<QueueItem> items;
-    size_t count = queue->dequeueBatch(items, numEntries, consumerToken);
+    size_t count = queue->tryDequeueBatch(items, numEntries, consumerToken);
 
     // Verify we got all items
     EXPECT_EQ(count, numEntries);
@@ -195,7 +195,7 @@ TEST_F(BufferQueueBasicTest, BatchDequeuePartial)
 
     // Try to dequeue more than available
     std::vector<QueueItem> items;
-    size_t count = queue->dequeueBatch(items, requestSize, consumerToken);
+    size_t count = queue->tryDequeueBatch(items, requestSize, consumerToken);
 
     // Verify we got what was available
     EXPECT_EQ(count, numEntries);
@@ -221,7 +221,7 @@ TEST_F(BufferQueueBasicTest, BatchEnqueue)
     EXPECT_EQ(queue->size(), numEntries);
 
     std::vector<QueueItem> retrievedItems;
-    size_t dequeued = queue->dequeueBatch(retrievedItems, numEntries, consumerToken);
+    size_t dequeued = queue->tryDequeueBatch(retrievedItems, numEntries, consumerToken);
 
     EXPECT_EQ(dequeued, numEntries);
     EXPECT_EQ(retrievedItems.size(), numEntries);
@@ -269,7 +269,7 @@ TEST_F(BufferQueueBasicTest, BatchEnqueueWhenAlmostFull)
 
     // Remove ALL items to make space (to free the entire block)
     std::vector<QueueItem> retrievedItems;
-    size_t removed = queue->dequeueBatch(retrievedItems, QUEUE_CAPACITY, consumerToken);
+    size_t removed = queue->tryDequeueBatch(retrievedItems, QUEUE_CAPACITY, consumerToken);
     EXPECT_EQ(removed, QUEUE_CAPACITY);
     EXPECT_EQ(queue->size(), 0);
 
@@ -317,7 +317,7 @@ TEST_F(BufferQueueBasicTest, BatchEnqueueBlocking)
         BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
         std::vector<QueueItem> items;
         // Dequeue all items to free the entire block
-        queue->dequeueBatch(items, QUEUE_CAPACITY, consumerToken); });
+        queue->tryDequeueBatch(items, QUEUE_CAPACITY, consumerToken); });
 
     // Wait for both threads
     consumerThread.join();
@@ -346,7 +346,7 @@ TEST_F(BufferQueueBasicTest, Flush)
         BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
         std::vector<QueueItem> items;
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
-        queue->dequeueBatch(items, numEntries, consumerToken); });
+        queue->tryDequeueBatch(items, numEntries, consumerToken); });
 
     // Flush should wait until queue is empty
     EXPECT_TRUE(queue->flush());
@@ -373,9 +373,9 @@ TEST_F(BufferQueueBasicTest, QueueItemWithTargetFilename)
     // Dequeue and verify
     QueueItem retrievedItem1, retrievedItem2, retrievedItem3;
 
-    EXPECT_TRUE(queue->dequeue(retrievedItem1, consumerToken));
-    EXPECT_TRUE(queue->dequeue(retrievedItem2, consumerToken));
-    EXPECT_TRUE(queue->dequeue(retrievedItem3, consumerToken));
+    EXPECT_TRUE(queue->tryDequeue(retrievedItem1, consumerToken));
+    EXPECT_TRUE(queue->tryDequeue(retrievedItem2, consumerToken));
+    EXPECT_TRUE(queue->tryDequeue(retrievedItem3, consumerToken));
 
     // Check targetFilename is preserved correctly
     EXPECT_TRUE(retrievedItem1.targetFilename.has_value());
@@ -442,7 +442,7 @@ TEST_F(BufferQueueThreadTest, QueueCapacityTest)
 
     // Dequeue all items
     std::vector<QueueItem> items;
-    size_t count = smallQueue->dequeueBatch(items, SMALL_CAPACITY, smallQueueConsumer);
+    size_t count = smallQueue->tryDequeueBatch(items, SMALL_CAPACITY, smallQueueConsumer);
     EXPECT_EQ(count, SMALL_CAPACITY);
     EXPECT_EQ(smallQueue->size(), 0);
 
@@ -469,7 +469,7 @@ TEST_F(BufferQueueThreadTest, MultipleProducersSingleConsumer)
         BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
         QueueItem item;
         while (totalDequeued.load() < TOTAL_ENTRIES) {
-            if (queue->dequeue(item, consumerToken)) {
+            if (queue->tryDequeue(item, consumerToken)) {
                 totalDequeued++;
             } else {
                 std::this_thread::yield();
@@ -529,9 +529,12 @@ TEST_F(BufferQueueThreadTest, SingleProducerMultipleConsumers)
             BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
             QueueItem item;
             while (totalDequeued.load() < TOTAL_ENTRIES) {
-                if (queue->dequeue(item, consumerToken)) {
+                if (queue->tryDequeue(item, consumerToken))
+                {
                     totalDequeued++;
-                } else {
+                }
+                else
+                {
                     std::this_thread::yield();
                 }
             } });
@@ -577,7 +580,7 @@ TEST_F(BufferQueueThreadTest, MultipleBatchProducers)
         BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
         std::vector<QueueItem> items;
         while (totalDequeued.load() < TOTAL_ENTRIES) {
-            size_t count = queue->dequeueBatch(items, 50, consumerToken);
+            size_t count = queue->tryDequeueBatch(items, 50, consumerToken);
             if (count > 0) {
                 totalDequeued += count;
             } else {
@@ -666,13 +669,13 @@ TEST_F(BufferQueueThreadTest, MixedBatchOperations)
                     if (gen() % 2 == 0) {
                         // Single dequeue
                         QueueItem item;
-                        if (queue->dequeue(item, consumerToken)) {
+                        if (queue->tryDequeue(item, consumerToken)) {
                             totalDequeued++;
                         }
                     } else {
                         // Batch dequeue
                         std::vector<QueueItem> items;
-                        size_t count = queue->dequeueBatch(items, batchSize(gen), consumerToken);
+                        size_t count = queue->tryDequeueBatch(items, batchSize(gen), consumerToken);
                         if (count > 0) {
                             totalDequeued += count;
                         }
@@ -693,7 +696,7 @@ TEST_F(BufferQueueThreadTest, MixedBatchOperations)
     BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
     // Dequeue remaining entries
     std::vector<QueueItem> items;
-    while (queue->dequeueBatch(items, MAX_BATCH_SIZE, consumerToken) > 0)
+    while (queue->tryDequeueBatch(items, MAX_BATCH_SIZE, consumerToken) > 0)
     {
         totalDequeued += items.size();
     }
@@ -723,7 +726,7 @@ TEST_F(BufferQueueThreadTest, BatchDequeueMultipleThreads)
             BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
             std::vector<QueueItem> items;
             while (totalDequeued.load() < TOTAL_ENTRIES) {
-                size_t count = queue->dequeueBatch(items, BATCH_SIZE, consumerToken);
+                size_t count = queue->tryDequeueBatch(items, BATCH_SIZE, consumerToken);
                 if (count > 0) {
                     totalDequeued += count;
                 } else {
@@ -805,7 +808,7 @@ TEST_F(BufferQueueThreadTest, RandomizedStressTest)
                 } else {
                     // Dequeue
                     QueueItem item;
-                    if (queue->dequeue(item, consumerToken)) {
+                    if (queue->tryDequeue(item, consumerToken)) {
                         totalDequeued++;
                     }
                 }
@@ -825,7 +828,7 @@ TEST_F(BufferQueueThreadTest, RandomizedStressTest)
     // Dequeue remaining entries
     BufferQueue::ConsumerToken consumerToken = queue->createConsumerToken();
     QueueItem item;
-    while (queue->dequeue(item, consumerToken))
+    while (queue->tryDequeue(item, consumerToken))
     {
         totalDequeued++;
     }
@@ -893,7 +896,7 @@ TEST_F(BufferQueueTimingTest, FlushWithTimeout)
         std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
         std::vector<QueueItem> items;
-        queue->dequeueBatch(items, 10, consumerToken); });
+        queue->tryDequeueBatch(items, 10, consumerToken); });
 
     // Flush should complete when queue is emptied
     auto status = future.wait_for(std::chrono::milliseconds(750));

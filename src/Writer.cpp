@@ -60,7 +60,7 @@ void Writer::processLogEntries()
 
     while (m_running)
     {
-        size_t entriesDequeued = m_queue.dequeueBatch(batch, m_batchSize, m_consumerToken);
+        size_t entriesDequeued = m_queue.tryDequeueBatch(batch, m_batchSize, m_consumerToken);
         if (entriesDequeued == 0)
         {
             std::this_thread::sleep_for(std::chrono::milliseconds(5));
