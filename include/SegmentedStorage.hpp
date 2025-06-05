@@ -38,48 +38,53 @@ private:
     size_t m_maxSegmentSize;
     size_t m_maxAttempts;
     std::chrono::milliseconds m_baseRetryDelay;
-    size_t m_maxOpenFiles; // Max number of file descriptors to keep open
+    size_t m_maxOpenFiles; // Max number of cache entries
 
-    struct SegmentInfo
+    struct CacheEntry
     {
+        int fd{-1};
         std::atomic<size_t> segmentIndex{0};
         std::atomic<size_t> currentOffset{0};
-        std::string currentSegmentPath;      // Full path to the current active segment file
+        std::string currentSegmentPath;
         mutable std::shared_mutex fileMutex; // shared for writes, exclusive for rotate/flush
     };
 
-    std::unordered_map<std::string, std::shared_ptr<SegmentInfo>> m_fileSegments;
-    mutable std::shared_mutex m_mapMutex; // Protects m_fileSegments map
-
-    // LRU Cache for file descriptors
-    class FdCache
+    // Unified LRU Cache for both file descriptors and segment information
+    class LRUCache
     {
     public:
-        FdCache(size_t capacity, SegmentedStorage *parent) : m_capacity(capacity), m_parent(parent) {}
+        LRUCache(size_t capacity, SegmentedStorage *parent) : m_capacity(capacity), m_parent(parent) {}
 
-        int get(const std::string &path);
-        void put(const std::string &path, int fd);
-        void closeFd(const std::string &path);
+        std::shared_ptr<CacheEntry> get(const std::string &filename);
+        void flush(const std::string &filename);
+        void flushAll();
         void closeAll();
 
     private:
         size_t m_capacity;
-        // List of (path, fd) pairs, ordered from most recently used to least recently used
-        std::list<std::pair<std::string, int>> m_lruList;
-        // Map from path to iterator in m_lruList for O(1) lookup
-        std::unordered_map<std::string, decltype(m_lruList.begin())> m_cacheMap;
-        std::mutex m_mutex;         // Protects m_lruList and m_cacheMap
-        SegmentedStorage *m_parent; // Pointer to the parent SegmentedStorage for retry helpers
+        SegmentedStorage *m_parent;
+
+        // LRU list of filenames
+        std::list<std::string> m_lruList;
+        // Map from filename to cache entry and iterator in LRU list
+        struct CacheData
+        {
+            std::shared_ptr<CacheEntry> entry;
+            std::list<std::string>::iterator lruIt;
+        };
+        std::unordered_map<std::string, CacheData> m_cache;
+        mutable std::mutex m_mutex; // Protects m_lruList and m_cache
+
+        void evictLRU();
+        std::shared_ptr<CacheEntry> reconstructState(const std::string &filename);
     };
 
-    FdCache m_fdCache;
+    LRUCache m_cache;
 
-    std::shared_ptr<SegmentInfo> getOrCreateSegment(const std::string &filename);
-    std::string rotateSegment(const std::string &filename);
+    std::string rotateSegment(const std::string &filename, std::shared_ptr<CacheEntry> entry);
     std::string generateSegmentPath(const std::string &filename, size_t segmentIndex) const;
-
-    // Helper to get FD for a given path using the cache
-    int getFdForPath(const std::string &path);
+    size_t getFileSize(const std::string &path) const;
+    size_t findLatestSegmentIndex(const std::string &filename) const;
 
     // Retry helpers use member-configured parameters
     template <typename Func>
