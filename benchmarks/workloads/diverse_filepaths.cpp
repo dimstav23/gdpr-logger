@@ -1,5 +1,5 @@
 #include "BenchmarkUtils.hpp"
-#include "LoggingSystem.hpp"
+#include "LoggingManager.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -33,8 +33,8 @@ BenchmarkResult runFilepathDiversityBenchmark(const LoggingConfig &config, int n
     std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes ("
               << totalDataSizeGiB << " GiB)" << std::endl;
 
-    LoggingSystem loggingSystem(runConfig);
-    loggingSystem.start();
+    LoggingManager loggingManager(runConfig);
+    loggingManager.start();
 
     auto startTime = std::chrono::high_resolution_clock::now();
 
@@ -44,7 +44,7 @@ BenchmarkResult runFilepathDiversityBenchmark(const LoggingConfig &config, int n
         futures.push_back(std::async(
             std::launch::async,
             appendLogEntries,
-            std::ref(loggingSystem),
+            std::ref(loggingManager),
             std::ref(batches)));
     }
 
@@ -53,7 +53,7 @@ BenchmarkResult runFilepathDiversityBenchmark(const LoggingConfig &config, int n
         future.wait();
     }
 
-    loggingSystem.stop();
+    loggingManager.stop();
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
 

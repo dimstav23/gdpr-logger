@@ -1,7 +1,7 @@
 #ifndef BENCHMARK_UTILS_HPP
 #define BENCHMARK_UTILS_HPP
 
-#include "LoggingSystem.hpp"
+#include "LoggingManager.hpp"
 #include <vector>
 #include <string>
 #include <optional>
@@ -10,7 +10,7 @@
 
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
-void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches);
+void appendLogEntries(LoggingManager &loggingManager, const std::vector<BatchWithDestination> &batches);
 
 void cleanupLogDirectory(const std::string &logDir);
 

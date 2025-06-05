@@ -1,5 +1,5 @@
 #include "BenchmarkUtils.hpp"
-#include "LoggingSystem.hpp"
+#include "LoggingManager.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -41,13 +41,13 @@ int main()
     size_t totalDataSizeBytes = calculateTotalDataSize(batches, numBursts);
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
 
-    LoggingSystem loggingSystem(config);
-    loggingSystem.start();
+    LoggingManager loggingManager(config);
+    loggingManager.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
     for (int burst = 0; burst < numBursts; burst++)
     {
-        appendLogEntries(loggingSystem, batches);
+        appendLogEntries(loggingManager, batches);
 
         if (burst < numBursts - 1)
         {
@@ -55,7 +55,7 @@ int main()
         }
     }
 
-    loggingSystem.stop();
+    loggingManager.stop();
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
 

@@ -1,12 +1,12 @@
 #include "BenchmarkUtils.hpp"
 
-void appendLogEntries(LoggingSystem &loggingSystem, const std::vector<BatchWithDestination> &batches)
+void appendLogEntries(LoggingManager &loggingManager, const std::vector<BatchWithDestination> &batches)
 {
-    auto token = loggingSystem.createProducerToken();
+    auto token = loggingManager.createProducerToken();
 
     for (const auto &batchWithDest : batches)
     {
-        if (!loggingSystem.appendBatch(batchWithDest.first, token, batchWithDest.second))
+        if (!loggingManager.appendBatch(batchWithDest.first, token, batchWithDest.second))
         {
             std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
                       << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;

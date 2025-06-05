@@ -6,7 +6,7 @@ set(LIBRARY_SOURCES
     src/Crypto.cpp
     src/Writer.cpp
     src/SegmentedStorage.cpp
-    src/LoggingSystem.cpp
+    src/LoggingManager.cpp
     benchmarks/BenchmarkUtils.cpp
 )
 

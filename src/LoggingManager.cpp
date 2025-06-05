@@ -1,10 +1,10 @@
-#include "LoggingSystem.hpp"
+#include "LoggingManager.hpp"
 #include "Crypto.hpp"
 #include "Compression.hpp"
 #include <iostream>
 #include <filesystem>
 
-LoggingSystem::LoggingSystem(const LoggingConfig &config)
+LoggingManager::LoggingManager(const LoggingConfig &config)
     : m_numWriterThreads(config.numWriterThreads),
       m_batchSize(config.batchSize),
       m_useEncryption(config.useEncryption),
@@ -29,12 +29,12 @@ LoggingSystem::LoggingSystem(const LoggingConfig &config)
     m_writers.reserve(m_numWriterThreads);
 }
 
-LoggingSystem::~LoggingSystem()
+LoggingManager::~LoggingManager()
 {
     stop();
 }
 
-bool LoggingSystem::start()
+bool LoggingManager::start()
 {
     std::lock_guard<std::mutex> lock(m_systemMutex);
 
@@ -60,7 +60,7 @@ bool LoggingSystem::start()
     return true;
 }
 
-bool LoggingSystem::stop()
+bool LoggingManager::stop()
 {
     std::lock_guard<std::mutex> lock(m_systemMutex);
 
@@ -97,14 +97,14 @@ bool LoggingSystem::stop()
     return true;
 }
 
-BufferQueue::ProducerToken LoggingSystem::createProducerToken()
+BufferQueue::ProducerToken LoggingManager::createProducerToken()
 {
     return LoggingAPI::getInstance().createProducerToken();
 }
 
-bool LoggingSystem::append(LogEntry entry,
-                           BufferQueue::ProducerToken &token,
-                           const std::optional<std::string> &filename)
+bool LoggingManager::append(LogEntry entry,
+                            BufferQueue::ProducerToken &token,
+                            const std::optional<std::string> &filename)
 {
     if (!m_acceptingEntries.load(std::memory_order_acquire))
     {
@@ -115,9 +115,9 @@ bool LoggingSystem::append(LogEntry entry,
     return LoggingAPI::getInstance().append(std::move(entry), token, filename);
 }
 
-bool LoggingSystem::appendBatch(std::vector<LogEntry> entries,
-                                BufferQueue::ProducerToken &token,
-                                const std::optional<std::string> &filename)
+bool LoggingManager::appendBatch(std::vector<LogEntry> entries,
+                                 BufferQueue::ProducerToken &token,
+                                 const std::optional<std::string> &filename)
 {
     if (!m_acceptingEntries.load(std::memory_order_acquire))
     {
@@ -128,7 +128,7 @@ bool LoggingSystem::appendBatch(std::vector<LogEntry> entries,
     return LoggingAPI::getInstance().appendBatch(std::move(entries), token, filename);
 }
 
-bool LoggingSystem::exportLogs(
+bool LoggingManager::exportLogs(
     const std::string &outputPath,
     std::chrono::system_clock::time_point fromTimestamp,
     std::chrono::system_clock::time_point toTimestamp)

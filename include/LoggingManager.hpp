@@ -15,11 +15,11 @@
 #include <string>
 #include <optional>
 
-class LoggingSystem
+class LoggingManager
 {
 public:
-    explicit LoggingSystem(const LoggingConfig &config);
-    ~LoggingSystem();
+    explicit LoggingManager(const LoggingConfig &config);
+    ~LoggingManager();
 
     bool start();
     bool stop();

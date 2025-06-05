@@ -1,5 +1,5 @@
 #include "BenchmarkUtils.hpp"
-#include "LoggingSystem.hpp"
+#include "LoggingManager.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -40,8 +40,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
               << " - Total data to be written: " << totalDataSizeBytes
               << " bytes (" << totalDataSizeGiB << " GiB)" << std::endl;
 
-    LoggingSystem loggingSystem(config);
-    loggingSystem.start();
+    LoggingManager loggingManager(config);
+    loggingManager.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
     std::vector<std::future<void>> futures;
@@ -50,7 +50,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
         futures.push_back(std::async(
             std::launch::async,
             appendLogEntries,
-            std::ref(loggingSystem),
+            std::ref(loggingManager),
             std::ref(batches)));
     }
 
@@ -59,7 +59,7 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
         future.wait();
     }
 
-    loggingSystem.stop();
+    loggingManager.stop();
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
 

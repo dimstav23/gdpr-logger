@@ -1,5 +1,5 @@
 #include "BenchmarkUtils.hpp"
-#include "LoggingSystem.hpp"
+#include "LoggingManager.hpp"
 #include <iostream>
 #include <thread>
 #include <chrono>
@@ -21,15 +21,16 @@ int main()
     config.queueCapacity = 3000000;
     config.maxExplicitProducers = 96;
     config.batchSize = 8192;
-    config.numWriterThreads = 64;
+    config.numWriterThreads = 96;
     config.appendTimeout = std::chrono::minutes(2);
-    config.useEncryption = false;
-    config.useCompression = false;
+    config.useEncryption = true;
+    config.useCompression = true;
+    config.maxOpenFiles = 512;
     // benchmark parameters
-    const int numSpecificFiles = 256;
-    const int producerBatchSize = 256;
+    const int numSpecificFiles = 1024;
+    const int producerBatchSize = 4096;
     const int numProducers = 96;
-    const int entriesPerProducer = 2000000;
+    const int entriesPerProducer = 800000;
     const int payloadSize = 4096;
 
     cleanupLogDirectory(config.basePath);
@@ -41,8 +42,8 @@ int main()
     double totalDataSizeGiB = static_cast<double>(totalDataSizeBytes) / (1024 * 1024 * 1024);
     std::cout << "Total data to be written: " << totalDataSizeBytes << " bytes (" << totalDataSizeGiB << " GiB)" << std::endl;
 
-    LoggingSystem loggingSystem(config);
-    loggingSystem.start();
+    LoggingManager loggingManager(config);
+    loggingManager.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
     std::vector<std::future<void>> futures;
@@ -51,7 +52,7 @@ int main()
         futures.push_back(std::async(
             std::launch::async,
             appendLogEntries,
-            std::ref(loggingSystem),
+            std::ref(loggingManager),
             std::ref(batches)));
     }
 
@@ -60,7 +61,7 @@ int main()
         future.wait();
     }
 
-    loggingSystem.stop();
+    loggingManager.stop();
     auto endTime = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double> elapsed = endTime - startTime;
 
