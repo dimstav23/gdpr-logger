@@ -11,10 +11,10 @@ protected:
     void SetUp() override
     {
         // Create a few sample log entries for testing
-        entry1 = LogEntry(LogEntry::ActionType::CREATE, "/data/records/1", "user123", "subject456");
-        entry2 = LogEntry(LogEntry::ActionType::READ, "/data/records/2", "admin789", "subject456");
-        entry3 = LogEntry(LogEntry::ActionType::UPDATE, "/data/records/3", "user123", "subject789");
-        entry4 = LogEntry(LogEntry::ActionType::DELETE, "/data/records/4", "admin789", "subject123");
+        entry1 = LogEntry(LogEntry::ActionType::CREATE, "/data/records/1", "controller123", "processor123", "subject456");
+        entry2 = LogEntry(LogEntry::ActionType::READ, "/data/records/2", "controller789", "processor789", "subject456");
+        entry3 = LogEntry(LogEntry::ActionType::UPDATE, "/data/records/3", "controller123", "processor123", "subject789");
+        entry4 = LogEntry(LogEntry::ActionType::DELETE, "/data/records/4", "controller789", "processor789", "subject123");
     }
 
     LogEntry entry1, entry2, entry3, entry4;
@@ -87,7 +87,7 @@ TEST_F(CompressionTest, BatchCompressionRatio)
     // Create a batch of log entries with repetitive data which should compress well
     const int batchSize = 50;
     std::string repetitiveData(1000, 'X');
-    LogEntry repetitiveEntry(LogEntry::ActionType::CREATE, repetitiveData, repetitiveData, repetitiveData);
+    LogEntry repetitiveEntry(LogEntry::ActionType::CREATE, repetitiveData, repetitiveData, repetitiveData, repetitiveData);
 
     std::vector<LogEntry> repetitiveBatch(batchSize, repetitiveEntry);
     std::vector<uint8_t> serializedBatch = LogEntry::serializeBatch(std::move(repetitiveBatch));

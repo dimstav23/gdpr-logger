@@ -7,6 +7,7 @@ LogEntry::LogEntry()
     : m_actionType(ActionType::CREATE),
       m_dataLocation(""),
       m_dataControllerId(""),
+      m_dataProcessorId(""),
       m_dataSubjectId(""),
       m_timestamp(std::chrono::system_clock::now()),
       m_payload() {}
@@ -14,11 +15,13 @@ LogEntry::LogEntry()
 LogEntry::LogEntry(ActionType actionType,
                    std::string dataLocation,
                    std::string dataControllerId,
+                   std::string dataProcessorId,
                    std::string dataSubjectId,
                    std::vector<uint8_t> payload)
     : m_actionType(actionType),
       m_dataLocation(std::move(dataLocation)),
       m_dataControllerId(std::move(dataControllerId)),
+      m_dataProcessorId(std::move(dataProcessorId)),
       m_dataSubjectId(std::move(dataSubjectId)),
       m_timestamp(std::chrono::system_clock::now()),
       m_payload(std::move(payload))
@@ -33,6 +36,7 @@ std::vector<uint8_t> LogEntry::serialize() &&
         sizeof(int) +                                  // ActionType
         sizeof(uint32_t) + m_dataLocation.size() +     // Size + data location
         sizeof(uint32_t) + m_dataControllerId.size() + // Size + data controller ID
+        sizeof(uint32_t) + m_dataProcessorId.size() +  // Size + data processor ID
         sizeof(uint32_t) + m_dataSubjectId.size() +    // Size + data subject ID
         sizeof(int64_t) +                              // Timestamp
         sizeof(uint32_t) + m_payload.size();           // Size + payload data
@@ -48,6 +52,7 @@ std::vector<uint8_t> LogEntry::serialize() &&
     // Move strings
     appendStringToVector(result, std::move(m_dataLocation));
     appendStringToVector(result, std::move(m_dataControllerId));
+    appendStringToVector(result, std::move(m_dataProcessorId));
     appendStringToVector(result, std::move(m_dataSubjectId));
 
     // Push timestamp
@@ -77,6 +82,7 @@ std::vector<uint8_t> LogEntry::serialize() const &
         sizeof(int) +                                  // ActionType
         sizeof(uint32_t) + m_dataLocation.size() +     // Size + data location
         sizeof(uint32_t) + m_dataControllerId.size() + // Size + data controller  ID
+        sizeof(uint32_t) + m_dataProcessorId.size() +  // Size + data processor  ID
         sizeof(uint32_t) + m_dataSubjectId.size() +    // Size + data subject ID
         sizeof(int64_t) +                              // Timestamp
         sizeof(uint32_t) + m_payload.size();           // Size + payload data
@@ -92,6 +98,7 @@ std::vector<uint8_t> LogEntry::serialize() const &
     // Copy strings
     appendStringToVector(result, m_dataLocation);
     appendStringToVector(result, m_dataControllerId);
+    appendStringToVector(result, m_dataProcessorId);
     appendStringToVector(result, m_dataSubjectId);
 
     // Push timestamp
@@ -133,6 +140,10 @@ bool LogEntry::deserialize(std::vector<uint8_t> &&data)
 
         // Extract data controller ID
         if (!extractStringFromVector(data, offset, m_dataControllerId))
+            return false;
+
+        // Extract data processor ID
+        if (!extractStringFromVector(data, offset, m_dataProcessorId))
             return false;
 
         // Extract data subject ID
@@ -204,6 +215,7 @@ std::vector<uint8_t> LogEntry::serializeBatch(std::vector<LogEntry> &&entries)
                          3 * sizeof(uint32_t) + // 3 string length fields
                          entry.getDataLocation().size() +
                          entry.getDataControllerId().size() +
+                         entry.getDataProcessorId().size() +
                          entry.getDataSubjectId().size() +
                          sizeof(int64_t) +  // Timestamp
                          sizeof(uint32_t) + // Payload size

@@ -70,9 +70,9 @@ TEST_F(WriterTest, MultipleStartCalls)
 TEST_F(WriterTest, ProcessBatchEntries)
 {
     std::vector<QueueItem> testItems = {
-        QueueItem{LogEntry{LogEntry::ActionType::READ, "location1", "user1", "subject1"}},
-        QueueItem{LogEntry{LogEntry::ActionType::CREATE, "location2", "user2", "subject2"}},
-        QueueItem{LogEntry{LogEntry::ActionType::UPDATE, "location3", "user3", "subject3"}}};
+        QueueItem{LogEntry{LogEntry::ActionType::READ, "location1", "controller1", "processor1", "subject1"}},
+        QueueItem{LogEntry{LogEntry::ActionType::CREATE, "location2", "controller2", "processor2", "subject2"}},
+        QueueItem{LogEntry{LogEntry::ActionType::UPDATE, "location3", "controller3", "processor3", "subject3"}}};
 
     BufferQueue::ProducerToken producerToken = queue->createProducerToken();
 

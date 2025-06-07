@@ -14,9 +14,9 @@ protected:
     void SetUp() override
     {
         // Create sample log entries for testing
-        entry1 = LogEntry(LogEntry::ActionType::CREATE, "/data/records/1", "user123", "subject456");
-        entry2 = LogEntry(LogEntry::ActionType::READ, "/data/records/2", "admin789", "subject456");
-        entry3 = LogEntry(LogEntry::ActionType::UPDATE, "/data/records/3", "user123", "subject789");
+        entry1 = LogEntry(LogEntry::ActionType::CREATE, "/data/records/1", "controller123", "processor123", "subject123");
+        entry2 = LogEntry(LogEntry::ActionType::READ, "/data/records/2", "controller456", "processor456", "subject456");
+        entry3 = LogEntry(LogEntry::ActionType::UPDATE, "/data/records/3", "controller789", "processor789", "subject789");
 
         // Create encryption key and IV
         key = std::vector<uint8_t>(32, 0x42);      // Fixed key for reproducibility

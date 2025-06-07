@@ -95,10 +95,12 @@ std::vector<BatchWithDestination> generateBatches(
             std::string dataLocation = "database/table/row" + std::to_string(generated + i);
             std::string dataSubjectId = "subject" + std::to_string((generated + i) % 10);
             std::string dataControllerId = "controller" + std::to_string(generated + i);
+            std::string dataProcessorId = "processor" + std::to_string(generated + i);
             std::vector<uint8_t> payload(payloadSize, 0x22); // payloadSize number of bytes of 0x22
             LogEntry entry(LogEntry::ActionType::CREATE,
                            std::move(dataLocation),
                            std::move(dataControllerId),
+                           std::move(dataProcessorId),
                            std::move(dataSubjectId),
                            std::move(payload));
             batch.push_back(entry);

@@ -29,7 +29,8 @@ protected:
         item.entry = LogEntry(
             LogEntry::ActionType::READ,
             "data/location/" + std::to_string(id),
-            "user" + std::to_string(id),
+            "controller" + std::to_string(id),
+            "processor" + std::to_string(id),
             "subject" + std::to_string(id % 10));
         return item;
     }
@@ -70,6 +71,7 @@ TEST_F(BufferQueueBasicTest, EnqueueDequeue)
 
     // Verify the item matches
     EXPECT_EQ(retrievedItem.entry.getDataControllerId(), item.entry.getDataControllerId());
+    EXPECT_EQ(retrievedItem.entry.getDataProcessorId(), item.entry.getDataProcessorId());
     EXPECT_EQ(retrievedItem.entry.getDataLocation(), item.entry.getDataLocation());
     EXPECT_EQ(retrievedItem.entry.getDataSubjectId(), item.entry.getDataSubjectId());
     EXPECT_EQ(retrievedItem.entry.getActionType(), item.entry.getActionType());
@@ -230,6 +232,8 @@ TEST_F(BufferQueueBasicTest, BatchEnqueue)
     {
         EXPECT_EQ(retrievedItems[i].entry.getDataLocation(), itemsToEnqueue[i].entry.getDataLocation());
         EXPECT_EQ(retrievedItems[i].entry.getDataControllerId(), itemsToEnqueue[i].entry.getDataControllerId());
+        EXPECT_EQ(retrievedItems[i].entry.getDataProcessorId(), itemsToEnqueue[i].entry.getDataProcessorId());
+        EXPECT_EQ(retrievedItems[i].entry.getDataSubjectId(), itemsToEnqueue[i].entry.getDataSubjectId());
     }
 
     EXPECT_EQ(queue->size(), 0);
@@ -409,7 +413,8 @@ protected:
         item.entry = LogEntry(
             LogEntry::ActionType::READ,
             "data/location/" + std::to_string(id),
-            "user" + std::to_string(id),
+            "controller" + std::to_string(id),
+            "processor" + std::to_string(id),
             "subject" + std::to_string(id % 10));
         return item;
     }
@@ -860,7 +865,8 @@ protected:
         item.entry = LogEntry(
             LogEntry::ActionType::READ,
             "data/location/" + std::to_string(id),
-            "user" + std::to_string(id),
+            "controller" + std::to_string(id),
+            "processor" + std::to_string(id),
             "subject" + std::to_string(id % 10));
         return item;
     }
@@ -881,7 +887,8 @@ TEST_F(BufferQueueTimingTest, FlushWithTimeout)
         item.entry = LogEntry(
             LogEntry::ActionType::READ,
             "data/location/" + std::to_string(i),
-            "user",
+            "controller",
+            "processor",
             "subject");
         queue->enqueueBlocking(item, producerToken, std::chrono::milliseconds(100));
     }

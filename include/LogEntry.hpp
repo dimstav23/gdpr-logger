@@ -23,6 +23,7 @@ public:
     LogEntry(ActionType actionType,
              std::string dataLocation,
              std::string dataControllerId,
+             std::string dataProcessorId,
              std::string dataSubjectId,
              std::vector<uint8_t> payload = std::vector<uint8_t>());
 
@@ -36,6 +37,7 @@ public:
     ActionType getActionType() const { return m_actionType; }
     std::string getDataLocation() const { return m_dataLocation; }
     std::string getDataControllerId() const { return m_dataControllerId; }
+    std::string getDataProcessorId() const { return m_dataProcessorId; }
     std::string getDataSubjectId() const { return m_dataSubjectId; }
     std::chrono::system_clock::time_point getTimestamp() const { return m_timestamp; }
     const std::vector<uint8_t> &getPayload() const { return m_payload; }
@@ -49,7 +51,8 @@ private:
 
     ActionType m_actionType;                           // Type of GDPR operation
     std::string m_dataLocation;                        // Location of the data being operated on
-    std::string m_dataControllerId;                    // ID of the user performing the operation
+    std::string m_dataControllerId;                    // ID of the entity controlling the data
+    std::string m_dataProcessorId;                     // ID of the entity performing the operation
     std::string m_dataSubjectId;                       // ID of the data subject
     std::chrono::system_clock::time_point m_timestamp; // When the operation occurred
     std::vector<uint8_t> m_payload;                    // optional extra bytes

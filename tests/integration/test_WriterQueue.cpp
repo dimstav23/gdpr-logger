@@ -47,7 +47,8 @@ protected:
         item.entry = LogEntry(
             LogEntry::ActionType::UPDATE,
             "location" + std::to_string(id),
-            "user" + std::to_string(id),
+            "controller" + std::to_string(id),
+            "processor" + std::to_string(id),
             "subject" + std::to_string(id % 10));
         return item;
     }
