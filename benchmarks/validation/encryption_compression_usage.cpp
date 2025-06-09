@@ -103,8 +103,8 @@ int main()
     LoggingConfig baseConfig;
     baseConfig.baseFilename = "default";
     baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
-    baseConfig.maxAttempts = 5;
-    baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
+    baseConfig.maxAttempts = 10;
+    baseConfig.baseRetryDelay = std::chrono::milliseconds(2);
     baseConfig.queueCapacity = 3000000;
     baseConfig.maxExplicitProducers = 96;
     baseConfig.batchSize = 8192;
@@ -114,7 +114,7 @@ int main()
     const int numSpecificFiles = 256;
     const int producerBatchSize = 512;
     const int numProducers = 96;
-    const int entriesPerProducer = 360000;
+    const int entriesPerProducer = 260000;
     const int payloadSize = 4096;
 
     const std::vector<int> compressionLevels = {0, 1, 3, 6, 9};

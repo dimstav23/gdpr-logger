@@ -42,6 +42,7 @@ std::vector<LogEntry> generateSyntheticEntries(size_t count)
         std::string dataControllerId = randomString(8, 12, rng);
         std::string dataProcessorId = randomString(8, 12, rng);
         std::string dataSubjectId = randomString(8, 12, rng);
+        std::vector<uint8_t> payload;
 
         LogEntry entry(action, dataLocation, dataControllerId, dataProcessorId, dataSubjectId);
         entries.push_back(entry);
@@ -52,7 +53,7 @@ std::vector<LogEntry> generateSyntheticEntries(size_t count)
 
 struct Result
 {
-    size_t entryCount;
+    int compressionLevel;
     size_t uncompressedSize;
     size_t compressedSize;
     double compressionRatio;
@@ -61,33 +62,34 @@ struct Result
 
 int main()
 {
-    std::vector<size_t> batchSizes = {1000, 5000, 10000, 50000};
+    size_t batchSize = 5000;
+    const std::vector<int> compressionLevels = {0, 1, 3, 6, 9};
     std::vector<Result> results;
 
-    for (auto n : batchSizes)
+    for (auto compressionLevel : compressionLevels)
     {
-        std::vector<LogEntry> entries = generateSyntheticEntries(n);
+        std::vector<LogEntry> entries = generateSyntheticEntries(batchSize);
         std::vector<uint8_t> serializedEntries = LogEntry::serializeBatch(std::move(entries));
         size_t uncompressedSize = serializedEntries.size();
 
         // Compress and time
         auto start = std::chrono::high_resolution_clock::now();
-        std::vector<uint8_t> compressed = Compression::compress(std::move(serializedEntries));
+        std::vector<uint8_t> compressed = Compression::compress(std::move(serializedEntries), compressionLevel);
         auto end = std::chrono::high_resolution_clock::now();
 
         size_t compressedSize = compressed.size();
         double compressionRatio = static_cast<double>(uncompressedSize) / compressedSize;
         auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
 
-        results.push_back({n, uncompressedSize, compressedSize, compressionRatio, duration});
+        results.push_back({compressionLevel, uncompressedSize, compressedSize, compressionRatio, duration});
     }
 
     std::cout << std::fixed << std::setprecision(2);
-    std::cout << "BatchSize  UncompressedB  CompressedB  Ratio    TimeMs\n";
+    std::cout << "CompressionLevel  UncompressedB  CompressedB  Ratio    TimeMs\n";
     std::cout << "--------------------------------------------------------\n";
     for (auto &r : results)
     {
-        std::cout << std::setw(8) << r.entryCount << "    "
+        std::cout << std::setw(8) << r.compressionLevel << "    "
                   << std::setw(13) << r.uncompressedSize << "    "
                   << std::setw(11) << r.compressedSize << "    "
                   << std::setw(6) << r.compressionRatio << "    "
