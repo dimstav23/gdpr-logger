@@ -18,6 +18,7 @@ struct BenchmarkResult
     size_t inputDataSizeBytes;
     size_t outputDataSizeBytes;
     double writeAmplification;
+    LatencyStats latencyStats;
 };
 
 BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThreads, int numProducerThreads,
@@ -43,7 +44,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
     loggingManager.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    std::vector<std::future<void>> futures;
+    // Each future now returns a LatencyCollector with thread-local measurements
+    std::vector<std::future<LatencyCollector>> futures;
     for (int i = 0; i < numProducerThreads; i++)
     {
         futures.push_back(std::async(
@@ -53,9 +55,12 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
             std::ref(batches)));
     }
 
+    // Collect latency measurements from all threads
+    LatencyCollector masterCollector;
     for (auto &future : futures)
     {
-        future.wait();
+        LatencyCollector threadCollector = future.get();
+        masterCollector.merge(threadCollector);
     }
 
     loggingManager.stop();
@@ -71,6 +76,9 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
     double logicalThroughputGiB = totalDataSizeGiB / elapsedSeconds;
     double physicalThroughputGiB = static_cast<double>(finalStorageSize) / (1024.0 * 1024.0 * 1024.0 * elapsedSeconds);
 
+    // Calculate latency statistics from merged measurements
+    LatencyStats latencyStats = calculateLatencyStats(masterCollector);
+
     cleanupLogDirectory(config.basePath);
 
     return BenchmarkResult{
@@ -80,7 +88,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
         physicalThroughputGiB,
         totalDataSizeBytes,
         finalStorageSize,
-        writeAmplification};
+        writeAmplification,
+        latencyStats};
 }
 
 void runScalabilityBenchmark(const LoggingConfig &baseConfig, const std::vector<int> &writerThreadCounts,
@@ -115,16 +124,18 @@ void runScalabilityBenchmark(const LoggingConfig &baseConfig, const std::vector<
               << std::setw(20) << "Physical (GiB/s)"
               << std::setw(25) << "Input Size (bytes)"
               << std::setw(25) << "Storage Size (bytes)"
-              << std::setw(20) << "Write Amplification"
-              << std::setw(15) << "Relative Perf." << std::endl;
-    std::cout << "-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Write Amp."
+              << std::setw(15) << "Rel. Perf."
+              << std::setw(12) << "Avg Lat(ms)"
+              << std::setw(12) << "Med Lat(ms)"
+              << std::setw(12) << "Max Lat(ms)" << std::endl;
+    std::cout << "-------------------------------------------------------------------------------------------------------------------------------" << std::endl;
 
     double baselineThroughput = results[0].throughputEntries;
 
     for (size_t i = 0; i < writerThreadCounts.size(); i++)
     {
         double relativePerformance = results[i].throughputEntries / (baselineThroughput * writerThreadCounts[i]);
-
         int scaledProducers = baseProducerThreads * writerThreadCounts[i];
 
         std::cout << std::left << std::setw(20) << writerThreadCounts[i]
@@ -136,9 +147,12 @@ void runScalabilityBenchmark(const LoggingConfig &baseConfig, const std::vector<
                   << std::setw(25) << results[i].inputDataSizeBytes
                   << std::setw(25) << results[i].outputDataSizeBytes
                   << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
-                  << std::setw(15) << std::fixed << std::setprecision(2) << relativePerformance << std::endl;
+                  << std::setw(15) << std::fixed << std::setprecision(2) << relativePerformance
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.avgMs
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.medianMs
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.maxMs << std::endl;
     }
-    std::cout << "===============================================================================================================================================================================================" << std::endl;
+    std::cout << "================================================================================================================================" << std::endl;
 }
 
 int main()
@@ -146,7 +160,7 @@ int main()
     // system parameters
     LoggingConfig baseConfig;
     baseConfig.baseFilename = "default";
-    baseConfig.maxSegmentSize = 250 * 1024 * 1024; // 50 MB
+    baseConfig.maxSegmentSize = 250 * 1024 * 1024; // 250 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 3000000;

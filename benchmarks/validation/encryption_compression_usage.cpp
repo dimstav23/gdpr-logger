@@ -21,6 +21,7 @@ struct BenchmarkResult
     double logicalThroughputGiB;
     double physicalThroughputGiB;
     double writeAmplification;
+    LatencyStats latencyStats;
 };
 
 BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption, bool useCompression,
@@ -45,7 +46,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
     loggingManager.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    std::vector<std::future<void>> futures;
+    // Each future now returns a LatencyCollector with thread-local measurements
+    std::vector<std::future<LatencyCollector>> futures;
     for (int i = 0; i < numProducerThreads; i++)
     {
         futures.push_back(std::async(
@@ -55,9 +57,12 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
             std::ref(batches)));
     }
 
+    // Collect latency measurements from all threads
+    LatencyCollector masterCollector;
     for (auto &future : futures)
     {
-        future.wait();
+        LatencyCollector threadCollector = future.get();
+        masterCollector.merge(threadCollector);
     }
 
     loggingManager.stop();
@@ -73,6 +78,9 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
     double logicalThroughputGiB = totalDataSizeGiB / elapsedSeconds;
     double physicalThroughputGiB = static_cast<double>(finalStorageSize) / (1024.0 * 1024.0 * 1024.0 * elapsedSeconds);
 
+    // Calculate latency statistics from merged measurements
+    LatencyStats latencyStats = calculateLatencyStats(masterCollector);
+
     cleanupLogDirectory(config.basePath);
 
     return BenchmarkResult{
@@ -85,7 +93,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
         finalStorageSize,
         logicalThroughputGiB,
         physicalThroughputGiB,
-        writeAmplification};
+        writeAmplification,
+        latencyStats};
 }
 
 int main()
@@ -118,17 +127,20 @@ int main()
     BenchmarkResult resultWithEncryptionNoCompression = runBenchmark(baseConfig, true, false, batches, numProducers, entriesPerProducer);
     BenchmarkResult resultWithEncryptionWithCompression = runBenchmark(baseConfig, true, true, batches, numProducers, entriesPerProducer);
 
-    std::cout << "\n============== BENCHMARK SUMMARY ==============" << std::endl;
+    std::cout << "\n============== ENCRYPTION/COMPRESSION BENCHMARK SUMMARY ==============" << std::endl;
     std::cout << std::left << std::setw(12) << "Encryption"
               << std::setw(12) << "Compression"
               << std::setw(20) << "Execution Time (s)"
               << std::setw(25) << "Input Size (bytes)"
               << std::setw(25) << "Storage Size (bytes)"
-              << std::setw(20) << "Write Amplification"
+              << std::setw(20) << "Write Amp."
               << std::setw(30) << "Throughput (entries/s)"
               << std::setw(20) << "Logical (GiB/s)"
-              << std::setw(20) << "Physical (GiB/s)" << std::endl;
-    std::cout << "-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Physical (GiB/s)"
+              << std::setw(12) << "Avg Lat(ms)"
+              << std::setw(12) << "Med Lat(ms)"
+              << std::setw(12) << "Max Lat(ms)" << std::endl;
+    std::cout << "-------------------------------------------------------------------------------------------------------------------------------" << std::endl;
 
     // Display results for each configuration
     auto printResult = [](const BenchmarkResult &result)
@@ -141,7 +153,10 @@ int main()
                   << std::fixed << std::setprecision(3) << std::setw(20) << result.writeAmplification
                   << std::fixed << std::setprecision(3) << std::setw(30) << result.throughputEntries
                   << std::fixed << std::setprecision(3) << std::setw(20) << result.logicalThroughputGiB
-                  << std::fixed << std::setprecision(3) << std::setw(20) << result.physicalThroughputGiB << std::endl;
+                  << std::fixed << std::setprecision(3) << std::setw(20) << result.physicalThroughputGiB
+                  << std::fixed << std::setprecision(3) << std::setw(12) << result.latencyStats.avgMs
+                  << std::fixed << std::setprecision(3) << std::setw(12) << result.latencyStats.medianMs
+                  << std::fixed << std::setprecision(3) << std::setw(12) << result.latencyStats.maxMs << std::endl;
     };
 
     printResult(resultNoEncryptionNoCompression);
@@ -149,7 +164,7 @@ int main()
     printResult(resultWithEncryptionNoCompression);
     printResult(resultWithEncryptionWithCompression);
 
-    std::cout << "===============================================================================================================================================================================================" << std::endl;
+    std::cout << "================================================================================================================================" << std::endl;
 
     return 0;
 }

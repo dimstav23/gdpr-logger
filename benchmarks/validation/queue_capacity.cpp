@@ -16,6 +16,7 @@ struct BenchmarkResult
     double logicalThroughputGiB;
     double physicalThroughputGiB;
     double writeAmplification;
+    LatencyStats latencyStats;
 };
 
 BenchmarkResult runQueueCapacityBenchmark(const LoggingConfig &config, int numProducerThreads,
@@ -37,7 +38,8 @@ BenchmarkResult runQueueCapacityBenchmark(const LoggingConfig &config, int numPr
     loggingManager.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    std::vector<std::future<void>> futures;
+    // Each future now returns a LatencyCollector with thread-local measurements
+    std::vector<std::future<LatencyCollector>> futures;
     for (int i = 0; i < numProducerThreads; i++)
     {
         futures.push_back(std::async(
@@ -47,9 +49,12 @@ BenchmarkResult runQueueCapacityBenchmark(const LoggingConfig &config, int numPr
             std::ref(batches)));
     }
 
+    // Collect latency measurements from all threads
+    LatencyCollector masterCollector;
     for (auto &future : futures)
     {
-        future.wait();
+        LatencyCollector threadCollector = future.get();
+        masterCollector.merge(threadCollector);
     }
 
     loggingManager.stop();
@@ -65,6 +70,9 @@ BenchmarkResult runQueueCapacityBenchmark(const LoggingConfig &config, int numPr
     double logicalThroughputGiB = totalDataSizeGiB / elapsedSeconds;
     double physicalThroughputGiB = static_cast<double>(finalStorageSize) / (1024.0 * 1024.0 * 1024.0 * elapsedSeconds);
 
+    // Calculate latency statistics from merged measurements
+    LatencyStats latencyStats = calculateLatencyStats(masterCollector);
+
     cleanupLogDirectory(config.basePath);
 
     return BenchmarkResult{
@@ -72,7 +80,8 @@ BenchmarkResult runQueueCapacityBenchmark(const LoggingConfig &config, int numPr
         throughputEntries,
         logicalThroughputGiB,
         physicalThroughputGiB,
-        writeAmplification};
+        writeAmplification,
+        latencyStats};
 }
 
 void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vector<int> &queueSizes,
@@ -100,12 +109,15 @@ void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vect
     std::cout << "\n=========== QUEUE CAPACITY BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(15) << "Queue Capacity"
               << std::setw(15) << "Time (sec)"
-              << std::setw(30) << "Throughput (entries/s)"
+              << std::setw(30) << "Throughput (ent/s)"
               << std::setw(20) << "Logical (GiB/s)"
               << std::setw(20) << "Physical (GiB/s)"
-              << std::setw(20) << "Write Amplification"
-              << std::setw(20) << "Relative Perf" << std::endl;
-    std::cout << "---------------------------------------------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Write Amp."
+              << std::setw(20) << "Rel. Perf"
+              << std::setw(12) << "Avg Lat(ms)"
+              << std::setw(12) << "Med Lat(ms)"
+              << std::setw(12) << "Max Lat(ms)" << std::endl;
+    std::cout << "-------------------------------------------------------------------------------------------------------------------------------" << std::endl;
 
     for (size_t i = 0; i < queueSizes.size(); i++)
     {
@@ -116,9 +128,12 @@ void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vect
                   << std::setw(20) << std::fixed << std::setprecision(3) << results[i].logicalThroughputGiB
                   << std::setw(20) << std::fixed << std::setprecision(3) << results[i].physicalThroughputGiB
                   << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
-                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << std::endl;
+                  << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.avgMs
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.medianMs
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.maxMs << std::endl;
     }
-    std::cout << "===============================================================================================================" << std::endl;
+    std::cout << "================================================================================================================================" << std::endl;
 }
 
 int main()

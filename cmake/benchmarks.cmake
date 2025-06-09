@@ -18,7 +18,6 @@ set(VALIDATION_BENCHMARKS
 )
 
 set(WORKLOAD_BENCHMARKS
-    burst
     compression_ratio
     diverse_filepaths
     large_batches

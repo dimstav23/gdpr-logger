@@ -16,6 +16,7 @@ struct BenchmarkResult
     double logicalThroughputGiB;
     double physicalThroughputGiB;
     double writeAmplification;
+    LatencyStats latencyStats;
 };
 
 BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int writerBatchSize, int numProducerThreads,
@@ -40,7 +41,8 @@ BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int write
     loggingManager.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    std::vector<std::future<void>> futures;
+    // Each future now returns a LatencyCollector with thread-local measurements
+    std::vector<std::future<LatencyCollector>> futures;
     for (int i = 0; i < numProducerThreads; i++)
     {
         futures.push_back(std::async(
@@ -50,9 +52,12 @@ BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int write
             std::ref(batches)));
     }
 
+    // Collect latency measurements from all threads
+    LatencyCollector masterCollector;
     for (auto &future : futures)
     {
-        future.wait();
+        LatencyCollector threadCollector = future.get();
+        masterCollector.merge(threadCollector);
     }
 
     loggingManager.stop();
@@ -68,6 +73,9 @@ BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int write
     double logicalThroughputGiB = totalDataSizeGiB / elapsedSeconds;
     double physicalThroughputGiB = static_cast<double>(finalStorageSize) / (1024.0 * 1024.0 * 1024.0 * elapsedSeconds);
 
+    // Calculate latency statistics from merged measurements
+    LatencyStats latencyStats = calculateLatencyStats(masterCollector);
+
     cleanupLogDirectory(config.basePath);
 
     return BenchmarkResult{
@@ -75,7 +83,8 @@ BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int write
         throughputEntries,
         logicalThroughputGiB,
         physicalThroughputGiB,
-        writeAmplification};
+        writeAmplification,
+        latencyStats};
 }
 
 void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<int> &batchSizes,
@@ -104,9 +113,12 @@ void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<i
               << std::setw(30) << "Throughput (entries/s)"
               << std::setw(20) << "Logical (GiB/s)"
               << std::setw(20) << "Physical (GiB/s)"
-              << std::setw(15) << "Relative Perf"
-              << std::setw(20) << "Write Amplification" << std::endl;
-    std::cout << "---------------------------------------------------------------------------------------------------------------" << std::endl;
+              << std::setw(15) << "Rel. Perf"
+              << std::setw(20) << "Write Amp."
+              << std::setw(12) << "Avg Lat(ms)"
+              << std::setw(12) << "Med Lat(ms)"
+              << std::setw(12) << "Max Lat(ms)" << std::endl;
+    std::cout << "-------------------------------------------------------------------------------------------------------------------------------" << std::endl;
 
     for (size_t i = 0; i < batchSizes.size(); i++)
     {
@@ -117,9 +129,12 @@ void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<i
                   << std::setw(20) << std::fixed << std::setprecision(3) << results[i].logicalThroughputGiB
                   << std::setw(20) << std::fixed << std::setprecision(3) << results[i].physicalThroughputGiB
                   << std::setw(15) << std::fixed << std::setprecision(2) << relativePerf
-                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification << std::endl;
+                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.avgMs
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.medianMs
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.maxMs << std::endl;
     }
-    std::cout << "===============================================================================================================" << std::endl;
+    std::cout << "======================================================================================================================================" << std::endl;
 }
 
 int main()

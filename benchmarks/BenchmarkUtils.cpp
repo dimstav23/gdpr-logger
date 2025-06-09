@@ -1,17 +1,34 @@
 #include "BenchmarkUtils.hpp"
 
-void appendLogEntries(LoggingManager &loggingManager, const std::vector<BatchWithDestination> &batches)
+LatencyCollector appendLogEntries(LoggingManager &loggingManager, const std::vector<BatchWithDestination> &batches)
 {
+    LatencyCollector localCollector;
+    // Pre-allocate to avoid reallocations during measurement
+    localCollector.reserve(batches.size());
+
     auto token = loggingManager.createProducerToken();
 
     for (const auto &batchWithDest : batches)
     {
-        if (!loggingManager.appendBatch(batchWithDest.first, token, batchWithDest.second))
+        // Measure latency for each appendBatch call
+        auto startTime = std::chrono::high_resolution_clock::now();
+
+        bool success = loggingManager.appendBatch(batchWithDest.first, token, batchWithDest.second);
+
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto latency = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
+
+        // Record the latency measurement in thread-local collector
+        localCollector.addMeasurement(latency);
+
+        if (!success)
         {
             std::cerr << "Failed to append batch of " << batchWithDest.first.size() << " entries to "
                       << (batchWithDest.second ? *batchWithDest.second : "default") << std::endl;
         }
     }
+
+    return localCollector;
 }
 
 void cleanupLogDirectory(const std::string &logDir)
@@ -112,4 +129,63 @@ std::vector<BatchWithDestination> generateBatches(
     }
 
     return batches;
+}
+
+LatencyStats calculateLatencyStats(const LatencyCollector &collector)
+{
+    const auto &latencies = collector.getMeasurements();
+
+    if (latencies.empty())
+    {
+        return {0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0};
+    }
+
+    // Convert to milliseconds for easier reading
+    std::vector<double> latenciesMs;
+    latenciesMs.reserve(latencies.size());
+    for (const auto &lat : latencies)
+    {
+        latenciesMs.push_back(static_cast<double>(lat.count()) / 1e6); // ns to ms
+    }
+
+    // Sort for percentile calculations
+    std::sort(latenciesMs.begin(), latenciesMs.end());
+
+    LatencyStats stats;
+    stats.count = latenciesMs.size();
+    stats.minMs = latenciesMs.front();
+    stats.maxMs = latenciesMs.back();
+    stats.avgMs = std::accumulate(latenciesMs.begin(), latenciesMs.end(), 0.0) / latenciesMs.size();
+
+    // Median
+    size_t medianIdx = latenciesMs.size() / 2;
+    if (latenciesMs.size() % 2 == 0)
+    {
+        stats.medianMs = (latenciesMs[medianIdx - 1] + latenciesMs[medianIdx]) / 2.0;
+    }
+    else
+    {
+        stats.medianMs = latenciesMs[medianIdx];
+    }
+
+    // Percentiles
+    size_t p95Idx = static_cast<size_t>(latenciesMs.size() * 0.95);
+    size_t p99Idx = static_cast<size_t>(latenciesMs.size() * 0.99);
+    stats.p95Ms = latenciesMs[std::min(p95Idx, latenciesMs.size() - 1)];
+    stats.p99Ms = latenciesMs[std::min(p99Idx, latenciesMs.size() - 1)];
+
+    return stats;
+}
+
+void printLatencyStats(const LatencyStats &stats)
+{
+    std::cout << "============== Latency Statistics ==============" << std::endl;
+    std::cout << "Total append operations: " << stats.count << std::endl;
+    std::cout << "Min latency: " << stats.minMs << " ms" << std::endl;
+    std::cout << "Max latency: " << stats.maxMs << " ms" << std::endl;
+    std::cout << "Average latency: " << stats.avgMs << " ms" << std::endl;
+    std::cout << "Median latency: " << stats.medianMs << " ms" << std::endl;
+    std::cout << "95th percentile: " << stats.p95Ms << " ms" << std::endl;
+    std::cout << "99th percentile: " << stats.p99Ms << " ms" << std::endl;
+    std::cout << "===============================================" << std::endl;
 }

@@ -46,7 +46,8 @@ int main()
     loggingManager.start();
     auto startTime = std::chrono::high_resolution_clock::now();
 
-    std::vector<std::future<void>> futures;
+    // Each future now returns a LatencyCollector with thread-local measurements
+    std::vector<std::future<LatencyCollector>> futures;
     for (int i = 0; i < numProducers; i++)
     {
         futures.push_back(std::async(
@@ -56,9 +57,12 @@ int main()
             std::ref(batches)));
     }
 
+    // Collect latency measurements from all threads
+    LatencyCollector masterCollector;
     for (auto &future : futures)
     {
-        future.wait();
+        LatencyCollector threadCollector = future.get();
+        masterCollector.merge(threadCollector);
     }
 
     loggingManager.stop();
@@ -76,6 +80,9 @@ int main()
     double physicalThroughputGiB = finalStorageSizeGiB / elapsedSeconds;
     double averageEntrySize = static_cast<double>(totalDataSizeBytes) / totalEntries;
 
+    // Calculate latency statistics from merged measurements
+    auto latencyStats = calculateLatencyStats(masterCollector);
+
     cleanupLogDirectory(config.basePath);
 
     std::cout << "============== Benchmark Results ==============" << std::endl;
@@ -89,6 +96,8 @@ int main()
     std::cout << "Throughput (logical): " << logicalThroughputGiB << " GiB/second" << std::endl;
     std::cout << "Throughput (physical): " << physicalThroughputGiB << " GiB/second" << std::endl;
     std::cout << "===============================================" << std::endl;
+
+    printLatencyStats(latencyStats);
 
     return 0;
 }

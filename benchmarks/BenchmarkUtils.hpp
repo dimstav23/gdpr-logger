@@ -7,10 +7,62 @@
 #include <optional>
 #include <filesystem>
 #include <iostream>
+#include <chrono>
+#include <algorithm>
+#include <numeric>
 
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;
 
-void appendLogEntries(LoggingManager &loggingManager, const std::vector<BatchWithDestination> &batches);
+class LatencyCollector
+{
+private:
+    std::vector<std::chrono::nanoseconds> latencies;
+
+public:
+    void addMeasurement(std::chrono::nanoseconds latency)
+    {
+        latencies.push_back(latency);
+    }
+
+    void reserve(size_t capacity)
+    {
+        latencies.reserve(capacity);
+    }
+
+    const std::vector<std::chrono::nanoseconds> &getMeasurements() const
+    {
+        return latencies;
+    }
+
+    void clear()
+    {
+        latencies.clear();
+    }
+
+    // Merge another collector's measurements into this one
+    void merge(const LatencyCollector &other)
+    {
+        const auto &otherLatencies = other.getMeasurements();
+        latencies.insert(latencies.end(), otherLatencies.begin(), otherLatencies.end());
+    }
+};
+
+struct LatencyStats
+{
+    double minMs;
+    double maxMs;
+    double avgMs;
+    double medianMs;
+    size_t count;
+    double p95Ms;
+    double p99Ms;
+};
+
+// Function to calculate statistics from a merged collector
+LatencyStats calculateLatencyStats(const LatencyCollector &collector);
+
+// Modified to return latency measurements instead of using global state
+LatencyCollector appendLogEntries(LoggingManager &loggingManager, const std::vector<BatchWithDestination> &batches);
 
 void cleanupLogDirectory(const std::string &logDir);
 
@@ -23,5 +75,7 @@ std::vector<BatchWithDestination> generateBatches(
     int numSpecificFiles,
     int batchSize,
     int payloadSize = 0);
+
+void printLatencyStats(const LatencyStats &stats);
 
 #endif
