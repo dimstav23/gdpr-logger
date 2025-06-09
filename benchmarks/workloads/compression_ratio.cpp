@@ -7,39 +7,9 @@
 #include <iomanip>
 #include <vector>
 #include <cstdint>
+#include <algorithm>
 
-// Helper to generate a random alphanumeric string
-std::string randomString(size_t minLen, size_t maxLen, std::mt19937 &rng)
-{
-    static const std::string chars =
-        "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-    std::uniform_int_distribution<size_t> lenDist(minLen, maxLen);
-    std::uniform_int_distribution<size_t> charDist(0, chars.size() - 1);
-
-    size_t length = lenDist(rng);
-    std::string result;
-    result.reserve(length);
-    for (size_t i = 0; i < length; ++i)
-    {
-        result += chars[charDist(rng)];
-    }
-    return result;
-}
-
-// generate random binary payload (power‑of‑two length 32‑1024 B)
-std::vector<uint8_t> randomPayload(std::mt19937 &rng)
-{
-    std::uniform_int_distribution<int> expDist(5, 10); // 2^5..2^10
-    const size_t len = static_cast<size_t>(1) << expDist(rng);
-
-    std::uniform_int_distribution<int> byteDist(0, 255);
-    std::vector<uint8_t> data(len);
-    for (auto &b : data)
-        b = static_cast<uint8_t>(byteDist(rng));
-    return data;
-}
-
-// Generate synthetic LogEntries
+// Generate synthetic LogEntries with realistic, compressible payloads
 std::vector<LogEntry> generateSyntheticEntries(size_t count)
 {
     std::vector<LogEntry> entries;
@@ -49,14 +19,86 @@ std::vector<LogEntry> generateSyntheticEntries(size_t count)
     std::mt19937 rng(rd());
     std::uniform_int_distribution<int> actionDist(0, 3);
 
+    // Create pools for repeated elements
+    std::vector<std::string> userIds;
+    for (int i = 1; i <= 1000; ++i)
+    {
+        userIds.push_back("user_" + std::to_string(i));
+    }
+
+    std::vector<std::string> attributes = {
+        "profile", "settings", "history", "preferences", "contacts",
+        "messages", "photos", "documents", "videos", "audio"};
+
+    std::vector<std::string> controllerIds;
+    for (int i = 1; i <= 10; ++i)
+    {
+        controllerIds.push_back("controller_" + std::to_string(i));
+    }
+
+    std::vector<std::string> processorIds;
+    for (int i = 1; i <= 20; ++i)
+    {
+        processorIds.push_back("processor_" + std::to_string(i));
+    }
+
+    // Predefined list of common English words for realistic payloads
+    std::vector<std::string> wordList = {
+        "the", "data", "to", "and", "user", "is", "in", "for", "of", "access",
+        "system", "time", "log", "with", "on", "from", "request", "error", "file", "server",
+        "update", "status", "by", "at", "process", "information", "new", "this", "connection", "failed",
+        "success", "operation", "id", "network", "event", "application", "check", "value", "into", "service",
+        "query", "response", "get", "set", "action", "report", "now", "client", "device", "start"};
+
+    // Create weights for Zipfian distribution (1/(rank+1))
+    std::vector<double> weights;
+    for (size_t k = 0; k < wordList.size(); ++k)
+    {
+        weights.push_back(1.0 / (k + 1.0));
+    }
+    std::discrete_distribution<size_t> wordDist(weights.begin(), weights.end());
+
+    // Distributions for selecting from pools
+    std::uniform_int_distribution<size_t> userDist(0, userIds.size() - 1);
+    std::uniform_int_distribution<size_t> attrDist(0, attributes.size() - 1);
+    std::uniform_int_distribution<size_t> controllerDist(0, controllerIds.size() - 1);
+    std::uniform_int_distribution<size_t> processorDist(0, processorIds.size() - 1);
+    std::uniform_int_distribution<int> wordCountDist(5, 170); // Payload word count
+
     for (size_t i = 0; i < count; ++i)
     {
         auto action = static_cast<LogEntry::ActionType>(actionDist(rng));
-        std::string dataLocation = randomString(20, 50, rng);
-        std::string dataControllerId = randomString(8, 12, rng);
-        std::string dataProcessorId = randomString(8, 12, rng);
-        std::string dataSubjectId = randomString(8, 12, rng);
-        std::vector<uint8_t> payload = randomPayload(rng);
+
+        // Structured dataLocation and related dataSubjectId
+        std::string user_id = userIds[userDist(rng)];
+        std::string attribute = attributes[attrDist(rng)];
+        std::string dataLocation = "user/" + user_id + "/" + attribute;
+        std::string dataSubjectId = user_id; // Matches user_id for realism
+
+        // Repeated IDs from limited pools
+        std::string dataControllerId = controllerIds[controllerDist(rng)];
+        std::string dataProcessorId = processorIds[processorDist(rng)];
+
+        // Generate payload with realistic words selected based on Zipfian distribution
+        int wordCount = wordCountDist(rng);
+        std::string payloadStr;
+        for (int j = 0; j < wordCount; ++j)
+        {
+            if (j > 0)
+                payloadStr += " ";
+            size_t wordIndex = wordDist(rng);
+            payloadStr += wordList[wordIndex];
+        }
+        // Ensure payload size is between 32 and 1024 bytes
+        if (payloadStr.size() < 32)
+        {
+            payloadStr += std::string(32 - payloadStr.size(), ' ');
+        }
+        else if (payloadStr.size() > 1024)
+        {
+            payloadStr = payloadStr.substr(0, 1024);
+        }
+        std::vector<uint8_t> payload(payloadStr.begin(), payloadStr.end());
 
         LogEntry entry(action,
                        dataLocation,
