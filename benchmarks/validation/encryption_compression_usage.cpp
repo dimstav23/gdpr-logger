@@ -18,7 +18,8 @@ struct BenchmarkResult
     double throughputEntries;
     size_t totalDataSizeBytes;
     size_t finalStorageSize;
-    double throughputGiB;
+    double logicalThroughputGiB;
+    double physicalThroughputGiB;
     double writeAmplification;
 };
 
@@ -69,7 +70,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughputEntries = totalEntries / elapsedSeconds;
-    double throughputGiB = totalDataSizeGiB / elapsedSeconds;
+    double logicalThroughputGiB = totalDataSizeGiB / elapsedSeconds;
+    double physicalThroughputGiB = static_cast<double>(finalStorageSize) / (1024.0 * 1024.0 * 1024.0 * elapsedSeconds);
 
     cleanupLogDirectory(config.basePath);
 
@@ -81,7 +83,8 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
         throughputEntries,
         totalDataSizeBytes,
         finalStorageSize,
-        throughputGiB,
+        logicalThroughputGiB,
+        physicalThroughputGiB,
         writeAmplification};
 }
 
@@ -122,9 +125,10 @@ int main()
               << std::setw(25) << "Input Size (bytes)"
               << std::setw(25) << "Storage Size (bytes)"
               << std::setw(20) << "Write Amplification"
-              << std::setw(25) << "Throughput (entries/s)"
-              << std::setw(20) << "Throughput (GiB/s)" << std::endl;
-    std::cout << "---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------" << std::endl;
+              << std::setw(30) << "Throughput (entries/s)"
+              << std::setw(20) << "Logical (GiB/s)"
+              << std::setw(20) << "Physical (GiB/s)" << std::endl;
+    std::cout << "-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------" << std::endl;
 
     // Display results for each configuration
     auto printResult = [](const BenchmarkResult &result)
@@ -135,8 +139,9 @@ int main()
                   << std::setw(25) << result.totalDataSizeBytes
                   << std::setw(25) << result.finalStorageSize
                   << std::fixed << std::setprecision(3) << std::setw(20) << result.writeAmplification
-                  << std::fixed << std::setprecision(3) << std::setw(25) << result.throughputEntries
-                  << std::fixed << std::setprecision(3) << std::setw(20) << result.throughputGiB << std::endl;
+                  << std::fixed << std::setprecision(3) << std::setw(30) << result.throughputEntries
+                  << std::fixed << std::setprecision(3) << std::setw(20) << result.logicalThroughputGiB
+                  << std::fixed << std::setprecision(3) << std::setw(20) << result.physicalThroughputGiB << std::endl;
     };
 
     printResult(resultNoEncryptionNoCompression);
@@ -144,7 +149,7 @@ int main()
     printResult(resultWithEncryptionNoCompression);
     printResult(resultWithEncryptionWithCompression);
 
-    std::cout << "======================================================================================================================================================" << std::endl;
+    std::cout << "===============================================================================================================================================================================================" << std::endl;
 
     return 0;
 }

@@ -13,7 +13,8 @@ struct BenchmarkResult
 {
     double elapsedSeconds;
     double throughputEntries;
-    double throughputGiB;
+    double logicalThroughputGiB;
+    double physicalThroughputGiB;
     double writeAmplification;
 };
 
@@ -61,14 +62,16 @@ BenchmarkResult runQueueCapacityBenchmark(const LoggingConfig &config, int numPr
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducerThreads * entriesPerProducer;
     double throughputEntries = totalEntries / elapsedSeconds;
-    double throughputGiB = totalDataSizeGiB / elapsedSeconds;
+    double logicalThroughputGiB = totalDataSizeGiB / elapsedSeconds;
+    double physicalThroughputGiB = static_cast<double>(finalStorageSize) / (1024.0 * 1024.0 * 1024.0 * elapsedSeconds);
 
     cleanupLogDirectory(config.basePath);
 
     return BenchmarkResult{
         elapsedSeconds,
         throughputEntries,
-        throughputGiB,
+        logicalThroughputGiB,
+        physicalThroughputGiB,
         writeAmplification};
 }
 
@@ -97,23 +100,25 @@ void runQueueCapacityComparison(const LoggingConfig &baseConfig, const std::vect
     std::cout << "\n=========== QUEUE CAPACITY BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(15) << "Queue Capacity"
               << std::setw(15) << "Time (sec)"
-              << std::setw(25) << "Throughput (entries/s)"
-              << std::setw(25) << "Throughput (GiB/s)"
+              << std::setw(30) << "Throughput (entries/s)"
+              << std::setw(20) << "Logical (GiB/s)"
+              << std::setw(20) << "Physical (GiB/s)"
               << std::setw(20) << "Write Amplification"
-              << std::setw(20) << "Relative Performance" << std::endl;
-    std::cout << "-----------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Relative Perf" << std::endl;
+    std::cout << "---------------------------------------------------------------------------------------------------------------" << std::endl;
 
     for (size_t i = 0; i < queueSizes.size(); i++)
     {
         double relativePerf = results[i].throughputEntries / results[0].throughputEntries; // Relative to smallest queue
         std::cout << std::left << std::setw(15) << queueSizes[i]
                   << std::setw(15) << std::fixed << std::setprecision(2) << results[i].elapsedSeconds
-                  << std::setw(25) << std::fixed << std::setprecision(2) << results[i].throughputEntries
-                  << std::setw(25) << std::fixed << std::setprecision(3) << results[i].throughputGiB
+                  << std::setw(30) << std::fixed << std::setprecision(2) << results[i].throughputEntries
+                  << std::setw(20) << std::fixed << std::setprecision(3) << results[i].logicalThroughputGiB
+                  << std::setw(20) << std::fixed << std::setprecision(3) << results[i].physicalThroughputGiB
                   << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
                   << std::setw(20) << std::fixed << std::setprecision(2) << relativePerf << std::endl;
     }
-    std::cout << "==============================================================================" << std::endl;
+    std::cout << "===============================================================================================================" << std::endl;
 }
 
 int main()

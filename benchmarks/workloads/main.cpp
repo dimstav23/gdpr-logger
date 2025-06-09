@@ -72,7 +72,8 @@ int main()
     double elapsedSeconds = elapsed.count();
     const size_t totalEntries = numProducers * entriesPerProducer;
     double entriesThroughput = totalEntries / elapsedSeconds;
-    double dataThroughputGiB = totalDataSizeGiB / elapsedSeconds;
+    double logicalThroughputGiB = totalDataSizeGiB / elapsedSeconds;
+    double physicalThroughputGiB = finalStorageSizeGiB / elapsedSeconds;
     double averageEntrySize = static_cast<double>(totalDataSizeBytes) / totalEntries;
 
     cleanupLogDirectory(config.basePath);
@@ -85,7 +86,8 @@ int main()
     std::cout << "Final storage size: " << finalStorageSizeGiB << " GiB" << std::endl;
     std::cout << "Write amplification: " << writeAmplification << " (ratio)" << std::endl;
     std::cout << "Throughput (entries): " << entriesThroughput << " entries/second" << std::endl;
-    std::cout << "Throughput (data): " << dataThroughputGiB << " GiB/second" << std::endl;
+    std::cout << "Throughput (logical): " << logicalThroughputGiB << " GiB/second" << std::endl;
+    std::cout << "Throughput (physical): " << physicalThroughputGiB << " GiB/second" << std::endl;
     std::cout << "===============================================" << std::endl;
 
     return 0;
