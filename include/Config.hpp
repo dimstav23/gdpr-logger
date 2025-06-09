@@ -15,7 +15,7 @@ struct LoggingConfig
     size_t batchSize = 100;
     size_t numWriterThreads = 2;
     bool useEncryption = true;
-    bool useCompression = true;
+    int compressionLevel = 9; // 0 = no compression, 1-9 = compression levels
     // segmented storage
     std::string basePath = "./logs";
     std::string baseFilename = "default";

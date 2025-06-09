@@ -16,7 +16,7 @@ public:
                     std::shared_ptr<SegmentedStorage> storage,
                     size_t batchSize = 100,
                     bool useEncryption = true,
-                    bool useCompression = true);
+                    int m_compressionLevel = 9);
 
     ~Writer();
 
@@ -33,7 +33,7 @@ private:
     std::atomic<bool> m_running{false};
     const size_t m_batchSize;
     const bool m_useEncryption;
-    const bool m_useCompression;
+    const int m_compressionLevel;
 
     BufferQueue::ConsumerToken m_consumerToken;
 };

@@ -189,7 +189,7 @@ int main()
     baseConfig.numWriterThreads = 64;
     baseConfig.appendTimeout = std::chrono::minutes(2);
     baseConfig.useEncryption = false;
-    baseConfig.useCompression = false;
+    baseConfig.compressionLevel = 0;
     // benchmark parameters
     const int numSpecificFiles = 0;
     const int producerBatchSize = 256;

@@ -167,7 +167,7 @@ int main()
     baseConfig.batchSize = 8192;
     baseConfig.appendTimeout = std::chrono::minutes(5);
     baseConfig.useEncryption = true;
-    baseConfig.useCompression = true;
+    baseConfig.compressionLevel = 9;
     // benchmark parameters
     const int numSpecificFiles = 256;
     const int producerBatchSize = 512;

@@ -1,11 +1,10 @@
 #include "Compression.hpp"
-#include <zlib.h>
 #include <stdexcept>
 #include <cstring>
 #include <iostream>
 
 // Helper function to compress raw data using zlib
-std::vector<uint8_t> Compression::compress(std::vector<uint8_t> &&data)
+std::vector<uint8_t> Compression::compress(std::vector<uint8_t> &&data, int level)
 {
     if (data.empty())
     {
@@ -15,7 +14,8 @@ std::vector<uint8_t> Compression::compress(std::vector<uint8_t> &&data)
     z_stream zs;
     std::memset(&zs, 0, sizeof(zs));
 
-    if (deflateInit(&zs, Z_BEST_COMPRESSION) != Z_OK)
+    // Use the provided compression level instead of hardcoded Z_BEST_COMPRESSION
+    if (deflateInit(&zs, level) != Z_OK)
     {
         throw std::runtime_error("Failed to initialize zlib deflate");
     }

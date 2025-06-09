@@ -24,7 +24,7 @@ int main()
     config.numWriterThreads = 96;
     config.appendTimeout = std::chrono::minutes(2);
     config.useEncryption = true;
-    config.useCompression = true;
+    config.compressionLevel = 9;
     config.maxOpenFiles = 512;
     // benchmark parameters
     const int numSpecificFiles = 1024;

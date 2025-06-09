@@ -9,12 +9,12 @@ Writer::Writer(BufferQueue &queue,
                std::shared_ptr<SegmentedStorage> storage,
                size_t batchSize,
                bool useEncryption,
-               bool useCompression)
+               int compressionLevel)
     : m_queue(queue),
       m_storage(std::move(storage)),
       m_batchSize(batchSize),
       m_useEncryption(useEncryption),
-      m_useCompression(useCompression),
+      m_compressionLevel(compressionLevel),
       m_consumerToken(queue.createConsumerToken())
 {
 }
@@ -78,9 +78,9 @@ void Writer::processLogEntries()
             std::vector<uint8_t> processedData = LogEntry::serializeBatch(std::move(entries));
 
             // Apply compression if enabled
-            if (m_useCompression)
+            if (m_compressionLevel > 0)
             {
-                processedData = Compression::compress(std::move(processedData));
+                processedData = Compression::compress(std::move(processedData), m_compressionLevel);
             }
             // Apply encryption if enabled
             if (m_useEncryption)
