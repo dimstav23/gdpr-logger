@@ -9,6 +9,7 @@
 #include <iostream>
 #include <chrono>
 #include <algorithm>
+#include <random>
 #include <numeric>
 
 using BatchWithDestination = std::pair<std::vector<LogEntry>, std::optional<std::string>>;

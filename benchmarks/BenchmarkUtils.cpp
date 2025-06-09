@@ -82,7 +82,7 @@ std::vector<BatchWithDestination> generateBatches(
 {
     std::vector<BatchWithDestination> batches;
 
-    // Generate specific filenames based on the parameter
+    // Generate specific filenames
     std::vector<std::string> specificFilenames;
     for (int i = 0; i < numSpecificFiles; i++)
     {
@@ -93,11 +93,60 @@ std::vector<BatchWithDestination> generateBatches(
     int generated = 0;
     int destinationIndex = 0;
 
+    // Random number generation setup
+    std::random_device rd;
+    std::mt19937 rng(rd());
+
+    // Define pools similar to compressionRatio.cpp
+    std::vector<std::string> userIds;
+    for (int i = 1; i <= 1000; ++i)
+    {
+        userIds.push_back("user_" + std::to_string(i));
+    }
+
+    std::vector<std::string> attributes = {
+        "profile", "settings", "history", "preferences", "contacts",
+        "messages", "photos", "documents", "videos", "audio"};
+
+    std::vector<std::string> controllerIds;
+    for (int i = 1; i <= 10; ++i)
+    {
+        controllerIds.push_back("controller_" + std::to_string(i));
+    }
+
+    std::vector<std::string> processorIds;
+    for (int i = 1; i <= 20; ++i)
+    {
+        processorIds.push_back("processor_" + std::to_string(i));
+    }
+
+    std::vector<std::string> wordList = {
+        "the", "data", "to", "and", "user", "is", "in", "for", "of", "access",
+        "system", "time", "log", "with", "on", "from", "request", "error", "file", "server",
+        "update", "status", "by", "at", "process", "information", "new", "this", "connection", "failed",
+        "success", "operation", "id", "network", "event", "application", "check", "value", "into", "service",
+        "query", "response", "get", "set", "action", "report", "now", "client", "device", "start"};
+
+    // Zipfian distribution for payload words
+    std::vector<double> weights;
+    for (size_t k = 0; k < wordList.size(); ++k)
+    {
+        weights.push_back(1.0 / (k + 1.0));
+    }
+    std::discrete_distribution<size_t> wordDist(weights.begin(), weights.end());
+
+    // Distributions for random selections
+    std::uniform_int_distribution<int> actionDist(0, 3); // CREATE, READ, UPDATE, DELETE
+    std::uniform_int_distribution<size_t> userDist(0, userIds.size() - 1);
+    std::uniform_int_distribution<size_t> attrDist(0, attributes.size() - 1);
+    std::uniform_int_distribution<size_t> controllerDist(0, controllerIds.size() - 1);
+    std::uniform_int_distribution<size_t> processorDist(0, processorIds.size() - 1);
+
     while (generated < numEntries)
     {
         int currentBatchSize = std::min(batchSize, numEntries - generated);
 
-        // Deterministically assign a destination (cycling through options)
+        // Assign destination in round-robin manner
         std::optional<std::string> targetFilename = std::nullopt;
         if (destinationIndex % totalChoices > 0)
         {
@@ -109,21 +158,40 @@ std::vector<BatchWithDestination> generateBatches(
         batch.reserve(currentBatchSize);
         for (int i = 0; i < currentBatchSize; i++)
         {
-            std::string dataLocation = "database/table/row" + std::to_string(generated + i);
-            std::string dataSubjectId = "subject" + std::to_string((generated + i) % 10);
-            std::string dataControllerId = "controller" + std::to_string(generated + i);
-            std::string dataProcessorId = "processor" + std::to_string(generated + i);
-            std::vector<uint8_t> payload(payloadSize, 0x22); // payloadSize number of bytes of 0x22
-            LogEntry entry(LogEntry::ActionType::CREATE,
-                           std::move(dataLocation),
-                           std::move(dataControllerId),
-                           std::move(dataProcessorId),
-                           std::move(dataSubjectId),
+            // Generate realistic log entry
+            auto action = static_cast<LogEntry::ActionType>(actionDist(rng));
+            std::string user_id = userIds[userDist(rng)];
+            std::string attribute = attributes[attrDist(rng)];
+            std::string dataLocation = "user/" + user_id + "/" + attribute;
+            std::string dataSubjectId = user_id;
+            std::string dataControllerId = controllerIds[controllerDist(rng)];
+            std::string dataProcessorId = processorIds[processorDist(rng)];
+
+            // Generate payload with words until it reaches or exceeds payloadSize, then trim
+            std::string payloadStr;
+            while (payloadStr.size() < static_cast<size_t>(payloadSize))
+            {
+                if (!payloadStr.empty())
+                    payloadStr += " ";
+                size_t wordIndex = wordDist(rng);
+                payloadStr += wordList[wordIndex];
+            }
+            if (payloadStr.size() > static_cast<size_t>(payloadSize))
+            {
+                payloadStr = payloadStr.substr(0, payloadSize);
+            }
+            std::vector<uint8_t> payload(payloadStr.begin(), payloadStr.end());
+
+            LogEntry entry(action,
+                           dataLocation,
+                           dataControllerId,
+                           dataProcessorId,
+                           dataSubjectId,
                            std::move(payload));
-            batch.push_back(entry);
+            batch.push_back(std::move(entry));
         }
 
-        batches.push_back({batch, targetFilename});
+        batches.push_back({std::move(batch), targetFilename});
         generated += currentBatchSize;
         destinationIndex++; // Move to the next destination
     }
