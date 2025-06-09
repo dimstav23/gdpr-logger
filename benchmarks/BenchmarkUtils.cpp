@@ -78,7 +78,8 @@ std::vector<BatchWithDestination> generateBatches(
     int numEntries,
     int numSpecificFiles,
     int batchSize,
-    int payloadSize)
+    int payloadSize,
+    bool fixedPayloadSize)
 {
     std::vector<BatchWithDestination> batches;
 
@@ -135,12 +136,22 @@ std::vector<BatchWithDestination> generateBatches(
     }
     std::discrete_distribution<size_t> wordDist(weights.begin(), weights.end());
 
+    // Generate power-of-2 sizes for variable payload
+    std::vector<size_t> powerOf2Sizes;
+    int minPowerOf2 = 5; // 2^5 = 32
+    int maxPowerOf2 = static_cast<int>(std::log2(payloadSize));
+    for (int power = minPowerOf2; power <= maxPowerOf2; power++)
+    {
+        powerOf2Sizes.push_back(1 << power); // 2^power
+    }
+
     // Distributions for random selections
     std::uniform_int_distribution<int> actionDist(0, 3); // CREATE, READ, UPDATE, DELETE
     std::uniform_int_distribution<size_t> userDist(0, userIds.size() - 1);
     std::uniform_int_distribution<size_t> attrDist(0, attributes.size() - 1);
     std::uniform_int_distribution<size_t> controllerDist(0, controllerIds.size() - 1);
     std::uniform_int_distribution<size_t> processorDist(0, processorIds.size() - 1);
+    std::uniform_int_distribution<size_t> powerOf2SizeDist(0, powerOf2Sizes.size() - 1);
 
     while (generated < numEntries)
     {
@@ -167,18 +178,21 @@ std::vector<BatchWithDestination> generateBatches(
             std::string dataControllerId = controllerIds[controllerDist(rng)];
             std::string dataProcessorId = processorIds[processorDist(rng)];
 
-            // Generate payload with words until it reaches or exceeds payloadSize, then trim
+            // Determine targetSize
+            size_t targetSize = fixedPayloadSize ? static_cast<size_t>(payloadSize) : powerOf2Sizes[powerOf2SizeDist(rng)];
+
+            // Build payload
             std::string payloadStr;
-            while (payloadStr.size() < static_cast<size_t>(payloadSize))
+            while (payloadStr.size() < targetSize)
             {
                 if (!payloadStr.empty())
                     payloadStr += " ";
                 size_t wordIndex = wordDist(rng);
                 payloadStr += wordList[wordIndex];
             }
-            if (payloadStr.size() > static_cast<size_t>(payloadSize))
+            if (payloadStr.size() > targetSize)
             {
-                payloadStr = payloadStr.substr(0, payloadSize);
+                payloadStr = payloadStr.substr(0, targetSize);
             }
             std::vector<uint8_t> payload(payloadStr.begin(), payloadStr.end());
 
