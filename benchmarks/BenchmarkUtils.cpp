@@ -122,11 +122,12 @@ std::vector<BatchWithDestination> generateBatches(
     }
 
     std::vector<std::string> wordList = {
-        "the", "data", "to", "and", "user", "is", "in", "for", "of", "access",
-        "system", "time", "log", "with", "on", "from", "request", "error", "file", "server",
-        "update", "status", "by", "at", "process", "information", "new", "this", "connection", "failed",
-        "success", "operation", "id", "network", "event", "application", "check", "value", "into", "service",
-        "query", "response", "get", "set", "action", "report", "now", "client", "device", "start"};
+        "the", //"data", "to", "and", "user", "is", "in", "for", "of", "access",
+        //"system", "time", "log", "with", "on", "from", "request", "error", "file", "server",
+        //"update", "status", "by", "at", "process", "information", "new", "this", "connection", "failed",
+        //"success", "operation", "id", "network", "event", "application", "check", "value", "into", "service",
+        //"query", "response", "get", "set", "action", "report", "now", "client", "device", "start"
+    };
 
     // Zipfian distribution for payload words
     std::vector<double> weights;
