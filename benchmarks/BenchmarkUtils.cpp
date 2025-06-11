@@ -220,7 +220,7 @@ LatencyStats calculateLatencyStats(const LatencyCollector &collector)
 
     if (latencies.empty())
     {
-        return {0.0, 0.0, 0.0, 0.0, 0, 0.0, 0.0};
+        return {0.0, 0.0, 0.0, 0.0, 0};
     }
 
     // Convert to milliseconds for easier reading
@@ -251,12 +251,6 @@ LatencyStats calculateLatencyStats(const LatencyCollector &collector)
         stats.medianMs = latenciesMs[medianIdx];
     }
 
-    // Percentiles
-    size_t p95Idx = static_cast<size_t>(latenciesMs.size() * 0.95);
-    size_t p99Idx = static_cast<size_t>(latenciesMs.size() * 0.99);
-    stats.p95Ms = latenciesMs[std::min(p95Idx, latenciesMs.size() - 1)];
-    stats.p99Ms = latenciesMs[std::min(p99Idx, latenciesMs.size() - 1)];
-
     return stats;
 }
 
@@ -268,7 +262,5 @@ void printLatencyStats(const LatencyStats &stats)
     std::cout << "Max latency: " << stats.maxMs << " ms" << std::endl;
     std::cout << "Average latency: " << stats.avgMs << " ms" << std::endl;
     std::cout << "Median latency: " << stats.medianMs << " ms" << std::endl;
-    std::cout << "95th percentile: " << stats.p95Ms << " ms" << std::endl;
-    std::cout << "99th percentile: " << stats.p99Ms << " ms" << std::endl;
     std::cout << "===============================================" << std::endl;
 }

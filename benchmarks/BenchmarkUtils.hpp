@@ -55,8 +55,6 @@ struct LatencyStats
     double avgMs;
     double medianMs;
     size_t count;
-    double p95Ms;
-    double p99Ms;
 };
 
 // Function to calculate statistics from a merged collector
