@@ -144,20 +144,21 @@ int main()
     baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.batchSize = 8400;
+    baseConfig.batchSize = 8192;
     baseConfig.maxExplicitProducers = 32;
-    baseConfig.numWriterThreads = 12;
+    baseConfig.numWriterThreads = 32;
     baseConfig.appendTimeout = std::chrono::minutes(2);
     baseConfig.useEncryption = true;
     baseConfig.compressionLevel = 9;
+    baseConfig.maxOpenFiles = 512;
     // benchmark parameters
-    const int numSpecificFiles = 100;
-    const int producerBatchSize = 1000;
+    const int numSpecificFiles = 256;
+    const int producerBatchSize = 1024;
     const int numProducers = 32;
-    const int entriesPerProducer = 3000000;
+    const int entriesPerProducer = 2000000;
     const int payloadSize = 2048;
 
-    std::vector<int> queueSizes = {10000, 50000, 100000, 200000, 500000, 1000000};
+    std::vector<int> queueSizes = {16384, 65536, 131072, 262144, 524288, 1048576, 2097152, 4194304};
     runQueueCapacityComparison(baseConfig, queueSizes,
                                numProducers,
                                entriesPerProducer,

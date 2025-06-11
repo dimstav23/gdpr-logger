@@ -192,12 +192,12 @@ int main()
     baseConfig.compressionLevel = 0;
     // benchmark parameters
     const int numSpecificFiles = 0;
-    const int producerBatchSize = 256;
+    const int producerBatchSize = 1024;
     const int numProducers = 32;
-    const int entriesPerProducer = 500000;
-    const int payloadSize = 2048;
+    const int entriesPerProducer = 1000000;
+    const int payloadSize = 256;
 
-    std::vector<int> segmentSizesMB = {20000, 10000, 5000, 2500, 1000, 500, 100, 50};
+    std::vector<int> segmentSizesMB = {8000, 4000, 2000, 1000, 500, 250, 100, 50, 10};
 
     runFileRotationComparison(
         baseConfig,
