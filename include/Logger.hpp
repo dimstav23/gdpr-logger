@@ -1,5 +1,5 @@
-#ifndef LOGGING_API_HPP
-#define LOGGING_API_HPP
+#ifndef LOGGER_HPP
+#define LOGGER_HPP
 
 #include "LogEntry.hpp"
 #include "BufferQueue.hpp"
@@ -12,12 +12,12 @@
 #include <functional>
 #include <optional>
 
-class LoggingAPI
+class Logger
 {
-    friend class LoggingAPITest;
+    friend class LoggerTest;
 
 public:
-    static LoggingAPI &getInstance();
+    static Logger &getInstance();
 
     bool initialize(std::shared_ptr<BufferQueue> queue,
                     std::chrono::milliseconds appendTimeout = std::chrono::milliseconds::max());
@@ -36,14 +36,14 @@ public:
 
     bool reset();
 
-    ~LoggingAPI();
+    ~Logger();
 
 private:
-    LoggingAPI();
-    LoggingAPI(const LoggingAPI &) = delete;
-    LoggingAPI &operator=(const LoggingAPI &) = delete;
+    Logger();
+    Logger(const Logger &) = delete;
+    Logger &operator=(const Logger &) = delete;
     // Singleton instance
-    static std::unique_ptr<LoggingAPI> s_instance;
+    static std::unique_ptr<Logger> s_instance;
     static std::mutex s_instanceMutex;
 
     std::shared_ptr<BufferQueue> m_logQueue;

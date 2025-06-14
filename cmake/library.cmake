@@ -1,6 +1,6 @@
 set(LIBRARY_SOURCES
     src/LogEntry.cpp
-    src/LoggingAPI.cpp
+    src/Logger.cpp
     src/BufferQueue.cpp
     src/Compression.cpp
     src/Crypto.cpp

@@ -2,7 +2,7 @@
 #define LOGGING_SYSTEM_HPP
 
 #include "Config.hpp"
-#include "LoggingAPI.hpp"
+#include "Logger.hpp"
 #include "BufferQueue.hpp"
 #include "SegmentedStorage.hpp"
 #include "Writer.hpp"

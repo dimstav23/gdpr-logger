@@ -1,29 +1,29 @@
-#include "LoggingAPI.hpp"
+#include "Logger.hpp"
 #include "QueueItem.hpp"
 #include <iostream>
 
 // Initialize static members
-std::unique_ptr<LoggingAPI> LoggingAPI::s_instance = nullptr;
-std::mutex LoggingAPI::s_instanceMutex;
+std::unique_ptr<Logger> Logger::s_instance = nullptr;
+std::mutex Logger::s_instanceMutex;
 
-LoggingAPI &LoggingAPI::getInstance()
+Logger &Logger::getInstance()
 {
     std::lock_guard<std::mutex> lock(s_instanceMutex);
     if (s_instance == nullptr)
     {
-        s_instance.reset(new LoggingAPI());
+        s_instance.reset(new Logger());
     }
     return *s_instance;
 }
 
-LoggingAPI::LoggingAPI()
+Logger::Logger()
     : m_logQueue(nullptr),
       m_appendTimeout(std::chrono::milliseconds::max()),
       m_initialized(false)
 {
 }
 
-LoggingAPI::~LoggingAPI()
+Logger::~Logger()
 {
     if (m_initialized)
     {
@@ -31,12 +31,12 @@ LoggingAPI::~LoggingAPI()
     }
 }
 
-bool LoggingAPI::initialize(std::shared_ptr<BufferQueue> queue,
-                            std::chrono::milliseconds appendTimeout)
+bool Logger::initialize(std::shared_ptr<BufferQueue> queue,
+                        std::chrono::milliseconds appendTimeout)
 {
     if (m_initialized)
     {
-        reportError("LoggingAPI already initialized");
+        reportError("Logger already initialized");
         return false;
     }
 
@@ -53,24 +53,24 @@ bool LoggingAPI::initialize(std::shared_ptr<BufferQueue> queue,
     return true;
 }
 
-BufferQueue::ProducerToken LoggingAPI::createProducerToken()
+BufferQueue::ProducerToken Logger::createProducerToken()
 {
     if (!m_initialized)
     {
-        reportError("LoggingAPI not initialized");
-        throw std::runtime_error("LoggingAPI not initialized");
+        reportError("Logger not initialized");
+        throw std::runtime_error("Logger not initialized");
     }
 
     return m_logQueue->createProducerToken();
 }
 
-bool LoggingAPI::append(LogEntry entry,
-                        BufferQueue::ProducerToken &token,
-                        const std::optional<std::string> &filename)
+bool Logger::append(LogEntry entry,
+                    BufferQueue::ProducerToken &token,
+                    const std::optional<std::string> &filename)
 {
     if (!m_initialized)
     {
-        reportError("LoggingAPI not initialized");
+        reportError("Logger not initialized");
         return false;
     }
 
@@ -78,13 +78,13 @@ bool LoggingAPI::append(LogEntry entry,
     return m_logQueue->enqueueBlocking(std::move(item), token, m_appendTimeout);
 }
 
-bool LoggingAPI::appendBatch(std::vector<LogEntry> entries,
-                             BufferQueue::ProducerToken &token,
-                             const std::optional<std::string> &filename)
+bool Logger::appendBatch(std::vector<LogEntry> entries,
+                         BufferQueue::ProducerToken &token,
+                         const std::optional<std::string> &filename)
 {
     if (!m_initialized)
     {
-        reportError("LoggingAPI not initialized");
+        reportError("Logger not initialized");
         return false;
     }
 
@@ -102,7 +102,7 @@ bool LoggingAPI::appendBatch(std::vector<LogEntry> entries,
     return m_logQueue->enqueueBatchBlocking(std::move(batch), token, m_appendTimeout);
 }
 
-bool LoggingAPI::reset()
+bool Logger::reset()
 {
     if (!m_initialized)
     {
@@ -116,24 +116,24 @@ bool LoggingAPI::reset()
     return true;
 }
 
-bool LoggingAPI::exportLogs(
+bool Logger::exportLogs(
     const std::string &outputPath,
     std::chrono::system_clock::time_point fromTimestamp,
     std::chrono::system_clock::time_point toTimestamp)
 {
     if (!m_initialized)
     {
-        reportError("LoggingAPI not initialized");
+        reportError("Logger not initialized");
         return false;
     }
 
     // This functionality would typically be handled by a separate component,
     // such as a log storage or retrieval system
-    reportError("Export logs functionality not implemented in LoggingAPI");
+    reportError("Export logs functionality not implemented in Logger");
     return false;
 }
 
-void LoggingAPI::reportError(const std::string &message)
+void Logger::reportError(const std::string &message)
 {
-    std::cerr << "LoggingAPI Error: " << message << std::endl;
+    std::cerr << "Logger Error: " << message << std::endl;
 }

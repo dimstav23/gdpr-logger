@@ -24,7 +24,7 @@ LoggingManager::LoggingManager(const LoggingConfig &config)
         config.baseRetryDelay,
         config.maxOpenFiles);
 
-    LoggingAPI::getInstance().initialize(m_queue, config.appendTimeout);
+    Logger::getInstance().initialize(m_queue, config.appendTimeout);
 
     m_writers.reserve(m_numWriterThreads);
 }
@@ -91,7 +91,7 @@ bool LoggingManager::stop()
 
     m_running.store(false, std::memory_order_release);
 
-    LoggingAPI::getInstance().reset();
+    Logger::getInstance().reset();
 
     std::cout << "LoggingSystem: Stopped" << std::endl;
     return true;
@@ -99,7 +99,7 @@ bool LoggingManager::stop()
 
 BufferQueue::ProducerToken LoggingManager::createProducerToken()
 {
-    return LoggingAPI::getInstance().createProducerToken();
+    return Logger::getInstance().createProducerToken();
 }
 
 bool LoggingManager::append(LogEntry entry,
@@ -112,7 +112,7 @@ bool LoggingManager::append(LogEntry entry,
         return false;
     }
 
-    return LoggingAPI::getInstance().append(std::move(entry), token, filename);
+    return Logger::getInstance().append(std::move(entry), token, filename);
 }
 
 bool LoggingManager::appendBatch(std::vector<LogEntry> entries,
@@ -125,7 +125,7 @@ bool LoggingManager::appendBatch(std::vector<LogEntry> entries,
         return false;
     }
 
-    return LoggingAPI::getInstance().appendBatch(std::move(entries), token, filename);
+    return Logger::getInstance().appendBatch(std::move(entries), token, filename);
 }
 
 bool LoggingManager::exportLogs(

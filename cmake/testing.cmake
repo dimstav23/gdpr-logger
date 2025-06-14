@@ -3,7 +3,7 @@ enable_testing()
 set(TEST_SOURCES
     # unit tests
     tests/unit/test_LogEntry.cpp
-    tests/unit/test_LoggingAPI.cpp
+    tests/unit/test_Logger.cpp
     tests/unit/test_BufferQueue.cpp
     tests/unit/test_Compression.cpp
     tests/unit/test_Crypto.cpp
@@ -30,7 +30,7 @@ endmacro()
 
 # unit tests
 add_test_suite(test_log_entry tests/unit/test_LogEntry.cpp)
-add_test_suite(test_logging_api tests/unit/test_LoggingAPI.cpp)
+add_test_suite(test_logger tests/unit/test_Logger.cpp)
 add_test_suite(test_buffer_queue tests/unit/test_BufferQueue.cpp)
 add_test_suite(test_compression tests/unit/test_Compression.cpp)
 add_test_suite(test_crypto tests/unit/test_Crypto.cpp)
