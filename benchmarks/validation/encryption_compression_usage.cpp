@@ -1,6 +1,7 @@
 #include "BenchmarkUtils.hpp"
 #include "LoggingManager.hpp"
 #include <iostream>
+#include <fstream>
 #include <thread>
 #include <chrono>
 #include <vector>
@@ -97,6 +98,139 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, bool useEncryption
         latencyStats};
 }
 
+// Helper function to get compression level description
+std::string getCompressionDescription(int level)
+{
+    switch (level)
+    {
+    case 0:
+        return "0 (None)";
+    case 1:
+        return "1 (Speed)";
+    case 3:
+        return "3 (Low-Med)";
+    case 6:
+        return "6 (Default)";
+    case 9:
+        return "9 (Best)";
+    default:
+        return std::to_string(level);
+    }
+}
+
+// Write CSV header
+void writeCSVHeader(std::ofstream &csvFile)
+{
+    csvFile << "encryption_enabled,compression_level,compression_description,execution_time_seconds,total_entries,"
+            << "throughput_entries_per_sec,total_data_size_bytes,final_storage_size_bytes,logical_throughput_gib_per_sec,"
+            << "physical_throughput_gib_per_sec,write_amplification,avg_latency_ms,median_latency_ms,"
+            << "min_latency_ms,max_latency_ms,latency_count\n";
+}
+
+// Write a single result row to CSV
+void writeCSVRow(std::ofstream &csvFile, const BenchmarkResult &result)
+{
+    csvFile << (result.useEncryption ? "true" : "false") << ","
+            << result.compressionLevel << ","
+            << "\"" << getCompressionDescription(result.compressionLevel) << "\"," // Quote in case of special chars
+            << std::fixed << std::setprecision(6) << result.executionTime << ","
+            << result.totalEntries << ","
+            << std::fixed << std::setprecision(2) << result.throughputEntries << ","
+            << result.totalDataSizeBytes << ","
+            << result.finalStorageSize << ","
+            << std::fixed << std::setprecision(6) << result.logicalThroughputGiB << ","
+            << std::fixed << std::setprecision(6) << result.physicalThroughputGiB << ","
+            << std::fixed << std::setprecision(8) << result.writeAmplification << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.avgMs << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.medianMs << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.minMs << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.maxMs << ","
+            << result.latencyStats.count << "\n";
+}
+
+void runEncryptionCompressionBenchmark(const LoggingConfig &baseConfig,
+                                       const std::vector<bool> &encryptionSettings,
+                                       const std::vector<int> &compressionLevels,
+                                       const std::vector<BatchWithDestination> &batches,
+                                       int numProducers, int entriesPerProducer,
+                                       const std::string &csvFilename = "encryption_compression_benchmark.csv")
+{
+    std::vector<BenchmarkResult> results;
+
+    // Open CSV file for writing
+    std::ofstream csvFile(csvFilename);
+    if (!csvFile.is_open())
+    {
+        std::cerr << "Error: Could not open CSV file " << csvFilename << " for writing." << std::endl;
+        return;
+    }
+
+    writeCSVHeader(csvFile);
+
+    int totalCombinations = encryptionSettings.size() * compressionLevels.size();
+    std::cout << "Running encryption/compression benchmark with " << totalCombinations << " configurations..." << std::endl;
+    std::cout << "Results will be saved to: " << csvFilename << std::endl;
+
+    int currentTest = 0;
+    for (bool useEncryption : encryptionSettings)
+    {
+        for (int compressionLevel : compressionLevels)
+        {
+            currentTest++;
+            std::cout << "\nProgress: " << currentTest << "/" << totalCombinations
+                      << " - Testing Encryption: " << (useEncryption ? "Enabled" : "Disabled")
+                      << ", Compression: " << getCompressionDescription(compressionLevel) << "..." << std::endl;
+
+            BenchmarkResult result = runBenchmark(baseConfig, useEncryption, compressionLevel, batches, numProducers, entriesPerProducer);
+            results.push_back(result);
+
+            // Write result to CSV immediately
+            writeCSVRow(csvFile, result);
+            csvFile.flush(); // Ensure data is written in case of early termination
+
+            // Print progress summary
+            std::cout << "  Completed: " << std::fixed << std::setprecision(2)
+                      << result.throughputEntries << " entries/s, "
+                      << std::fixed << std::setprecision(3) << result.logicalThroughputGiB << " GiB/s, "
+                      << "write amp: " << std::fixed << std::setprecision(3) << result.writeAmplification << std::endl;
+        }
+    }
+
+    csvFile.close();
+    std::cout << "\nBenchmark completed! Results saved to " << csvFilename << std::endl;
+
+    // Still print summary table to console for immediate review
+    std::cout << "\n============== ENCRYPTION/COMPRESSION LEVEL BENCHMARK SUMMARY ==============" << std::endl;
+    std::cout << std::left << std::setw(12) << "Encryption"
+              << std::setw(15) << "Comp. Level"
+              << std::setw(15) << "Exec. Time (s)"
+              << std::setw(20) << "Input Size (bytes)"
+              << std::setw(20) << "Storage Size (bytes)"
+              << std::setw(12) << "Write Amp."
+              << std::setw(20) << "Throughput (ent/s)"
+              << std::setw(15) << "Logical (GiB/s)"
+              << std::setw(15) << "Physical (GiB/s)"
+              << std::setw(12) << "Avg Lat(ms)" << std::endl;
+    std::cout << "--------------------------------------------------------------------------------------------------------------------------------" << std::endl;
+
+    // Display results for each configuration
+    for (const auto &result : results)
+    {
+        std::cout << std::left << std::setw(12) << (result.useEncryption ? "True" : "False")
+                  << std::setw(15) << getCompressionDescription(result.compressionLevel)
+                  << std::fixed << std::setprecision(2) << std::setw(15) << result.executionTime
+                  << std::setw(20) << result.totalDataSizeBytes
+                  << std::setw(20) << result.finalStorageSize
+                  << std::fixed << std::setprecision(3) << std::setw(12) << result.writeAmplification
+                  << std::fixed << std::setprecision(2) << std::setw(20) << result.throughputEntries
+                  << std::fixed << std::setprecision(3) << std::setw(15) << result.logicalThroughputGiB
+                  << std::fixed << std::setprecision(3) << std::setw(15) << result.physicalThroughputGiB
+                  << std::fixed << std::setprecision(3) << std::setw(12) << result.latencyStats.avgMs << std::endl;
+    }
+
+    std::cout << "================================================================================================================================" << std::endl;
+}
+
 int main()
 {
     // system parameters
@@ -117,83 +251,20 @@ int main()
     const int entriesPerProducer = 260000;
     const int payloadSize = 4096;
 
-    const std::vector<int> compressionLevels = {0, 1, 3, 6, 9};
+    const std::vector<int> compressionLevels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     const std::vector<bool> encryptionSettings = {false, true};
 
     std::cout << "Generating batches with pre-determined destinations for all threads...";
     std::vector<BatchWithDestination> batches = generateBatches(entriesPerProducer, numSpecificFiles, producerBatchSize, payloadSize);
     std::cout << " Done." << std::endl;
 
-    // Run benchmarks for all combinations of encryption and compression levels
-    std::vector<BenchmarkResult> results;
-
-    for (bool useEncryption : encryptionSettings)
-    {
-        for (int compressionLevel : compressionLevels)
-        {
-            BenchmarkResult result = runBenchmark(baseConfig, useEncryption, compressionLevel, batches, numProducers, entriesPerProducer);
-            results.push_back(result);
-        }
-    }
-
-    std::cout << "\n============== ENCRYPTION/COMPRESSION LEVEL BENCHMARK SUMMARY ==============" << std::endl;
-    std::cout << std::left << std::setw(12) << "Encryption"
-              << std::setw(15) << "Comp. Level"
-              << std::setw(20) << "Execution Time (s)"
-              << std::setw(25) << "Input Size (bytes)"
-              << std::setw(25) << "Storage Size (bytes)"
-              << std::setw(20) << "Write Amp."
-              << std::setw(30) << "Throughput (entries/s)"
-              << std::setw(20) << "Logical (GiB/s)"
-              << std::setw(20) << "Physical (GiB/s)"
-              << std::setw(12) << "Avg Lat(ms)"
-              << std::setw(12) << "Med Lat(ms)"
-              << std::setw(12) << "Max Lat(ms)" << std::endl;
-    std::cout << "-------------------------------------------------------------------------------------------------------------------------------" << std::endl;
-
-    // Helper function to format compression level description
-    auto getCompressionDescription = [](int level) -> std::string
-    {
-        switch (level)
-        {
-        case 0:
-            return "0 (None)";
-        case 1:
-            return "1 (Speed)";
-        case 3:
-            return "3 (Low-Med)";
-        case 6:
-            return "6 (Default)";
-        case 9:
-            return "9 (Best)";
-        default:
-            return std::to_string(level);
-        }
-    };
-
-    // Display results for each configuration
-    auto printResult = [&getCompressionDescription](const BenchmarkResult &result)
-    {
-        std::cout << std::left << std::setw(12) << (result.useEncryption ? "True" : "False")
-                  << std::setw(15) << getCompressionDescription(result.compressionLevel)
-                  << std::fixed << std::setprecision(3) << std::setw(20) << result.executionTime
-                  << std::setw(25) << result.totalDataSizeBytes
-                  << std::setw(25) << result.finalStorageSize
-                  << std::fixed << std::setprecision(3) << std::setw(20) << result.writeAmplification
-                  << std::fixed << std::setprecision(3) << std::setw(30) << result.throughputEntries
-                  << std::fixed << std::setprecision(3) << std::setw(20) << result.logicalThroughputGiB
-                  << std::fixed << std::setprecision(3) << std::setw(20) << result.physicalThroughputGiB
-                  << std::fixed << std::setprecision(3) << std::setw(12) << result.latencyStats.avgMs
-                  << std::fixed << std::setprecision(3) << std::setw(12) << result.latencyStats.medianMs
-                  << std::fixed << std::setprecision(3) << std::setw(12) << result.latencyStats.maxMs << std::endl;
-    };
-
-    for (const auto &result : results)
-    {
-        printResult(result);
-    }
-
-    std::cout << "================================================================================================================================" << std::endl;
+    runEncryptionCompressionBenchmark(baseConfig,
+                                      encryptionSettings,
+                                      compressionLevels,
+                                      batches,
+                                      numProducers,
+                                      entriesPerProducer,
+                                      "encryption_compression_benchmark_results.csv");
 
     return 0;
 }

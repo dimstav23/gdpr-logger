@@ -1,6 +1,7 @@
 #include "BenchmarkUtils.hpp"
 #include "LoggingManager.hpp"
 #include <iostream>
+#include <fstream>
 #include <thread>
 #include <chrono>
 #include <vector>
@@ -92,19 +93,65 @@ BenchmarkResult runBenchmark(const LoggingConfig &baseConfig, int numWriterThrea
         latencyStats};
 }
 
+// Write CSV header
+void writeCSVHeader(std::ofstream &csvFile)
+{
+    csvFile << "writer_threads,producer_threads,execution_time_seconds,throughput_entries_per_sec,logical_throughput_gib_per_sec,"
+            << "physical_throughput_gib_per_sec,input_data_size_bytes,output_data_size_bytes,scaling_efficiency,"
+            << "write_amplification,avg_latency_ms,median_latency_ms,min_latency_ms,max_latency_ms,latency_count\n";
+}
+
+// Write a single result row to CSV
+void writeCSVRow(std::ofstream &csvFile, int writerThreads, int producerThreads, const BenchmarkResult &result, double scalingEfficiency)
+{
+    csvFile << writerThreads << ","
+            << producerThreads << ","
+            << std::fixed << std::setprecision(6) << result.executionTime << ","
+            << std::fixed << std::setprecision(2) << result.throughputEntries << ","
+            << std::fixed << std::setprecision(6) << result.logicalThroughputGiB << ","
+            << std::fixed << std::setprecision(6) << result.physicalThroughputGiB << ","
+            << result.inputDataSizeBytes << ","
+            << result.outputDataSizeBytes << ","
+            << std::fixed << std::setprecision(6) << scalingEfficiency << ","
+            << std::fixed << std::setprecision(8) << result.writeAmplification << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.avgMs << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.medianMs << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.minMs << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.maxMs << ","
+            << result.latencyStats.count << "\n";
+}
+
 void runScalabilityBenchmark(const LoggingConfig &baseConfig, const std::vector<int> &writerThreadCounts,
                              int baseProducerThreads, int baseEntriesPerProducer,
-                             int numSpecificFiles, int producerBatchSize, int payloadSize)
+                             int numSpecificFiles, int producerBatchSize, int payloadSize,
+                             const std::string &csvFilename = "scaling_concurrency_benchmark.csv")
 {
     std::vector<BenchmarkResult> results;
+    std::vector<int> producerThreadCounts;
 
-    for (int writerCount : writerThreadCounts)
+    // Open CSV file for writing
+    std::ofstream csvFile(csvFilename);
+    if (!csvFile.is_open())
     {
-        std::cout << "\nRunning scalability benchmark with " << writerCount << " writer thread(s)..." << std::endl;
+        std::cerr << "Error: Could not open CSV file " << csvFilename << " for writing." << std::endl;
+        return;
+    }
+
+    writeCSVHeader(csvFile);
+
+    std::cout << "Running scaling concurrency benchmark with " << writerThreadCounts.size() << " data points..." << std::endl;
+    std::cout << "Results will be saved to: " << csvFilename << std::endl;
+
+    for (size_t i = 0; i < writerThreadCounts.size(); i++)
+    {
+        int writerCount = writerThreadCounts[i];
+        std::cout << "\nProgress: " << (i + 1) << "/" << writerThreadCounts.size()
+                  << " - Running scalability benchmark with " << writerCount << " writer thread(s)..." << std::endl;
 
         // Option 1: Scale producer threads, keeping entries per producer constant
         int scaledProducers = baseProducerThreads * writerCount;
         int entriesPerProducer = baseEntriesPerProducer;
+        producerThreadCounts.push_back(scaledProducers);
 
         std::cout << "Scaled workload: " << scaledProducers << " producers, "
                   << entriesPerProducer << " entries per producer" << std::endl;
@@ -113,44 +160,56 @@ void runScalabilityBenchmark(const LoggingConfig &baseConfig, const std::vector<
                                               numSpecificFiles, producerBatchSize, payloadSize);
 
         results.push_back(result);
+
+        // Calculate scaling efficiency (normalized by expected linear scaling)
+        double scalingEfficiency = results.size() > 1 ? (result.throughputEntries / results[0].throughputEntries) / writerCount : 1.0;
+
+        // Write result to CSV immediately
+        writeCSVRow(csvFile, writerCount, scaledProducers, result, scalingEfficiency);
+        csvFile.flush(); // Ensure data is written in case of early termination
+
+        // Print progress summary
+        std::cout << "  Completed: " << std::fixed << std::setprecision(2)
+                  << result.throughputEntries << " entries/s, "
+                  << std::fixed << std::setprecision(3) << result.logicalThroughputGiB << " GiB/s, "
+                  << std::fixed << std::setprecision(2) << scalingEfficiency << " scaling efficiency" << std::endl;
     }
 
+    csvFile.close();
+    std::cout << "\nBenchmark completed! Results saved to " << csvFilename << std::endl;
+
+    // Still print summary table to console for immediate review
     std::cout << "\n=================== SCALABILITY BENCHMARK SUMMARY ===================" << std::endl;
     std::cout << std::left << std::setw(20) << "Writer Threads"
               << std::setw(20) << "Producer Threads"
               << std::setw(15) << "Time (sec)"
-              << std::setw(30) << "Throughput (entries/s)"
-              << std::setw(20) << "Logical (GiB/s)"
-              << std::setw(20) << "Physical (GiB/s)"
-              << std::setw(25) << "Input Size (bytes)"
-              << std::setw(25) << "Storage Size (bytes)"
-              << std::setw(20) << "Write Amp."
-              << std::setw(15) << "Rel. Perf."
-              << std::setw(12) << "Avg Lat(ms)"
-              << std::setw(12) << "Med Lat(ms)"
-              << std::setw(12) << "Max Lat(ms)" << std::endl;
-    std::cout << "-------------------------------------------------------------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Throughput (ent/s)"
+              << std::setw(15) << "Logical (GiB/s)"
+              << std::setw(15) << "Physical (GiB/s)"
+              << std::setw(20) << "Input Size (bytes)"
+              << std::setw(20) << "Storage Size (bytes)"
+              << std::setw(15) << "Write Amp."
+              << std::setw(12) << "Rel. Perf."
+              << std::setw(12) << "Avg Lat(ms)" << std::endl;
+    std::cout << "--------------------------------------------------------------------------------------------------------------------------------" << std::endl;
 
     double baselineThroughput = results[0].throughputEntries;
 
     for (size_t i = 0; i < writerThreadCounts.size(); i++)
     {
         double relativePerformance = results[i].throughputEntries / (baselineThroughput * writerThreadCounts[i]);
-        int scaledProducers = baseProducerThreads * writerThreadCounts[i];
 
         std::cout << std::left << std::setw(20) << writerThreadCounts[i]
-                  << std::setw(20) << scaledProducers
+                  << std::setw(20) << producerThreadCounts[i]
                   << std::setw(15) << std::fixed << std::setprecision(2) << results[i].executionTime
-                  << std::setw(30) << std::fixed << std::setprecision(2) << results[i].throughputEntries
-                  << std::setw(20) << std::fixed << std::setprecision(3) << results[i].logicalThroughputGiB
-                  << std::setw(20) << std::fixed << std::setprecision(3) << results[i].physicalThroughputGiB
-                  << std::setw(25) << results[i].inputDataSizeBytes
-                  << std::setw(25) << results[i].outputDataSizeBytes
-                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
-                  << std::setw(15) << std::fixed << std::setprecision(2) << relativePerformance
-                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.avgMs
-                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.medianMs
-                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.maxMs << std::endl;
+                  << std::setw(20) << std::fixed << std::setprecision(2) << results[i].throughputEntries
+                  << std::setw(15) << std::fixed << std::setprecision(3) << results[i].logicalThroughputGiB
+                  << std::setw(15) << std::fixed << std::setprecision(3) << results[i].physicalThroughputGiB
+                  << std::setw(20) << results[i].inputDataSizeBytes
+                  << std::setw(20) << results[i].outputDataSizeBytes
+                  << std::setw(15) << std::fixed << std::setprecision(4) << results[i].writeAmplification
+                  << std::setw(12) << std::fixed << std::setprecision(2) << relativePerformance
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.avgMs << std::endl;
     }
     std::cout << "================================================================================================================================" << std::endl;
 }
@@ -173,7 +232,7 @@ int main()
     const int producerBatchSize = 512;
     const int payloadSize = 2048;
 
-    std::vector<int> writerThreadCounts = {1, 2, 4, 8, 16, 32, 64};
+    std::vector<int> writerThreadCounts = {1, 2, 4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
 
     int baseProducerThreads = 1;
     int baseEntriesPerProducer = 4000000;
@@ -184,7 +243,8 @@ int main()
                             baseEntriesPerProducer,
                             numSpecificFiles,
                             producerBatchSize,
-                            payloadSize);
+                            payloadSize,
+                            "scaling_concurrency_benchmark_results.csv");
 
     return 0;
 }

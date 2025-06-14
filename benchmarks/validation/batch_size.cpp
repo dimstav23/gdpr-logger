@@ -1,6 +1,7 @@
 #include "BenchmarkUtils.hpp"
 #include "LoggingManager.hpp"
 #include <iostream>
+#include <fstream>
 #include <thread>
 #include <chrono>
 #include <vector>
@@ -87,15 +88,56 @@ BenchmarkResult runBatchSizeBenchmark(const LoggingConfig &baseConfig, int write
         latencyStats};
 }
 
+// Write CSV header
+void writeCSVHeader(std::ofstream &csvFile)
+{
+    csvFile << "batch_size,elapsed_seconds,throughput_entries_per_sec,logical_throughput_gib_per_sec,"
+            << "physical_throughput_gib_per_sec,relative_performance,write_amplification,"
+            << "avg_latency_ms,median_latency_ms,min_latency_ms,max_latency_ms,latency_count\n";
+}
+
+// Write a single result row to CSV
+void writeCSVRow(std::ofstream &csvFile, int batchSize, const BenchmarkResult &result, double relativePerf)
+{
+    csvFile << batchSize << ","
+            << std::fixed << std::setprecision(6) << result.elapsedSeconds << ","
+            << std::fixed << std::setprecision(2) << result.throughputEntries << ","
+            << std::fixed << std::setprecision(6) << result.logicalThroughputGiB << ","
+            << std::fixed << std::setprecision(6) << result.physicalThroughputGiB << ","
+            << std::fixed << std::setprecision(6) << relativePerf << ","
+            << std::fixed << std::setprecision(8) << result.writeAmplification << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.avgMs << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.medianMs << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.minMs << ","
+            << std::fixed << std::setprecision(6) << result.latencyStats.maxMs << ","
+            << result.latencyStats.count << "\n";
+}
+
 void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<int> &batchSizes,
                             int numProducerThreads, int entriesPerProducer,
-                            int numSpecificFiles, int producerBatchSize, int payloadSize)
+                            int numSpecificFiles, int producerBatchSize, int payloadSize,
+                            const std::string &csvFilename = "batch_size_benchmark.csv")
 {
     std::vector<BenchmarkResult> results;
 
-    for (int batchSize : batchSizes)
+    // Open CSV file for writing
+    std::ofstream csvFile(csvFilename);
+    if (!csvFile.is_open())
     {
-        std::cout << "\nRunning benchmark with writer batch size: " << batchSize << "..." << std::endl;
+        std::cerr << "Error: Could not open CSV file " << csvFilename << " for writing." << std::endl;
+        return;
+    }
+
+    writeCSVHeader(csvFile);
+
+    std::cout << "Running batch size benchmark with " << batchSizes.size() << " data points..." << std::endl;
+    std::cout << "Results will be saved to: " << csvFilename << std::endl;
+
+    for (size_t i = 0; i < batchSizes.size(); i++)
+    {
+        int batchSize = batchSizes[i];
+        std::cout << "\nProgress: " << (i + 1) << "/" << batchSizes.size()
+                  << " - Running benchmark with writer batch size: " << batchSize << "..." << std::endl;
 
         BenchmarkResult result = runBatchSizeBenchmark(
             baseConfig, batchSize, numProducerThreads,
@@ -103,60 +145,73 @@ void runBatchSizeComparison(const LoggingConfig &baseConfig, const std::vector<i
 
         results.push_back(result);
 
-        // small delay between runs
+        // Calculate relative performance (using first result as baseline)
+        double relativePerf = results.size() > 1 ? result.throughputEntries / results[0].throughputEntries : 1.0;
+
+        // Write result to CSV immediately
+        writeCSVRow(csvFile, batchSize, result, relativePerf);
+        csvFile.flush(); // Ensure data is written in case of early termination
+
+        // Print progress summary
+        std::cout << "  Completed: " << std::fixed << std::setprecision(2)
+                  << result.throughputEntries << " entries/s, "
+                  << std::fixed << std::setprecision(3) << result.logicalThroughputGiB << " GiB/s" << std::endl;
+
+        // Small delay between runs
         std::this_thread::sleep_for(std::chrono::seconds(1));
     }
+
+    csvFile.close();
+    std::cout << "\nBenchmark completed! Results saved to " << csvFilename << std::endl;
 
     std::cout << "\n=========== WRITER BATCH SIZE BENCHMARK SUMMARY ===========" << std::endl;
     std::cout << std::left << std::setw(12) << "Batch Size"
               << std::setw(15) << "Time (sec)"
-              << std::setw(30) << "Throughput (entries/s)"
-              << std::setw(20) << "Logical (GiB/s)"
-              << std::setw(20) << "Physical (GiB/s)"
-              << std::setw(15) << "Rel. Perf"
-              << std::setw(20) << "Write Amp."
-              << std::setw(12) << "Avg Lat(ms)"
-              << std::setw(12) << "Med Lat(ms)"
-              << std::setw(12) << "Max Lat(ms)" << std::endl;
-    std::cout << "-------------------------------------------------------------------------------------------------------------------------------" << std::endl;
+              << std::setw(20) << "Throughput (entries/s)"
+              << std::setw(15) << "Logical (GiB/s)"
+              << std::setw(15) << "Physical (GiB/s)"
+              << std::setw(12) << "Rel. Perf"
+              << std::setw(15) << "Write Amp."
+              << std::setw(12) << "Avg Lat(ms)" << std::endl;
+    std::cout << "--------------------------------------------------------------------------------------------------------------------------------" << std::endl;
 
     for (size_t i = 0; i < batchSizes.size(); i++)
     {
         double relativePerf = results[i].throughputEntries / results[0].throughputEntries;
         std::cout << std::left << std::setw(12) << batchSizes[i]
                   << std::setw(15) << std::fixed << std::setprecision(2) << results[i].elapsedSeconds
-                  << std::setw(30) << std::fixed << std::setprecision(2) << results[i].throughputEntries
-                  << std::setw(20) << std::fixed << std::setprecision(3) << results[i].logicalThroughputGiB
-                  << std::setw(20) << std::fixed << std::setprecision(3) << results[i].physicalThroughputGiB
-                  << std::setw(15) << std::fixed << std::setprecision(2) << relativePerf
-                  << std::setw(20) << std::fixed << std::setprecision(4) << results[i].writeAmplification
-                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.avgMs
-                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.medianMs
-                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.maxMs << std::endl;
+                  << std::setw(20) << std::fixed << std::setprecision(2) << results[i].throughputEntries
+                  << std::setw(15) << std::fixed << std::setprecision(3) << results[i].logicalThroughputGiB
+                  << std::setw(15) << std::fixed << std::setprecision(3) << results[i].physicalThroughputGiB
+                  << std::setw(12) << std::fixed << std::setprecision(2) << relativePerf
+                  << std::setw(15) << std::fixed << std::setprecision(4) << results[i].writeAmplification
+                  << std::setw(12) << std::fixed << std::setprecision(3) << results[i].latencyStats.avgMs << std::endl;
     }
     std::cout << "======================================================================================================================================" << std::endl;
 }
 
 int main()
 {
-    // system parameters
+    // System parameters
     LoggingConfig baseConfig;
     baseConfig.baseFilename = "default";
-    baseConfig.maxSegmentSize = 50 * 1024 * 1024; // 50 MB
+    baseConfig.maxSegmentSize = 100 * 1024 * 1024; // 100 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
     baseConfig.queueCapacity = 3000000;
-    baseConfig.maxExplicitProducers = 32;
+    baseConfig.maxExplicitProducers = 64;
     baseConfig.numWriterThreads = 64;
     baseConfig.appendTimeout = std::chrono::minutes(2);
-    // benchmark parameters
-    const int numSpecificFiles = 100;
-    const int producerBatchSize = 1000;
-    const int numProducers = 32;
-    const int entriesPerProducer = 2000000;
+    baseConfig.useEncryption = true;
+    baseConfig.compressionLevel = 9;
+    // Benchmark parameters
+    const int numSpecificFiles = 256;
+    const int producerBatchSize = 4096;
+    const int numProducers = 64;
+    const int entriesPerProducer = 1000000;
     const int payloadSize = 2048;
 
-    std::vector<int> batchSizes = {1, 32, 64, 128, 512, 1024, 2048, 4096, 8192, 16384};
+    std::vector<int> batchSizes = {1, 4, 8, 16, 32, 64, 96, 128, 256, 512, 768, 1024, 1536, 2048, 4096, 8192, 16384, 32768, 65536, 131072};
 
     runBatchSizeComparison(baseConfig,
                            batchSizes,
@@ -164,7 +219,8 @@ int main()
                            entriesPerProducer,
                            numSpecificFiles,
                            producerBatchSize,
-                           payloadSize);
+                           payloadSize,
+                           "batch_size_benchmark_results.csv");
 
     return 0;
 }

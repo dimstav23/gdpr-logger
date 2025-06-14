@@ -20,7 +20,7 @@ struct Result
 int main()
 {
     constexpr size_t batchSize = 1000;
-    const std::vector<int> compressionLevels = {0, 1, 3, 6, 9};
+    const std::vector<int> compressionLevels = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9};
     std::vector<Result> results;
 
     for (int level : compressionLevels)
