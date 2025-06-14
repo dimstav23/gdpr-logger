@@ -26,7 +26,7 @@ int main()
     for (int level : compressionLevels)
     {
         // Generate one batch with batchSize entries, no specific destinations
-        std::vector<BatchWithDestination> batches = generateBatches(batchSize, 0, batchSize, 1024, false);
+        std::vector<BatchWithDestination> batches = generateBatches(batchSize, 0, batchSize, 1024);
         std::vector<LogEntry> entries = std::move(batches[0].first);
 
         // Serialize the entries

@@ -73,8 +73,7 @@ std::vector<BatchWithDestination> generateBatches(
     int numEntries,
     int numSpecificFiles,
     int batchSize,
-    int payloadSize,
-    bool fixedPayloadSize = true);
+    int payloadSize);
 
 void printLatencyStats(const LatencyStats &stats);
 

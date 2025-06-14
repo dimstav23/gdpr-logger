@@ -78,8 +78,7 @@ std::vector<BatchWithDestination> generateBatches(
     int numEntries,
     int numSpecificFiles,
     int batchSize,
-    int payloadSize,
-    bool fixedPayloadSize)
+    int payloadSize)
 {
     std::vector<BatchWithDestination> batches;
 
@@ -122,7 +121,7 @@ std::vector<BatchWithDestination> generateBatches(
     }
 
     std::vector<std::string> wordList = {
-        "the", //"data", "to", "and", "user", "is", "in", "for", "of", "access",
+        "the", "data", //"to", "and", "user","is", "in", "for", "of", "access",
         //"system", "time", "log", "with", "on", "from", "request", "error", "file", "server",
         //"update", "status", "by", "at", "process", "information", "new", "this", "connection", "failed",
         //"success", "operation", "id", "network", "event", "application", "check", "value", "into", "service",
@@ -180,7 +179,7 @@ std::vector<BatchWithDestination> generateBatches(
             std::string dataProcessorId = processorIds[processorDist(rng)];
 
             // Determine targetSize
-            size_t targetSize = fixedPayloadSize ? static_cast<size_t>(payloadSize) : powerOf2Sizes[powerOf2SizeDist(rng)];
+            size_t targetSize = static_cast<size_t>(payloadSize);
 
             // Build payload
             std::string payloadStr;

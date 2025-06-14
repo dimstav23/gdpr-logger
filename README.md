@@ -1,4 +1,4 @@
-# GDPRlogger 
+# GDPRlogger
 
 ## Overview
 
@@ -9,7 +9,7 @@ The **GDPRlogger** is a key component of the [GDPRruler](https://github.com/dims
 ![System figure](assets/systemfigure.png)
 
 1. **Log Entry Creation**: When the GDPRuler engine processes a personal data related operation, it generates a log entry containing relevant metadata such as timestamps, action types, and data locations.
-2. **Enqueuing**: Log entries are immediately enqueued through the logging API, allowing the calling process to continue without waiting for disk operations.
+2. **Enqueuing**: Log entries are immediately enqueued through the Logger, allowing the calling process to continue without waiting for disk operations.
 3. **Batch Processing**: Dedicated writer threads continuously monitor the queue, collecting entries into batches for optimized processing.
 4. **Security Processing**: Batched entries undergo security treatments including compression and encryption, with cryptographic chaining applied to ensure tamper-evidence.
 5. **Persistent Storage**: Processed batches are written to append-only segment files, with new segments created based on size or time thresholds.
