@@ -50,7 +50,6 @@ public:
 
 struct LatencyStats
 {
-    double minMs;
     double maxMs;
     double avgMs;
     double medianMs;

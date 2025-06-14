@@ -97,7 +97,7 @@ void writeCSVHeader(std::ofstream &csvFile)
 {
     csvFile << "writer_threads,execution_time_seconds,throughput_entries_per_sec,logical_throughput_gib_per_sec,"
             << "physical_throughput_gib_per_sec,input_data_size_bytes,output_data_size_bytes,speedup_vs_baseline,"
-            << "write_amplification,avg_latency_ms,median_latency_ms,min_latency_ms,max_latency_ms,latency_count\n";
+            << "write_amplification,avg_latency_ms,median_latency_ms,max_latency_ms,latency_count\n";
 }
 
 // Write a single result row to CSV
@@ -114,7 +114,6 @@ void writeCSVRow(std::ofstream &csvFile, int writerThreads, const BenchmarkResul
             << std::fixed << std::setprecision(8) << result.writeAmplification << ","
             << std::fixed << std::setprecision(6) << result.latencyStats.avgMs << ","
             << std::fixed << std::setprecision(6) << result.latencyStats.medianMs << ","
-            << std::fixed << std::setprecision(6) << result.latencyStats.minMs << ","
             << std::fixed << std::setprecision(6) << result.latencyStats.maxMs << ","
             << result.latencyStats.count << "\n";
 }

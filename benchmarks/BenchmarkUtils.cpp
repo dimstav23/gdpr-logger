@@ -219,7 +219,7 @@ LatencyStats calculateLatencyStats(const LatencyCollector &collector)
 
     if (latencies.empty())
     {
-        return {0.0, 0.0, 0.0, 0.0, 0};
+        return {0.0, 0.0, 0.0, 0};
     }
 
     // Convert to milliseconds for easier reading
@@ -235,7 +235,6 @@ LatencyStats calculateLatencyStats(const LatencyCollector &collector)
 
     LatencyStats stats;
     stats.count = latenciesMs.size();
-    stats.minMs = latenciesMs.front();
     stats.maxMs = latenciesMs.back();
     stats.avgMs = std::accumulate(latenciesMs.begin(), latenciesMs.end(), 0.0) / latenciesMs.size();
 
@@ -257,7 +256,6 @@ void printLatencyStats(const LatencyStats &stats)
 {
     std::cout << "============== Latency Statistics ==============" << std::endl;
     std::cout << "Total append operations: " << stats.count << std::endl;
-    std::cout << "Min latency: " << stats.minMs << " ms" << std::endl;
     std::cout << "Max latency: " << stats.maxMs << " ms" << std::endl;
     std::cout << "Average latency: " << stats.avgMs << " ms" << std::endl;
     std::cout << "Median latency: " << stats.medianMs << " ms" << std::endl;
