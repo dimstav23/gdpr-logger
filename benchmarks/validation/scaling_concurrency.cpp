@@ -229,12 +229,11 @@ int main()
     // benchmark parameters
     const int numSpecificFiles = 256;
     const int producerBatchSize = 512;
+    const int baseProducerThreads = 1;
+    const int baseEntriesPerProducer = 4000000;
     const int payloadSize = 2048;
 
     std::vector<int> writerThreadCounts = {1, 2, 4, 8, 12, 16, 20, 24, 28, 32, 40, 48, 56, 64};
-
-    int baseProducerThreads = 1;
-    int baseEntriesPerProducer = 4000000;
 
     runScalabilityBenchmark(baseConfig,
                             writerThreadCounts,

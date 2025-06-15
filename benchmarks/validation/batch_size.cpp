@@ -194,21 +194,22 @@ int main()
     // System parameters
     LoggingConfig baseConfig;
     baseConfig.baseFilename = "default";
-    baseConfig.maxSegmentSize = 100 * 1024 * 1024; // 100 MB
+    baseConfig.maxSegmentSize = 500 * 1024 * 1024; // 100 MB
     baseConfig.maxAttempts = 5;
     baseConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    baseConfig.queueCapacity = 3000000;
-    baseConfig.maxExplicitProducers = 64;
-    baseConfig.numWriterThreads = 64;
+    baseConfig.queueCapacity = 2000000;
+    baseConfig.maxExplicitProducers = 16;
+    baseConfig.numWriterThreads = 16;
     baseConfig.appendTimeout = std::chrono::minutes(2);
     baseConfig.useEncryption = true;
-    baseConfig.compressionLevel = 9;
+    baseConfig.compressionLevel = 4;
+    baseConfig.maxOpenFiles = 512;
     // Benchmark parameters
     const int numSpecificFiles = 256;
     const int producerBatchSize = 4096;
-    const int numProducers = 64;
-    const int entriesPerProducer = 1000000;
-    const int payloadSize = 2048;
+    const int numProducers = 16;
+    const int entriesPerProducer = 2000000;
+    const int payloadSize = 4096;
 
     std::vector<int> batchSizes = {1, 4, 8, 16, 32, 64, 96, 128, 256, 512, 768, 1024, 1536, 2048, 4096, 8192, 16384, 32768, 65536, 131072};
 

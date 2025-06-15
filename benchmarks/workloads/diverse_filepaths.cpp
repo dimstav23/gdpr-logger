@@ -229,9 +229,9 @@ int main()
     config.compressionLevel = 9;
     config.maxOpenFiles = 256;
     // benchmark parameters
+    const int producerBatchSize = 8192;
     const int numProducers = 32;
     const int entriesPerProducer = 2000000;
-    const int producerBatchSize = 8192;
     const int payloadSize = 2048;
 
     std::vector<int> numFilesVariants = {0, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192};
