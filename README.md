@@ -1,8 +1,13 @@
-# Tamperproof Logging System for GDPR-compliant Key-Value Stores
+# Secure and Tamperproof Logging System for GDPR-compliant Key-Value Stores
 
 ## Overview
 
-This bachelor thesis presents a high-performance, tamper-evident logging system designed to support secure, auditable transaction logging in environments where data protection and regulatory compliance—such as GDPR—are essential. The system acts as a standalone component that can be integrated into a wide range of data processing infrastructures, including key-value store proxies. Designed for low-latency, high-throughput environments, it collects structured log entries from external sources and appends them to an immutable, append-only storage format. Each entry is cryptographically secured to ensure confidentiality and tamper detection, supporting audit trails while maintaining performance.
+This bachelor thesis presents a **secure**, **tamper-evident**, **performant** and **modular** logging system for GDPR compliance.
+Its impact lies in:
+
+- Enabling verifiable audit trails with minimal integration effort
+- Supporting GDPR accountability with high performance
+- Laying the groundwork for future improvements (e.g. key management, export)
 
 ![System figure](assets/systemfigure.svg)
 
@@ -15,7 +20,7 @@ This bachelor thesis presents a high-performance, tamper-evident logging system 
 - **Immutable, append-only storage** for compliance and auditability.
 - **Future-proof design** prepared for secure export and verification support.
 
-## System Workflow
+### System Workflow
 
 1. **Log Entry Submission**: When a database proxy intercepts a request to the underlying database involving personal data, it generates a structured log entry containing metadata such as operation type, key identifier, and timestamp. This entry is submitted to the logging API.
 2. **Enqueuing**: Log entries are immediately enqueued into a thread-safe buffer, allowing the calling process to proceed without blocking on disk I/O or encryption tasks.
@@ -55,7 +60,7 @@ To evaluate performance under realistic heavy-load conditions, the system was be
 
 ### Scalability benchmark
 
-To evaluate parallel scalability, a proportional-load benchmark was conducted where the number of producer and writer threads was scaled together from 1 to 16. Each producer submitted 2 million entries (~4 KiB each), resulting in an input data volume that grew linearly with thread count.
+To evaluate parallel scalability, a proportional-load benchmark was conducted where the number of producer and writer threads was scaled together from 1 to 16, resulting in an input data volume that grew linearly with thread count.
 
 #### Configuration Highlights
 
