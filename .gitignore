@@ -1,8 +1,3 @@
 /build/
 .vscode/
 notes.md
-
-# LaTeX ignores
-thesis/build/*
-#!thesis/build/*.pdf
-thesis/*.log
