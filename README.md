@@ -20,7 +20,64 @@ Its impact lies in:
 - **Immutable, append-only storage** for compliance and auditability.
 - **Future-proof design** prepared for secure export and verification support.
 
-### System Workflow
+## Setup and Usage
+
+### Prerequisites
+
+- C++17 compatible compiler (GCC 9+ or Clang 10+)
+- CMake 3.15 or higher
+- Git (for submodule management)
+
+### Dependencies
+Make sure the following libraries are available on your system:
+- OpenSSL - For cryptographic operations (AES-GCM encryption)
+- ZLIB - For compression functionality
+- Google Test (GTest) - For running unit and integration tests
+
+### Building the System
+
+1. **Clone the repository with submodules:**
+   ```bash
+   git clone --recursive <repository-url>
+   ```
+
+2. **If not cloned with `--recursive`, initialize submodules manually:**
+   ```bash
+   git submodule update --init --recursive
+   ```
+
+3. **Configure and build:**
+   ```bash
+   mkdir build
+   cd build
+   cmake ..
+   make -j$(nproc)
+   ```
+
+### Running the System
+
+A simple usage example is provided in `/examples/main.cpp` that demonstrates how to integrate and use the logging system:
+```bash
+# Run the usage example
+./logging_example
+```
+
+#### Running Tests
+```bash
+# Run all tests
+ctest
+
+# Or run specific tests
+./test_<component>
+```
+
+### Development Environment (Optional)
+
+A reproducible environment is provided using Nix:
+```bash
+nix-shell
+```
+## System Workflow
 
 1. **Log Entry Submission**: When a database proxy intercepts a request to the underlying database involving personal data, it generates a structured log entry containing metadata such as operation type, key identifier, and timestamp. This entry is submitted to the logging API.
 2. **Enqueuing**: Log entries are immediately enqueued into a thread-safe buffer, allowing the calling process to proceed without blocking on disk I/O or encryption tasks.
