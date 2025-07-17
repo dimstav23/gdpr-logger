@@ -9,6 +9,8 @@ Its impact lies in:
 - Supporting GDPR accountability with high performance
 - Laying the groundwork for future improvements (e.g. key management, export)
 
+For an in-depth explanation of the design, implementation, and evaluation, please refer to the full [bachelor thesis](https://github.com/TUM-DSE/research-work-archive/blob/main/archive/2025/summer/docs/bsc_karidas.pdf) or the accompanying [presentation slides](https://github.com/TUM-DSE/research-work-archive/blob/main/archive/2025/summer/talks/bsc_karidas.pdf).
+
 ![System figure](assets/systemfigure.svg)
 
 **Key features** include:
