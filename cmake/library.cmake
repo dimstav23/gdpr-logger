@@ -10,14 +10,18 @@ set(LIBRARY_SOURCES
     benchmarks/BenchmarkUtils.cpp
 )
 
-add_library(GDPR_Logging_lib ${LIBRARY_SOURCES})
+add_library(gdpr_logging_lib ${LIBRARY_SOURCES})
 
-target_link_libraries(GDPR_Logging_lib 
-    PUBLIC 
-    OpenSSL::SSL 
-    OpenSSL::Crypto 
-    ZLIB::ZLIB
+# Use absolute paths with PUBLIC visibility
+target_include_directories(gdpr_logging_lib
+    PUBLIC
+    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/external/concurrentqueue
 )
 
-target_include_directories(GDPR_Logging_lib PUBLIC ${CMAKE_CURRENT_SOURCE_DIR}/include)
-target_include_directories(GDPR_Logging_lib PUBLIC external/concurrentqueue)
+target_link_libraries(gdpr_logging_lib
+    PUBLIC 
+    OpenSSL::SSL 
+    OpenSSL::Crypto
+    ZLIB::ZLIB
+)

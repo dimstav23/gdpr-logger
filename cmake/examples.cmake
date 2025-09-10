@@ -6,7 +6,7 @@ add_executable(logging_example ${EXAMPLE_SOURCES})
 
 target_link_libraries(logging_example
     PRIVATE
-    GDPR_Logging_lib
+    gdpr_logging_lib
 )
 
 target_include_directories(logging_example

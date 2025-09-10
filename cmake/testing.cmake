@@ -18,7 +18,7 @@ macro(add_test_suite TEST_NAME TEST_SOURCE)
     add_executable(${TEST_NAME} ${TEST_SOURCE})
     target_link_libraries(${TEST_NAME}
         PRIVATE
-        GDPR_Logging_lib
+        gdpr_logging_lib
         GTest::GTest 
         GTest::Main
         OpenSSL::SSL 

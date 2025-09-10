@@ -1,6 +1,6 @@
 set(BENCHMARK_LIBS
     PRIVATE
-    GDPR_Logging_lib
+    gdpr_logging_lib
     OpenSSL::SSL
     OpenSSL::Crypto
     ZLIB::ZLIB

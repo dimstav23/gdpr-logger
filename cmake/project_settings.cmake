@@ -10,6 +10,6 @@ endif()
 
 # Set a default build type if not specified
 if(NOT CMAKE_BUILD_TYPE)
-    set(CMAKE_BUILD_TYPE "RelWithDebInfo" CACHE STRING "Choose the type of build" FORCE)
-    message(STATUS "No build type selected, defaulting to RelWithDebInfo")
+    set(CMAKE_BUILD_TYPE "Release" CACHE STRING "Choose the type of build" FORCE)
+    message(STATUS "No build type selected, defaulting to Release")
 endif()
