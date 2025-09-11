@@ -178,6 +178,10 @@ TEST_F(SegmentedStorageTest, ConcurrentWriteTest)
     for (size_t i = 0; i < numThreads; i++)
     {
         dataBlocks.push_back(generateRandomData(dataSize));
+    }
+
+    for (size_t i = 0; i < numThreads; i++)
+    {
         threads.emplace_back([&storage, &dataBlocks, i]()
                              { storage.write(std::move(dataBlocks[i])); });
     }
@@ -211,6 +215,10 @@ TEST_F(SegmentedStorageTest, ConcurrentWriteWithRotationTest)
     for (size_t i = 0; i < numThreads; i++)
     {
         dataBlocks.push_back(generateRandomData(dataSize));
+    }
+
+    for (size_t i = 0; i < numThreads; i++)
+    {
         threads.emplace_back([&storage, &dataBlocks, i]()
                              { storage.write(std::move(dataBlocks[i])); });
     }
@@ -369,6 +377,11 @@ TEST_F(SegmentedStorageTest, RealisticConcurrencyRotationTest)
 
     std::vector<std::thread> threads;
     std::vector<std::vector<uint8_t>> dataBlocks;
+
+    for (size_t i = 0; i < numThreads; i++)
+    {
+        dataBlocks.push_back(generateRandomData(dataSize));
+    }
 
     for (size_t i = 0; i < numThreads; i++)
     {
@@ -557,6 +570,9 @@ TEST_F(SegmentedStorageTest, FrequentRotationTest)
     for (size_t i = 0; i < numWrites; i++)
     {
         dataBlocks.push_back(generateRandomData(dataSize));
+    }
+    for (size_t i = 0; i < numWrites; i++)
+    {
         storage.write(std::move(dataBlocks[i]));
     }
 
