@@ -21,11 +21,13 @@ public:
     ~Writer();
 
     void start();
+    void startGDPR();
     void stop();
     bool isRunning() const;
 
 private:
     void processLogEntries();
+    void processLogEntriesGDPR();
 
     BufferQueue &m_queue;
     std::shared_ptr<SegmentedStorage> m_storage;

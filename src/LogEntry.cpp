@@ -3,14 +3,27 @@
 #include <stdexcept>
 #include <iostream>
 
-LogEntry::LogEntry()
-    : m_actionType(ActionType::CREATE),
-      m_dataLocation(""),
-      m_dataControllerId(""),
-      m_dataProcessorId(""),
-      m_dataSubjectId(""),
-      m_timestamp(std::chrono::system_clock::now()),
-      m_payload() {}
+// GDPRuler constructors
+LogEntry::LogEntry() 
+    : m_gdpr_timestamp(0), m_gdpr_cnt(0), m_gdpr_user_key(0), m_gdpr_operation_result(0) {}
+
+LogEntry::LogEntry(uint64_t timestamp,
+                   uint32_t trustedCounter,
+                   std::bitset<128> userKeyMap,
+                   uint8_t operationValidity,
+                   std::vector<uint8_t> newValue)
+    : m_gdpr_timestamp(timestamp), m_gdpr_cnt(trustedCounter), 
+      m_gdpr_user_key(userKeyMap), m_gdpr_operation_result(operationValidity),
+      m_gdpr_payload(std::move(newValue)) {}
+
+// LogEntry::LogEntry()
+//     : m_actionType(ActionType::CREATE),
+//       m_dataLocation(""),
+//       m_dataControllerId(""),
+//       m_dataProcessorId(""),
+//       m_dataSubjectId(""),
+//       m_timestamp(std::chrono::system_clock::now()),
+//       m_payload() {}
 
 LogEntry::LogEntry(ActionType actionType,
                    std::string dataLocation,
@@ -26,6 +39,46 @@ LogEntry::LogEntry(ActionType actionType,
       m_timestamp(std::chrono::system_clock::now()),
       m_payload(std::move(payload))
 {
+}
+
+// Serialization for GDPRuler
+std::vector<uint8_t> LogEntry::serializeGDPR() const {
+  // Calculate total size: m_gdpr_timestamp(8) + m_gdpr_cnt(4) + m_gdpr_user_key(16) + m_gdpr_operation_result(1) + m_gdpr_payload_size(4) + m_gdpr_payload
+  size_t totalSize = sizeof(m_gdpr_timestamp) + sizeof(m_gdpr_cnt) + sizeof(m_gdpr_user_key) + sizeof(m_gdpr_operation_result) + sizeof(uint32_t) + m_gdpr_payload.size();
+
+  std::vector<uint8_t> result;
+  result.reserve(totalSize);
+
+  // 1. Timestamp (64-bit)
+  appendToVector(result, &m_gdpr_timestamp, sizeof(m_gdpr_timestamp));
+
+  // 2. Trusted counter (32-bit)
+  appendToVector(result, &m_gdpr_cnt, sizeof(m_gdpr_cnt));
+
+  // 3. User key map (128-bit = 16 bytes)
+  // Convert bitset to bytes manually for portability
+  for (size_t i = 0; i < 16; ++i) {
+    uint8_t byte = 0;
+    for (size_t bit = 0; bit < 8; ++bit) {
+      if (m_gdpr_user_key[i * 8 + bit]) {
+        byte |= (1 << bit);
+      }
+    }
+    result.push_back(byte);
+  }
+
+  // 4. Operation + validity (8-bit)
+  appendToVector(result, &m_gdpr_operation_result, sizeof(m_gdpr_operation_result));
+
+  // 5. New value size (32-bit) + data
+  uint32_t payloadSize = static_cast<uint32_t>(m_gdpr_payload.size());
+  appendToVector(result, &payloadSize, sizeof(payloadSize));
+  
+  if (payloadSize > 0) {
+    appendToVector(result, m_gdpr_payload.data(), m_gdpr_payload.size());
+  }
+
+  return result;
 }
 
 // Move version that consumes the LogEntry
@@ -118,6 +171,66 @@ std::vector<uint8_t> LogEntry::serialize() const &
     return result;
 }
 
+// Deserialization for GDPRuler
+bool LogEntry::deserializeGDPR(const std::vector<uint8_t>& data) {
+  size_t offset = 0;
+  const size_t minSize = sizeof(m_gdpr_timestamp) + sizeof(m_gdpr_cnt) + sizeof(m_gdpr_user_key) + sizeof(m_gdpr_operation_result) + sizeof(uint32_t); // Minimum size without payload
+
+  if (data.size() < minSize) {
+    return false;
+  }
+
+  try {
+    // 1. Extract timestamp (64-bit)
+    if (!extractFromVector(data, offset, &m_gdpr_timestamp, sizeof(m_gdpr_timestamp))) {
+      return false;
+    }
+
+    // 2. Extract trusted counter (32-bit)
+    if (!extractFromVector(data, offset, &m_gdpr_cnt, sizeof(m_gdpr_cnt))) {
+      return false;
+    }
+
+    // 3. Extract user key map (128-bit = 16 bytes)
+    m_gdpr_user_key.reset();
+    for (size_t i = 0; i < 16; ++i) {
+      if (offset >= data.size()) return false;
+      uint8_t byte = data[offset++];
+      for (size_t bit = 0; bit < 8; ++bit) {
+        if (byte & (1 << bit)) {
+          m_gdpr_user_key.set(i * 8 + bit);
+        }
+      }
+    }
+
+    // 4. Extract operation + validity (8-bit)
+    if (!extractFromVector(data, offset, &m_gdpr_operation_result, sizeof(m_gdpr_operation_result))) {
+      return false;
+    }
+
+    // 5. Extract new value size and data
+    uint32_t payloadSize;
+    if (!extractFromVector(data, offset, &payloadSize, sizeof(payloadSize))) {
+      return false;
+    }
+
+    if (offset + payloadSize > data.size()) {
+      return false;
+    }
+
+    if (payloadSize > 0) {
+      m_gdpr_payload.resize(payloadSize);
+      std::memcpy(m_gdpr_payload.data(), data.data() + offset, payloadSize);
+    } else {
+      m_gdpr_payload.clear();
+    }
+
+    return true;
+  } catch (...) {
+    return false;
+  }
+}
+
 bool LogEntry::deserialize(std::vector<uint8_t> &&data)
 {
     try
@@ -192,6 +305,80 @@ bool LogEntry::deserialize(std::vector<uint8_t> &&data)
     {
         return false;
     }
+}
+
+std::vector<uint8_t> LogEntry::serializeBatchGDPR(std::vector<LogEntry>&& entries) {
+  if (entries.empty()) 
+  {
+    // Just return a vector with count = 0
+    std::vector<uint8_t> batchData(sizeof(uint32_t));
+    uint32_t count = 0;
+    std::memcpy(batchData.data(), &count, sizeof(count));
+    return batchData;
+  }
+
+  std::vector<uint8_t> result;
+  
+  // Reserve space for entry count
+  result.resize(sizeof(uint32_t));
+  uint32_t entryCount = static_cast<uint32_t>(entries.size());
+  std::memcpy(result.data(), &entryCount, sizeof(entryCount));
+
+  // Serialize each entry
+  for (auto& entry : entries) {
+    std::vector<uint8_t> entryData = entry.serializeGDPR();
+    uint32_t entrySize = static_cast<uint32_t>(entryData.size());
+    
+    // Add entry size
+    size_t currentSize = result.size();
+    result.resize(currentSize + sizeof(entrySize));
+    std::memcpy(result.data() + currentSize, &entrySize, sizeof(entrySize));
+    
+    // Add entry data
+    result.insert(result.end(), entryData.begin(), entryData.end());
+  }
+
+  return result;
+}
+
+std::vector<LogEntry> LogEntry::deserializeBatchGDPR(std::vector<uint8_t>&& batchData) {
+  std::vector<LogEntry> entries;
+  
+  if (batchData.size() < sizeof(uint32_t)) {
+    return entries;
+  }
+
+  size_t offset = 0;
+  uint32_t entryCount;
+  std::memcpy(&entryCount, batchData.data(), sizeof(entryCount));
+  offset += sizeof(entryCount);
+
+  entries.reserve(entryCount);
+
+  for (uint32_t i = 0; i < entryCount; ++i) {
+    if (offset + sizeof(uint32_t) > batchData.size()) {
+      break;
+    }
+
+    uint32_t entrySize;
+    std::memcpy(&entrySize, batchData.data() + offset, sizeof(entrySize));
+    offset += sizeof(entrySize);
+
+    if (offset + entrySize > batchData.size()) {
+      break;
+    }
+
+    std::vector<uint8_t> entryData(batchData.begin() + offset, 
+                                  batchData.begin() + offset + entrySize);
+    offset += entrySize;
+
+    LogEntry entry;
+    if (entry.deserializeGDPR(entryData)) {
+      entries.emplace_back(std::move(entry));
+    }
+  }
+
+  return entries;
 }
 
 std::vector<uint8_t> LogEntry::serializeBatch(std::vector<LogEntry> &&entries)
@@ -372,4 +559,15 @@ bool LogEntry::extractStringFromVector(std::vector<uint8_t> &vec, size_t &offset
     offset += length;
 
     return true;
+}
+
+bool LogEntry::extractFromVector(const std::vector<uint8_t>& vec, size_t& offset, 
+                                void* data, size_t size) const 
+{
+  if (offset + size > vec.size()) {
+    return false;
+  }
+  std::memcpy(data, vec.data() + offset, size);
+  offset += size;
+  return true;
 }

@@ -22,6 +22,7 @@ public:
     ~LoggingManager();
 
     bool start();
+    bool startGDPR();
     bool stop();
 
     BufferQueue::ProducerToken createProducerToken();

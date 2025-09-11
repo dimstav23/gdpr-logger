@@ -54,9 +54,35 @@ bool LoggingManager::start()
         m_writers.push_back(std::move(writer));
     }
 
-    std::cout << "LoggingSystem: Started " << m_numWriterThreads << " writer threads";
-    std::cout << " (Encryption: " << (m_useEncryption ? "Enabled" : "Disabled");
-    std::cout << ", Compression: " << (m_compressionLevel != 0 ? "Enabled" : "Disabled") << ")" << std::endl;
+    std::cout << "LoggingSystem: Started " << m_numWriterThreads << " writer threads" << std::endl;
+    std::cout << "Encryption: " << (m_useEncryption ? "Enabled" : "Disabled") << std::endl;
+    std::cout << "Compression: " << (m_compressionLevel != 0 ? "Enabled" : "Disabled") << std::endl;
+    return true;
+}
+
+bool LoggingManager::startGDPR()
+{
+    std::lock_guard<std::mutex> lock(m_systemMutex);
+
+    if (m_running.load(std::memory_order_acquire))
+    {
+        std::cerr << "LoggingSystem: Already running" << std::endl;
+        return false;
+    }
+
+    m_running.store(true, std::memory_order_release);
+    m_acceptingEntries.store(true, std::memory_order_release);
+
+    for (size_t i = 0; i < m_numWriterThreads; ++i)
+    {
+        auto writer = std::make_unique<Writer>(*m_queue, m_storage, m_batchSize, m_useEncryption, m_compressionLevel);
+        writer->startGDPR();
+        m_writers.push_back(std::move(writer));
+    }
+
+    std::cout << "LoggingSystem: Started " << m_numWriterThreads << " writer threads" << std::endl;
+    std::cout << "Encryption: " << (m_useEncryption ? "Enabled" : "Disabled") << std::endl;
+    std::cout << "Compression: " << (m_compressionLevel != 0 ? "Enabled" : "Disabled") << std::endl;
     return true;
 }
 
