@@ -3,10 +3,20 @@
 #include <stdexcept>
 #include <iostream>
 
-// GDPRuler constructors
-LogEntry::LogEntry() 
-    : m_gdpr_timestamp(0), m_gdpr_cnt(0), m_gdpr_user_key(0), m_gdpr_operation_result(0) {}
+LogEntry::LogEntry()
+    : m_actionType(ActionType::CREATE),
+      m_dataLocation(""),
+      m_dataControllerId(""),
+      m_dataProcessorId(""),
+      m_dataSubjectId(""),
+      m_timestamp(std::chrono::system_clock::now()),
+      m_gdpr_timestamp(0),
+      m_gdpr_cnt(0),
+      m_gdpr_user_key(0),
+      m_gdpr_operation_result(0),
+      m_payload() {}
 
+// GDPRuler constructor
 LogEntry::LogEntry(uint64_t timestamp,
                    uint32_t trustedCounter,
                    std::bitset<128> userKeyMap,
@@ -15,15 +25,6 @@ LogEntry::LogEntry(uint64_t timestamp,
     : m_gdpr_timestamp(timestamp), m_gdpr_cnt(trustedCounter), 
       m_gdpr_user_key(userKeyMap), m_gdpr_operation_result(operationValidity),
       m_gdpr_payload(std::move(newValue)) {}
-
-// LogEntry::LogEntry()
-//     : m_actionType(ActionType::CREATE),
-//       m_dataLocation(""),
-//       m_dataControllerId(""),
-//       m_dataProcessorId(""),
-//       m_dataSubjectId(""),
-//       m_timestamp(std::chrono::system_clock::now()),
-//       m_payload() {}
 
 LogEntry::LogEntry(ActionType actionType,
                    std::string dataLocation,
