@@ -9,6 +9,8 @@
 #include <cstring>
 #include <bitset>
 
+constexpr int num_users = 128;
+
 class LogEntry
 {
 public:
@@ -25,7 +27,7 @@ public:
     // GDPRuler constructor
     LogEntry(uint64_t timestamp,
              uint32_t trustedCounter,
-             std::bitset<128> userKeyMap,
+             std::bitset<num_users> userKeyMap,
              uint8_t operationValidity,
              std::vector<uint8_t> payload = {});
     
@@ -51,7 +53,7 @@ public:
     // GDPRuler Getters
     uint64_t getGDPRTimestamp() const { return m_gdpr_timestamp; }
     uint32_t getTrustedCounter() const { return m_gdpr_cnt; }
-    std::bitset<128> getUserKeyMap() const { return m_gdpr_user_key; }
+    std::bitset<num_users> getUserKeyMap() const { return m_gdpr_user_key; }
     uint8_t getOperationValidity() const { return m_gdpr_operation_result; }
     const std::vector<uint8_t>& getNewValue() const { return m_gdpr_payload; }
 
@@ -74,7 +76,7 @@ private:
     // GDPRuler fields
     uint64_t m_gdpr_timestamp;                          // 64-bit timestamp
     uint32_t m_gdpr_cnt;                                // 32-bit trusted counter
-    std::bitset<128> m_gdpr_user_key;                   // 128-bit user key bitmap
+    std::bitset<num_users> m_gdpr_user_key;             // 128-bit user key bitmap
     uint8_t m_gdpr_operation_result;                    // Operation + validity bit
     std::vector<uint8_t> m_gdpr_payload;                // Arbitrary size new value
 
