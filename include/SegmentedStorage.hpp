@@ -15,6 +15,9 @@
 #include <thread>
 #include <stdexcept>
 #include <list> // For LRU cache
+#include <cerrno>
+#include <cstring>
+#include <iostream>
 
 class SegmentedStorage
 {
@@ -123,9 +126,18 @@ private:
             ssize_t written = ::pwrite(fd, buf + total, count - total, offset + total);
             if (written < 0)
             {
-                if (errno == EINTR)
-                    continue;
-                throw std::runtime_error("pwrite failed");
+                int err = errno;
+                std::cerr << "pwrite failed:" << std::endl;
+                std::cerr << "  Error: " << strerror(err) << " (errno=" << err << ")" << std::endl;
+                std::cerr << "  File descriptor: " << fd << std::endl;
+                std::cerr << "  Buffer address: " << static_cast<const void*>(buf + total) << std::endl;
+                std::cerr << "  Bytes requested: " << (count - total) << std::endl;
+                std::cerr << "  File offset: " << (offset + total) << std::endl;
+                std::cerr << "  Total written so far: " << total << std::endl;
+                
+                if (err != EINTR) {
+                    throw std::runtime_error(std::string("pwrite failed: ") + strerror(err));
+                }
             }
             total += written;
         }

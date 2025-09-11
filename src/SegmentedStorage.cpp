@@ -287,17 +287,9 @@ std::string SegmentedStorage::rotateSegment(const std::string &filename, std::sh
 
 std::string SegmentedStorage::generateSegmentPath(const std::string &filename, size_t segmentIndex) const
 {
-    auto now = std::chrono::system_clock::now();
-    auto now_time_t = std::chrono::system_clock::to_time_t(now);
-    std::tm time_info;
-
-    // Linux-specific thread-safe version of localtime
-    localtime_r(&now_time_t, &time_info);
-
     std::stringstream ss;
     ss << m_basePath << "/";
     ss << filename << "_";
-    ss << std::put_time(&time_info, "%Y%m%d_%H%M%S") << "_";
     ss << std::setw(6) << std::setfill('0') << segmentIndex << ".log";
     return ss.str();
 }
