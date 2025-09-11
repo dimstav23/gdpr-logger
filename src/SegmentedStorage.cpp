@@ -19,8 +19,6 @@ SegmentedStorage::SegmentedStorage(const std::string &basePath,
       m_cache(maxOpenFiles, this)
 {
     std::filesystem::create_directories(m_basePath);
-    // Pre-warm the cache with the base filename
-    m_cache.get(m_baseFilename);
 }
 
 SegmentedStorage::~SegmentedStorage()

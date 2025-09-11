@@ -348,12 +348,12 @@ TEST_F(SegmentedStorageTest, ExactRotationBoundaryTest)
     SegmentedStorage storage(testPath, baseFilename, maxSegmentSize);
 
     std::vector<uint8_t> data1 = generateRandomData(maxSegmentSize);
-    std::vector<uint8_t> data1Copy = data1; // Copy for verification
+    std::vector<uint8_t> data1Copy(data1.begin(), data1.end()); // Copy for verification
     size_t bytesWritten1 = storage.write(std::move(data1));
     ASSERT_EQ(bytesWritten1, data1Copy.size());
 
     std::vector<uint8_t> data2 = {42};
-    std::vector<uint8_t> data2Copy = data2; // Copy for verification
+    std::vector<uint8_t> data2Copy(data2.begin(), data2.end()); // Copy for verification
     size_t bytesWritten2 = storage.write(std::move(data2));
     ASSERT_EQ(bytesWritten2, data2Copy.size());
 
@@ -464,8 +464,7 @@ TEST_F(SegmentedStorageTest, ZeroByteWriteTest)
     storage.flush();
 
     auto files = getSegmentFiles(testPath, baseFilename);
-    ASSERT_EQ(files.size(), 1) << "One file should still be created";
-    ASSERT_EQ(getFileSize(files[0]), 0) << "File should be empty";
+    ASSERT_EQ(files.size(), 0) << "No files should be created";
 }
 
 // Test concurrent writes to different files
