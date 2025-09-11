@@ -94,6 +94,11 @@ std::shared_ptr<SegmentedStorage::CacheEntry> SegmentedStorage::LRUCache::recons
     // Open the file and get its current size
     entry->fd = m_parent->openWithRetry(segmentPath.c_str(), O_CREAT | O_RDWR | O_APPEND, 0644);
 
+    // Store original file metadata
+    if (entry->fd >= 0 && ::fstat(entry->fd, &entry->originalStat) == 0) {
+        entry->hasOriginalStat = true;
+    }
+
     // Get the current file size to set as the offset
     size_t fileSize = m_parent->getFileSize(segmentPath);
     entry->currentOffset.store(fileSize, std::memory_order_release);
@@ -193,6 +198,17 @@ size_t SegmentedStorage::getFileSize(const std::string &path) const
     return 0;
 }
 
+bool SegmentedStorage::isFileDeleted(int fd) const
+{
+    struct stat st;
+    if (::fstat(fd, &st) != 0) {
+        return true; // Consider invalid fd as "deleted"
+    }
+
+    // If nlink is 0, the file has been unlinked from all directory entries
+    return st.st_nlink == 0;
+}
+
 size_t SegmentedStorage::write(std::vector<uint8_t> &&data)
 {
     return writeToFile(m_baseFilename, std::move(data));
@@ -242,11 +258,21 @@ size_t SegmentedStorage::writeToFile(const std::string &filename, std::vector<ui
     {
         std::shared_lock<std::shared_mutex> writeLock(entry->fileMutex);
 
-        // Verify the fd is still valid
-        if (entry->fd < 0)
-        {
-            // This shouldn't happen, but if it does, retry
-            return writeToFile(filename, std::move(data));
+        // Check if file was deleted before writing
+        if (entry->fd < 0 || isFileDeleted(entry->fd)) {
+            // File was deleted, need to recreate
+            writeLock.unlock();
+
+            // Get exclusive lock and recreate file
+            std::unique_lock<std::shared_mutex> exclusiveLock(entry->fileMutex);
+            if (entry->fd >= 0) {
+                ::close(entry->fd);
+            }
+            entry->fd = openWithRetry(entry->currentSegmentPath.c_str(),
+                                      O_CREAT | O_RDWR | O_APPEND, 0644);
+
+            exclusiveLock.unlock();
+            return writeToFile(filename, std::move(data)); // Retry
         }
 
         pwriteFull(entry->fd, data.data(), size, static_cast<off_t>(writeOffset));

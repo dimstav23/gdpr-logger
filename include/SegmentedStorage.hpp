@@ -50,6 +50,10 @@ private:
         std::atomic<size_t> currentOffset{0};
         std::string currentSegmentPath;
         mutable std::shared_mutex fileMutex; // shared for writes, exclusive for rotate/flush
+
+        // Deletion detection metadata
+        struct stat originalStat;
+        bool hasOriginalStat = false;
     };
 
     // Unified LRU Cache for both file descriptors and segment information
@@ -87,6 +91,7 @@ private:
     std::string rotateSegment(const std::string &filename, std::shared_ptr<CacheEntry> entry);
     std::string generateSegmentPath(const std::string &filename, size_t segmentIndex) const;
     size_t getFileSize(const std::string &path) const;
+    bool isFileDeleted(int fd) const;
     size_t findLatestSegmentIndex(const std::string &filename) const;
 
     // Retry helpers use member-configured parameters
