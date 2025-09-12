@@ -148,6 +148,16 @@ void Writer::processLogEntriesGDPR()
             if (m_useEncryption)
             {
                 processedData = crypto.encrypt(std::move(processedData), encryptionKey, dummyIV);
+            } 
+            else 
+            {
+                // Add size header even for unencrypted data to enable batch separation
+                // for the encryption case, this is implicitly done in the encrypt function
+                size_t dataSize = processedData.size();
+                std::vector<uint8_t> sizedData(sizeof(uint32_t) + dataSize);
+                std::memcpy(sizedData.data(), &dataSize, sizeof(uint32_t));
+                std::memcpy(sizedData.data() + sizeof(uint32_t), processedData.data(), dataSize);
+                processedData = std::move(sizedData);
             }
 
             if (targetFilename)

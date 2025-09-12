@@ -72,13 +72,6 @@ private:
     void appendStringToVector(std::vector<uint8_t> &vec, std::string &&str);
     bool extractFromVector(const std::vector<uint8_t>& vec, size_t& offset, void* data, size_t size) const;
     bool extractStringFromVector(std::vector<uint8_t> &vec, size_t &offset, std::string &str);
-    
-    // GDPRuler fields
-    uint64_t m_gdpr_timestamp;                          // 64-bit timestamp
-    uint32_t m_gdpr_cnt;                                // 32-bit trusted counter
-    std::bitset<num_users> m_gdpr_user_key;             // 128-bit user key bitmap
-    uint8_t m_gdpr_operation_result;                    // Operation + validity bit
-    std::vector<uint8_t> m_gdpr_payload;                // Arbitrary size new value
 
     ActionType m_actionType;                            // Type of GDPR operation
     std::string m_dataLocation;                         // Location of the data being operated on
@@ -87,6 +80,13 @@ private:
     std::string m_dataSubjectId;                        // ID of the data subject
     std::chrono::system_clock::time_point m_timestamp;  // When the operation occurred
     std::vector<uint8_t> m_payload;                     // optional extra bytes
+
+    // GDPRuler fields
+    uint64_t m_gdpr_timestamp;                          // 64-bit timestamp
+    uint32_t m_gdpr_cnt;                                // 32-bit trusted counter
+    std::bitset<num_users> m_gdpr_user_key;             // 128-bit user key bitmap
+    uint8_t m_gdpr_operation_result;                    // Operation + validity bit
+    std::vector<uint8_t> m_gdpr_payload;                // Arbitrary size new value
 };
 
 #endif

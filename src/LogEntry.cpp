@@ -10,11 +10,12 @@ LogEntry::LogEntry()
       m_dataProcessorId(""),
       m_dataSubjectId(""),
       m_timestamp(std::chrono::system_clock::now()),
+      m_payload(),
       m_gdpr_timestamp(0),
       m_gdpr_cnt(0),
       m_gdpr_user_key(0),
       m_gdpr_operation_result(0),
-      m_payload() {}
+      m_gdpr_payload() {}
 
 // GDPRuler constructor
 LogEntry::LogEntry(uint64_t timestamp,
@@ -324,8 +325,8 @@ std::vector<uint8_t> LogEntry::serializeBatchGDPR(std::vector<LogEntry>&& entrie
   result.resize(sizeof(uint32_t));
   uint32_t entryCount = static_cast<uint32_t>(entries.size());
   std::memcpy(result.data(), &entryCount, sizeof(entryCount));
-  std::cout<< "Serializing batch of " << entryCount << " GDPR entries." << std::endl;
-  
+  // std::cout<< "Serializing batch of " << entryCount << " GDPR entries." << std::endl;
+
   // Serialize each entry
   for (auto& entry : entries) {
     std::vector<uint8_t> entryData = entry.serializeGDPR();

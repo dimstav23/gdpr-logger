@@ -116,23 +116,6 @@ bool Logger::reset()
     return true;
 }
 
-bool Logger::exportLogs(
-    const std::string &outputPath,
-    std::chrono::system_clock::time_point fromTimestamp,
-    std::chrono::system_clock::time_point toTimestamp)
-{
-    if (!m_initialized)
-    {
-        reportError("Logger not initialized");
-        return false;
-    }
-
-    // This functionality would typically be handled by a separate component,
-    // such as a log storage or retrieval system
-    reportError("Export logs functionality not implemented in Logger");
-    return false;
-}
-
 void Logger::reportError(const std::string &message)
 {
     std::cerr << "Logger Error: " << message << std::endl;

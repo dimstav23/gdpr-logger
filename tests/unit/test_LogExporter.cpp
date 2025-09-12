@@ -424,7 +424,13 @@ TEST_F(LogExporterTest, UnencryptedData)
     if (compressionLevel > 0) {
         serializedData = Compression::compress(std::move(serializedData), compressionLevel);
     }
-    storage->writeToFile(testKey, std::move(serializedData));
+    // Append the size header (even for non-encrypted data)
+    size_t dataSize = serializedData.size();
+    std::vector<uint8_t> sizedData(sizeof(uint32_t) + dataSize);
+    std::memcpy(sizedData.data(), &dataSize, sizeof(uint32_t));
+    std::memcpy(sizedData.data() + sizeof(uint32_t), serializedData.data(), dataSize);
+    
+    storage->writeToFile(testKey, std::move(sizedData));
     storage->flush();
     
     // Export should work

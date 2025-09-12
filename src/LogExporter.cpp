@@ -46,7 +46,6 @@ std::vector<std::string> LogExporter::exportLogsForKey(const std::string& key,
         for (const auto& segmentFile : segmentFiles) {
             auto fileEntries = readAndDecodeSegmentFile(segmentFile, timestampThreshold);
             entries.insert(entries.end(), fileEntries.begin(), fileEntries.end());
-            std::cout << entries.size() << " entries found in " << segmentFile << std::endl;
         }
 
         // Sort entries by timestamp (they should already be mostly sorted)
@@ -157,7 +156,7 @@ std::vector<std::string> LogExporter::readAndDecodeSegmentFile(const std::string
 
         std::cout << "Processing segment file: " << segmentFile 
                   << " of size " << fileData.size() << " bytes." << std::endl;
-
+        
         // Process multiple encrypted batches in the same file
         size_t offset = 0;
         int batchCount = 0;
@@ -166,48 +165,62 @@ std::vector<std::string> LogExporter::readAndDecodeSegmentFile(const std::string
             batchCount++;
             std::cout << "Processing batch " << batchCount << " at offset " << offset << std::endl;
             
-            // Read the encrypted batch size from the current position
+            // Read the batch size from the current position
             if (offset + sizeof(uint32_t) > fileData.size()) {
                 std::cout << "Not enough data for size field at offset " << offset << std::endl;
                 break;
             }
             
-            uint32_t ciphertextSize;
-            std::memcpy(&ciphertextSize, fileData.data() + offset, sizeof(uint32_t));
+            uint32_t dataSize;
+            std::memcpy(&dataSize, fileData.data() + offset, sizeof(uint32_t));
+            std::cout << "Batch " << batchCount << " data size: " << dataSize << " bytes" << std::endl;
             
-            std::cout << "Batch " << batchCount << " ciphertext size: " << ciphertextSize << " bytes" << std::endl;
-            
-            // Calculate total size for this encrypted batch
-            size_t totalBatchSize = sizeof(uint32_t) + ciphertextSize + Crypto::GCM_TAG_SIZE;
-            
-            if (offset + totalBatchSize > fileData.size()) {
-                std::cout << "Not enough data for complete encrypted batch at offset " << offset 
-                          << " (need " << totalBatchSize << ", have " << (fileData.size() - offset) << ")" << std::endl;
-                break;
-            }
-            
-            // Extract this complete encrypted batch
-            std::vector<uint8_t> encryptedBatch(fileData.begin() + offset, 
-                                              fileData.begin() + offset + totalBatchSize);
-            
-            std::cout << "Extracted encrypted batch " << batchCount << ": " << encryptedBatch.size() << " bytes" << std::endl;
-            
-            // Move offset to start of next batch
-            offset += totalBatchSize;
-            
-            // Decrypt this batch
             std::vector<uint8_t> processedData;
-            if (m_useEncryption) {
-                try {
-                    processedData = m_crypto.decrypt(encryptedBatch, m_encryptionKey, m_dummyIV);
-                    std::cout << "Decrypted batch " << batchCount << ": " << processedData.size() << " bytes" << std::endl;
-                } catch (const std::exception& e) {
-                    std::cerr << "LogExporter: Failed to decrypt batch " << batchCount 
-                              << " in " << segmentFile << ": " << e.what() << std::endl;
-                    continue; // Skip this batch and try next
-                }
+
+            if (m_useEncryption) {              
+              // Calculate total size for this encrypted batch
+              size_t totalBatchSize = sizeof(uint32_t) + dataSize + Crypto::GCM_TAG_SIZE;
+              
+              if (offset + totalBatchSize > fileData.size()) {
+                  std::cout << "Not enough data for complete encrypted batch at offset " << offset 
+                            << " (need " << totalBatchSize << ", have " << (fileData.size() - offset) << ")" << std::endl;
+                  break;
+              }
+              
+              // Extract this complete encrypted batch
+              std::vector<uint8_t> encryptedBatch(fileData.begin() + offset, 
+                                                fileData.begin() + offset + totalBatchSize);
+              
+              std::cout << "Extracted encrypted batch " << batchCount << ": " << encryptedBatch.size() << " bytes" << std::endl;
+              
+              // Move offset to start of next batch
+              offset += totalBatchSize;
+
+              try {
+                  processedData = m_crypto.decrypt(encryptedBatch, m_encryptionKey, m_dummyIV);
+                  std::cout << "Decrypted batch " << batchCount << ": " << processedData.size() << " bytes" << std::endl;
+              } catch (const std::exception& e) {
+                  std::cerr << "LogExporter: Failed to decrypt batch " << batchCount 
+                            << " in " << segmentFile << ": " << e.what() << std::endl;
+                  break;
+              }
             } else {
-                processedData = std::move(encryptedBatch);
+              // Move offset to start of next batch
+              size_t totalBatchSize = sizeof(uint32_t) + dataSize;
+              if (offset + totalBatchSize > fileData.size()) {
+                  std::cout << "Not enough data for complete unencrypted batch at offset " << offset 
+                            << " (need " << totalBatchSize << ", have " << (fileData.size() - offset) << ")" << std::endl;
+                  break;
+              }
+              
+              // Extract just the data part (skip the size header)
+              processedData.assign(fileData.begin() + offset + sizeof(uint32_t), 
+                                  fileData.begin() + offset + totalBatchSize);
+              
+              std::cout << "Extracted unencrypted batch " << batchCount << ": " << processedData.size() << " bytes" << std::endl;
+              
+              // Move offset to start of next batch
+              offset += totalBatchSize;
             }
 
             // Decompress this batch
@@ -322,10 +335,7 @@ std::string LogExporter::extractKeyFromFilename(const std::string& filename) con
 bool LogExporter::exportToFile(const std::string& outputPath,
                               std::chrono::system_clock::time_point fromTimestamp,
                               std::chrono::system_clock::time_point toTimestamp) const
-{
-    // Implementation from your original exportLogs method
-    // This is the file-based export functionality
-    
+{    
     try {
         // Create output directory if needed
         std::filesystem::path outputDir = std::filesystem::path(outputPath).parent_path();

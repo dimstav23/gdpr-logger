@@ -100,7 +100,7 @@ bool LoggingManager::stop()
 
     if (m_queue)
     {
-        std::cout << "LoggingSystem: Waiting for queue to empty..." << std::endl;
+        // std::cout << "LoggingSystem: Waiting for queue to empty..." << std::endl;
         m_queue->flush();
     }
 
@@ -157,7 +157,7 @@ bool LoggingManager::appendBatch(std::vector<LogEntry> entries,
 
 void LoggingManager::pauseWorkersDrainAndResume()
 {
-    std::cout << "LoggingManager: Pausing workers and draining queue..." << std::endl;
+    // std::cout << "LoggingManager: Pausing workers and draining queue..." << std::endl;
     
     // Block new entries
     bool wasAccepting = m_acceptingEntries.exchange(false);
@@ -180,5 +180,5 @@ void LoggingManager::pauseWorkersDrainAndResume()
     // Resume accepting entries
     m_acceptingEntries.store(wasAccepting);
     
-    std::cout << "LoggingManager: Queue drained and workers resumed" << std::endl;
+    // std::cout << "LoggingManager: Queue drained and workers resumed" << std::endl;
 }
