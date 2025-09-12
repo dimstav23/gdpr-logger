@@ -147,15 +147,15 @@ TEST_F(WriterGDPRTest, MultipleStartCallsGDPR)
 TEST_F(WriterGDPRTest, ProcessGDPRBatchEntries)
 {
     // Create GDPR-format LogEntries
-    std::bitset<128> userMap1;
+    std::bitset<num_users> userMap1;
     userMap1.set(1);
     userMap1.set(64);
 
-    std::bitset<128> userMap2;
+    std::bitset<num_users> userMap2;
     userMap2.set(10);
     userMap2.set(127);
 
-    std::bitset<128> userMap3;
+    std::bitset<num_users> userMap3;
     userMap3.set(50);
 
     std::vector<uint8_t> payload1 = {0x01, 0x02, 0x03};
@@ -210,11 +210,11 @@ TEST_F(WriterGDPRTest, GDPRLargePayloadHandling)
     BufferQueue::ProducerToken token = queue->createProducerToken();
 
     // Create GDPR entries with large payloads
-    std::bitset<128> userMap1;
+    std::bitset<num_users> userMap1;
     userMap1.set(5);
     userMap1.set(100);
 
-    std::bitset<128> userMap2;
+    std::bitset<num_users> userMap2;
     userMap2.set(20);
     userMap2.set(120);
 
@@ -261,7 +261,7 @@ TEST_F(WriterGDPRTest, GDPRMixedOperationTypes)
     std::vector<QueueItem> mixedItems;
     
     // Different operation types with GDPR format
-    std::bitset<128> userMap;
+    std::bitset<num_users> userMap;
     userMap.set(42);
 
     std::vector<uint8_t> payload = {0x01, 0x02, 0x03, 0x04, 0x05};
@@ -319,7 +319,7 @@ TEST_F(WriterGDPRTest, GDPRHighFrequencySmallBatches)
         std::vector<QueueItem> items;
         
         for (int i = 0; i < itemsPerBatch; ++i) {
-            std::bitset<128> userMap;
+            std::bitset<num_users> userMap;
             userMap.set(batch + i); // Different user for each item
             
             uint64_t timestamp = 2000000000 + batch * 100 + i;
@@ -355,13 +355,13 @@ TEST_F(WriterGDPRTest, GDPRMaxUserKeyMap)
     BufferQueue::ProducerToken token = queue->createProducerToken();
 
     // Create entries with maximum values
-    std::bitset<128> maxUserMap;
+    std::bitset<num_users> maxUserMap;
     maxUserMap.flip(); // Set all bits to 1
 
     std::vector<uint8_t> payload(1000, 0xFF);
 
     std::vector<QueueItem> maxItems;
-    maxItems.emplace_back(QueueItem{LogEntry{UINT64_MAX, UINT32_MAX, maxUserMap, 0xFF, payload}});
+    maxItems.emplace_back(QueueItem{LogEntry{INT64_MAX, INT32_MAX, maxUserMap, 0xFF, payload}});
 
     queue->enqueueBatchBlocking(maxItems, token, std::chrono::milliseconds(500));
 
@@ -400,12 +400,12 @@ TEST_F(WriterGDPRTest, GDPRConcurrentEnqueuingAndProcessing)
     std::atomic<int> itemsEnqueued{0};
     
     std::thread enqueuingThread([&]() {
-        int counter = 0;
+        uint32_t counter = 0;
         while (!shouldStop.load()) {
             std::vector<QueueItem> items;
             for (int i = 0; i < 3; ++i) {
-                std::bitset<128> userMap;
-                userMap.set(counter % 128);
+                std::bitset<num_users> userMap;
+                userMap.set(counter % num_users);
                 
                 uint64_t timestamp = 3000000000UL + counter;
                 uint8_t operationValidity = ((counter % 4) << 1) | (counter % 2);

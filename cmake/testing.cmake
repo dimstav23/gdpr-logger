@@ -37,6 +37,7 @@ add_test_suite(test_compression tests/unit/test_Compression.cpp)
 add_test_suite(test_crypto tests/unit/test_Crypto.cpp)
 add_test_suite(test_writer tests/unit/test_Writer.cpp)
 add_test_suite(test_segmented_storage tests/unit/test_SegmentedStorage.cpp)
+add_test_suite(test_log_exporter tests/unit/test_LogExporter.cpp)
 # integration tests
 add_test_suite(test_compression_crypto tests/integration/test_CompressionCrypto.cpp)
 add_test_suite(test_writer_queue tests/integration/test_WriterQueue.cpp)
