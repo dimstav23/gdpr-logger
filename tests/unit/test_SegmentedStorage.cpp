@@ -26,6 +26,14 @@ protected:
         }
     }
 
+    void TearDown() override
+    {        
+        // Clean up test files
+        if (std::filesystem::exists(testPath)) {
+            std::filesystem::remove_all(testPath);
+        }
+    }
+
     std::string getCurrentTimestamp()
     {
         auto now = std::chrono::system_clock::now();
