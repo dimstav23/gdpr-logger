@@ -24,8 +24,6 @@ public:
     std::vector<std::string> getLogFilesList() const;
 
     std::vector<std::string> getFilenames(const std::string& dir) const;
-    
-    void flushLogs();
 
     // Export to file
     bool exportToFile(const std::string& outputPath,

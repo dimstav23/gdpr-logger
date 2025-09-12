@@ -154,3 +154,31 @@ bool LoggingManager::appendBatch(std::vector<LogEntry> entries,
 
     return Logger::getInstance().appendBatch(std::move(entries), token, filename);
 }
+
+void LoggingManager::pauseWorkersDrainAndResume()
+{
+    std::cout << "LoggingManager: Pausing workers and draining queue..." << std::endl;
+    
+    // Block new entries
+    bool wasAccepting = m_acceptingEntries.exchange(false);
+    
+    // Wait for queue to empty
+    size_t queueSize = m_queue->size();
+    while (queueSize > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        queueSize = m_queue->size();
+    }
+    
+    // Give writers time to finish current batch
+    std::this_thread::sleep_for(std::chrono::milliseconds(50));
+    
+    // Flush storage
+    if (m_storage) {
+        m_storage->flush();
+    }
+    
+    // Resume accepting entries
+    m_acceptingEntries.store(wasAccepting);
+    
+    std::cout << "LoggingManager: Queue drained and workers resumed" << std::endl;
+}

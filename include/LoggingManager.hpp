@@ -25,6 +25,7 @@ public:
     bool start();
     bool startGDPR();
     bool stop();
+    void pauseWorkersDrainAndResume();
 
     BufferQueue::ProducerToken createProducerToken();
     bool append(LogEntry entry,

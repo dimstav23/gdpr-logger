@@ -23,12 +23,6 @@ LogExporter::LogExporter(std::shared_ptr<SegmentedStorage> storage,
 {
 }
 
-void LogExporter::flushLogs() {
-    if (m_storage) {
-        m_storage->flush();
-    }
-}
-
 std::vector<std::string> LogExporter::exportLogsForKey(const std::string& key, 
                                                       uint64_t timestampThreshold) const
 {
