@@ -23,7 +23,8 @@ LoggingManager::LoggingManager(const LoggingConfig &config)
         config.maxAttempts,
         config.baseRetryDelay,
         config.maxOpenFiles);
-
+    m_logExporter = std::make_shared<LogExporter>(m_storage, m_useEncryption, m_compressionLevel);
+    
     Logger::getInstance().initialize(m_queue, config.appendTimeout);
 
     m_writers.reserve(m_numWriterThreads);

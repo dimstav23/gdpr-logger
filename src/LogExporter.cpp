@@ -1,0 +1,313 @@
+#include "LogExporter.hpp"
+#include <iostream>
+#include <fstream>
+#include <sstream>
+#include <iomanip>
+#include <algorithm>
+#include <set>
+
+LogExporter::LogExporter(std::shared_ptr<SegmentedStorage> storage, 
+                        bool useEncryption, 
+                        int compressionLevel)
+    : m_storage(std::move(storage))
+    , m_useEncryption(useEncryption)
+    , m_compressionLevel(compressionLevel)
+    , m_encryptionKey(m_crypto.KEY_SIZE, 0x42)  // TODO: Use proper key management
+    , m_dummyIV(m_crypto.GCM_IV_SIZE, 0x24)     // TODO: Use proper IV management
+{
+}
+
+std::vector<std::string> LogExporter::exportLogsForKey(const std::string& key, 
+                                                      uint64_t timestampThreshold) const
+{
+    std::vector<std::string> entries;
+    
+    if (!m_storage) {
+        std::cerr << "LogExporter: Storage not initialized" << std::endl;
+        return entries;
+    }
+
+    try {
+        // Get segment files for the specific key
+        auto segmentFiles = m_storage->getSegmentFilesForKey(key);
+        
+        if (segmentFiles.empty()) {
+            std::cerr << "LogExporter: No log files found for key: " << key << std::endl;
+            return entries;
+        }
+
+        // Process each segment file for this key
+        for (const auto& segmentFile : segmentFiles) {
+            auto fileEntries = readAndDecodeSegmentFile(segmentFile, timestampThreshold);
+            entries.insert(entries.end(), fileEntries.begin(), fileEntries.end());
+        }
+
+        // Sort entries by timestamp (they should already be mostly sorted)
+        // std::sort(entries.begin(), entries.end());
+
+    } catch (const std::exception& e) {
+        std::cerr << "LogExporter: Error reading logs for key " << key 
+                  << ": " << e.what() << std::endl;
+    }
+
+    return entries;
+}
+
+std::vector<std::string> LogExporter::exportAllLogs(uint64_t timestampThreshold) const
+{
+    std::vector<std::string> allEntries;
+    
+    if (!m_storage) {
+        std::cerr << "LogExporter: Storage not initialized" << std::endl;
+        return allEntries;
+    }
+
+    try {
+        // Get all segment files
+        auto segmentFiles = m_storage->getSegmentFiles();
+        
+        if (segmentFiles.empty()) {
+            std::cerr << "LogExporter: No log files found" << std::endl;
+            return allEntries;
+        }
+
+        // Process each segment file
+        for (const auto& segmentFile : segmentFiles) {
+            auto fileEntries = readAndDecodeSegmentFile(segmentFile, timestampThreshold);
+            allEntries.insert(allEntries.end(), fileEntries.begin(), fileEntries.end());
+        }
+
+        // Sort all entries by timestamp
+        std::sort(allEntries.begin(), allEntries.end());
+
+    } catch (const std::exception& e) {
+        std::cerr << "LogExporter: Error reading all logs: " << e.what() << std::endl;
+    }
+
+    return allEntries;
+}
+
+std::vector<std::string> LogExporter::getLogFilesList() const
+{
+    if (!m_storage) {
+        std::cerr << "LogExporter: Storage not initialized" << std::endl;
+        return {};
+    }
+
+    // Get the storage base path and use filesystem to list files
+    // This mimics your get_filenames functionality
+    return getFilenames(m_storage->getBasePath());
+}
+
+std::vector<std::string> LogExporter::getFilenames(const std::string& dir) const
+{
+    std::vector<std::string> filenames;
+    
+    try {
+        std::filesystem::path logs_dir(dir);
+        
+        if (!std::filesystem::exists(logs_dir)) {
+            return filenames;
+        }
+
+        for (const auto& file : std::filesystem::directory_iterator(logs_dir)) {
+            if (file.is_regular_file()) {
+                filenames.push_back(file.path().string());
+            }
+        }
+        
+        std::sort(filenames.begin(), filenames.end());
+        
+    } catch (const std::filesystem::filesystem_error& e) {
+        std::cerr << "LogExporter: Error listing files in " << dir << ": " << e.what() << std::endl;
+    }
+
+    return filenames;
+}
+
+std::vector<std::string> LogExporter::readAndDecodeSegmentFile(const std::string& segmentFile, 
+                                                              uint64_t timestampThreshold) const
+{
+    std::vector<std::string> entries;
+    
+    try {
+        // Read the encrypted/compressed segment file
+        std::ifstream inputFile(segmentFile, std::ios::binary | std::ios::ate);
+        if (!inputFile.is_open()) {
+            std::cerr << "LogExporter: Failed to open segment file: " << segmentFile << std::endl;
+            return entries;
+        }
+
+        size_t fileSize = inputFile.tellg();
+        if (fileSize == 0) {
+            return entries;
+        }
+
+        inputFile.seekg(0);
+        std::vector<uint8_t> fileData(fileSize);
+        inputFile.read(reinterpret_cast<char*>(fileData.data()), fileSize);
+        inputFile.close();
+
+        // Reverse the processing pipeline: decrypt -> decompress -> deserialize
+        std::vector<uint8_t> processedData = std::move(fileData);
+
+        // Decrypt if encryption was used
+        if (m_useEncryption) {
+            try {
+                processedData = m_crypto.decrypt(std::move(processedData), m_encryptionKey, m_dummyIV);
+            } catch (const std::exception& e) {
+                std::cerr << "LogExporter: Failed to decrypt " << segmentFile 
+                          << ": " << e.what() << std::endl;
+                return entries;
+            }
+        }
+
+        // Decompress if compression was used
+        if (m_compressionLevel > 0) {
+            try {
+                processedData = Compression::decompress(std::move(processedData));
+            } catch (const std::exception& e) {
+                std::cerr << "LogExporter: Failed to decompress " << segmentFile 
+                          << ": " << e.what() << std::endl;
+                return entries;
+            }
+        }
+
+        // Deserialize GDPR log entries
+        std::vector<LogEntry> logEntries;
+        try {
+            logEntries = LogEntry::deserializeBatchGDPR(std::move(processedData));
+        } catch (const std::exception& e) {
+            std::cerr << "LogExporter: Failed to deserialize " << segmentFile 
+                      << ": " << e.what() << std::endl;
+            return entries;
+        }
+
+        // Filter by timestamp and format (similar to your decode_log_entry logic)
+        for (const auto& entry : logEntries) {
+            // Only include entries with timestamp before the threshold (like your old logger)
+            if (entry.getGDPRTimestamp() <= timestampThreshold) {
+                entries.push_back(formatGDPRLogEntryReadable(entry));
+            }
+        }
+
+    } catch (const std::exception& e) {
+        std::cerr << "LogExporter: Error processing segment file " << segmentFile 
+                  << ": " << e.what() << std::endl;
+    }
+
+    return entries;
+}
+
+std::string LogExporter::formatGDPRLogEntryReadable(const LogEntry& entry) const
+{
+    std::ostringstream oss;
+    
+    // Convert timestamp to readable format (similar to your timestamp_to_datetime)
+    auto timePoint = std::chrono::system_clock::time_point(
+        std::chrono::nanoseconds(entry.getGDPRTimestamp()));
+    auto timeT = std::chrono::system_clock::to_time_t(timePoint);
+    
+    oss << "Timestamp: " << std::put_time(std::gmtime(&timeT), "%Y-%m-%d %H:%M:%S UTC");
+    
+    oss << ", User key: " << entry.getUserKeyMap().to_string();
+    
+    // Decode operation and validity (same logic as your decode_log_entry)
+    uint8_t operation_bits = (entry.getOperationValidity() >> 1) & 0x07;
+    uint8_t result_bit = entry.getOperationValidity() & 0x01;
+    
+    oss << ", Operation: " << operationToString(operation_bits);
+    oss << ", Result: " << (result_bit != 0 ? "valid" : "invalid");
+    
+    // Add payload if present (similar to your gdpr_metadata_fmt)
+    if (!entry.getNewValue().empty()) {
+        oss << ", New value: ";
+        // Convert payload to string representation
+        std::string payloadStr(entry.getNewValue().begin(), entry.getNewValue().end());
+        oss << payloadStr; // You might want to apply gdpr_metadata_fmt here
+    }
+    
+    return oss.str();
+}
+
+std::string LogExporter::operationToString(uint8_t operation) const
+{
+    switch (operation) {
+        case 0: return "unknown";
+        case 1: return "get";
+        case 2: return "put";
+        case 3: return "delete";
+        case 4: return "getM";
+        case 5: return "putM";
+        case 6: return "putC";
+        case 7: return "getLogs";
+        default: return "invalid";
+    }
+}
+
+std::string LogExporter::extractKeyFromFilename(const std::string& filename) const
+{
+    std::filesystem::path filePath(filename);
+    std::string name = filePath.stem().string(); // Remove extension
+    
+    // Remove segment suffix (e.g., "_001", "_002") if present
+    size_t lastUnderscore = name.find_last_of('_');
+    if (lastUnderscore != std::string::npos) {
+        std::string suffix = name.substr(lastUnderscore + 1);
+        // Check if suffix is numeric (segment number)
+        if (std::all_of(suffix.begin(), suffix.end(), ::isdigit)) {
+            return name.substr(0, lastUnderscore);
+        }
+    }
+    
+    return name;
+}
+
+bool LogExporter::exportToFile(const std::string& outputPath,
+                              std::chrono::system_clock::time_point fromTimestamp,
+                              std::chrono::system_clock::time_point toTimestamp) const
+{
+    // Implementation from your original exportLogs method
+    // This is the file-based export functionality
+    
+    try {
+        // Create output directory if needed
+        std::filesystem::path outputDir = std::filesystem::path(outputPath).parent_path();
+        if (!outputDir.empty() && !std::filesystem::exists(outputDir)) {
+            if (!std::filesystem::create_directories(outputDir)) {
+                std::cerr << "LogExporter: Failed to create output directory: " << outputDir << std::endl;
+                return false;
+            }
+        }
+
+        std::ofstream outputFile(outputPath);
+        if (!outputFile.is_open()) {
+            std::cerr << "LogExporter: Failed to open output file: " << outputPath << std::endl;
+            return false;
+        }
+
+        // Convert time points to nanoseconds
+        int64_t fromNanos = fromTimestamp.time_since_epoch().count();
+        int64_t toNanos = toTimestamp.time_since_epoch().count();
+
+        // Get all logs and filter by time range
+        auto allLogs = exportAllLogs(toNanos);
+        
+        size_t exportedCount = 0;
+        for (const auto& logEntry : allLogs) {
+            // Simple timestamp extraction from formatted string
+            // You might want to make this more robust
+            outputFile << logEntry << std::endl;
+            exportedCount++;
+        }
+
+        outputFile.close();
+        std::cout << "LogExporter: Successfully exported " << exportedCount 
+                  << " entries to " << outputPath << std::endl;
+        return true;
+
+    } catch (const std::exception& e) {
+        std::cerr << "LogExporter: Export to file failed: " << e.what() << std::endl;
+        return false;
+    }
+}

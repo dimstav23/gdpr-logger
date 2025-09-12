@@ -317,3 +317,55 @@ std::string SegmentedStorage::generateSegmentPath(const std::string &filename, s
     ss << std::setw(6) << std::setfill('0') << segmentIndex << ".log";
     return ss.str();
 }
+
+std::vector<std::string> SegmentedStorage::getSegmentFiles() const
+{
+  std::vector<std::string> segmentFiles;
+  
+  try {
+    if (!std::filesystem::exists(m_basePath)) {
+      std::cerr << "SegmentedStorage: Base path does not exist: " << m_basePath << std::endl;
+      return segmentFiles;
+    }
+
+    for (const auto& entry : std::filesystem::directory_iterator(m_basePath)) {
+      if (entry.is_regular_file()) {
+        std::string filename = entry.path().filename().string();
+        // Check if it's a log file (contains .log extension)
+        if (filename.find(".log") != std::string::npos) {
+          segmentFiles.push_back(entry.path().string());
+        }
+      }
+    }
+
+    // Sort files by name to ensure chronological order
+    std::sort(segmentFiles.begin(), segmentFiles.end());
+      
+  } catch (const std::filesystem::filesystem_error& e) {
+    std::cerr << "SegmentedStorage: Error listing files: " << e.what() << std::endl;
+  }
+
+  return segmentFiles;
+}
+
+std::vector<std::string> SegmentedStorage::getSegmentFilesForKey(const std::string& key) const
+{
+  std::vector<std::string> keyFiles;
+  auto allFiles = getSegmentFiles();
+  
+  for (const auto& file : allFiles) {
+    std::filesystem::path filePath(file);
+    std::string filename = filePath.stem().string(); // Without extension
+    
+    // Check if file belongs to this key
+    if (filename == key || 
+      (filename.length() > key.length() + 1 && 
+        filename.substr(0, key.length()) == key && 
+        filename[key.length()] == '_')) {
+      keyFiles.push_back(file);
+    }
+  }
+  
+  std::sort(keyFiles.begin(), keyFiles.end());
+  return keyFiles;
+}

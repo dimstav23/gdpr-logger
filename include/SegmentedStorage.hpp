@@ -34,6 +34,10 @@ public:
     size_t write(std::vector<uint8_t> &&data);
     size_t writeToFile(const std::string &filename, std::vector<uint8_t> &&data);
     void flush();
+    
+    std::vector<std::string> getSegmentFiles() const;
+    std::vector<std::string> getSegmentFilesForKey(const std::string& key) const;
+    std::string getBasePath() const { return m_basePath; }
 
 private:
     std::string m_basePath;

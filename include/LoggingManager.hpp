@@ -7,6 +7,7 @@
 #include "SegmentedStorage.hpp"
 #include "Writer.hpp"
 #include "LogEntry.hpp"
+#include "LogExporter.hpp"
 #include <memory>
 #include <vector>
 #include <atomic>
@@ -37,9 +38,17 @@ public:
                     std::chrono::system_clock::time_point fromTimestamp = std::chrono::system_clock::time_point(),
                     std::chrono::system_clock::time_point toTimestamp = std::chrono::system_clock::time_point());
 
+    std::shared_ptr<LogExporter> getLogExporter() const {
+      return m_logExporter;
+    }
+    std::shared_ptr<SegmentedStorage> getStorage() const {
+      return m_storage;
+    }
+                    
 private:
     std::shared_ptr<BufferQueue> m_queue;           // Thread-safe queue for queue items
     std::shared_ptr<SegmentedStorage> m_storage;    // Manages append-only log segments
+    std::shared_ptr<LogExporter> m_logExporter;     // For exporting logs
     std::vector<std::unique_ptr<Writer>> m_writers; // Multiple writer threads
     std::atomic<bool> m_running{false};             // System running state
     std::atomic<bool> m_acceptingEntries{false};    // Controls whether new entries are accepted
