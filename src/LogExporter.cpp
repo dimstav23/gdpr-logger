@@ -6,6 +6,12 @@
 #include <algorithm>
 #include <set>
 
+// Logs export pipeline:
+// 1. Read the encrypted segments from storage
+// 2. Decrypt and decompress them
+// 3. Filter by timestamp if requested
+// 4. Write to the output path
+
 LogExporter::LogExporter(std::shared_ptr<SegmentedStorage> storage, 
                         bool useEncryption, 
                         int compressionLevel)
@@ -17,11 +23,17 @@ LogExporter::LogExporter(std::shared_ptr<SegmentedStorage> storage,
 {
 }
 
+void LogExporter::flushLogs() {
+    if (m_storage) {
+        m_storage->flush();
+    }
+}
+
 std::vector<std::string> LogExporter::exportLogsForKey(const std::string& key, 
                                                       uint64_t timestampThreshold) const
 {
     std::vector<std::string> entries;
-    
+
     if (!m_storage) {
         std::cerr << "LogExporter: Storage not initialized" << std::endl;
         return entries;
@@ -40,6 +52,7 @@ std::vector<std::string> LogExporter::exportLogsForKey(const std::string& key,
         for (const auto& segmentFile : segmentFiles) {
             auto fileEntries = readAndDecodeSegmentFile(segmentFile, timestampThreshold);
             entries.insert(entries.end(), fileEntries.begin(), fileEntries.end());
+            std::cout << entries.size() << " entries found in " << segmentFile << std::endl;
         }
 
         // Sort entries by timestamp (they should already be mostly sorted)
@@ -131,7 +144,7 @@ std::vector<std::string> LogExporter::readAndDecodeSegmentFile(const std::string
     std::vector<std::string> entries;
     
     try {
-        // Read the encrypted/compressed segment file
+        // Read the entire file
         std::ifstream inputFile(segmentFile, std::ios::binary | std::ios::ate);
         if (!inputFile.is_open()) {
             std::cerr << "LogExporter: Failed to open segment file: " << segmentFile << std::endl;
@@ -148,48 +161,97 @@ std::vector<std::string> LogExporter::readAndDecodeSegmentFile(const std::string
         inputFile.read(reinterpret_cast<char*>(fileData.data()), fileSize);
         inputFile.close();
 
-        // Reverse the processing pipeline: decrypt -> decompress -> deserialize
-        std::vector<uint8_t> processedData = std::move(fileData);
+        std::cout << "Processing segment file: " << segmentFile 
+                  << " of size " << fileData.size() << " bytes." << std::endl;
 
-        // Decrypt if encryption was used
-        if (m_useEncryption) {
+        // Process multiple encrypted batches in the same file
+        size_t offset = 0;
+        int batchCount = 0;
+        
+        while (offset < fileData.size()) {
+            batchCount++;
+            std::cout << "Processing batch " << batchCount << " at offset " << offset << std::endl;
+            
+            // Read the encrypted batch size from the current position
+            if (offset + sizeof(uint32_t) > fileData.size()) {
+                std::cout << "Not enough data for size field at offset " << offset << std::endl;
+                break;
+            }
+            
+            uint32_t ciphertextSize;
+            std::memcpy(&ciphertextSize, fileData.data() + offset, sizeof(uint32_t));
+            
+            std::cout << "Batch " << batchCount << " ciphertext size: " << ciphertextSize << " bytes" << std::endl;
+            
+            // Calculate total size for this encrypted batch
+            size_t totalBatchSize = sizeof(uint32_t) + ciphertextSize + Crypto::GCM_TAG_SIZE;
+            
+            if (offset + totalBatchSize > fileData.size()) {
+                std::cout << "Not enough data for complete encrypted batch at offset " << offset 
+                          << " (need " << totalBatchSize << ", have " << (fileData.size() - offset) << ")" << std::endl;
+                break;
+            }
+            
+            // Extract this complete encrypted batch
+            std::vector<uint8_t> encryptedBatch(fileData.begin() + offset, 
+                                              fileData.begin() + offset + totalBatchSize);
+            
+            std::cout << "Extracted encrypted batch " << batchCount << ": " << encryptedBatch.size() << " bytes" << std::endl;
+            
+            // Move offset to start of next batch
+            offset += totalBatchSize;
+            
+            // Decrypt this batch
+            std::vector<uint8_t> processedData;
+            if (m_useEncryption) {
+                try {
+                    processedData = m_crypto.decrypt(encryptedBatch, m_encryptionKey, m_dummyIV);
+                    std::cout << "Decrypted batch " << batchCount << ": " << processedData.size() << " bytes" << std::endl;
+                } catch (const std::exception& e) {
+                    std::cerr << "LogExporter: Failed to decrypt batch " << batchCount 
+                              << " in " << segmentFile << ": " << e.what() << std::endl;
+                    continue; // Skip this batch and try next
+                }
+            } else {
+                processedData = std::move(encryptedBatch);
+            }
+
+            // Decompress this batch
+            if (m_compressionLevel > 0) {
+                try {
+                    processedData = Compression::decompress(std::move(processedData));
+                    std::cout << "Decompressed batch " << batchCount << ": " << processedData.size() << " bytes" << std::endl;
+                } catch (const std::exception& e) {
+                    std::cerr << "LogExporter: Failed to decompress batch " << batchCount 
+                              << " in " << segmentFile << ": " << e.what() << std::endl;
+                    exit(1);
+                }
+            }
+
+            // Deserialize this batch
+            std::vector<LogEntry> logEntries;
             try {
-                processedData = m_crypto.decrypt(std::move(processedData), m_encryptionKey, m_dummyIV);
+                logEntries = LogEntry::deserializeBatchGDPR(std::move(processedData));
+                std::cout << "Deserialized batch " << batchCount << ": " << logEntries.size() << " entries" << std::endl;
             } catch (const std::exception& e) {
-                std::cerr << "LogExporter: Failed to decrypt " << segmentFile 
-                          << ": " << e.what() << std::endl;
-                return entries;
+                std::cerr << "LogExporter: Failed to deserialize batch " << batchCount 
+                          << " in " << segmentFile << ": " << e.what() << std::endl;
+                exit(1);
             }
-        }
 
-        // Decompress if compression was used
-        if (m_compressionLevel > 0) {
-            try {
-                processedData = Compression::decompress(std::move(processedData));
-            } catch (const std::exception& e) {
-                std::cerr << "LogExporter: Failed to decompress " << segmentFile 
-                          << ": " << e.what() << std::endl;
-                return entries;
+            // Filter and format entries from this batch
+            size_t entriesFromThisBatch = 0;
+            for (const auto& entry : logEntries) {
+                if (entry.getGDPRTimestamp() <= timestampThreshold) {
+                    entries.push_back(formatGDPRLogEntryReadable(entry));
+                    entriesFromThisBatch++;
+                }
             }
+            
+            std::cout << "Added " << entriesFromThisBatch << " entries from batch " << batchCount << std::endl;
         }
-
-        // Deserialize GDPR log entries
-        std::vector<LogEntry> logEntries;
-        try {
-            logEntries = LogEntry::deserializeBatchGDPR(std::move(processedData));
-        } catch (const std::exception& e) {
-            std::cerr << "LogExporter: Failed to deserialize " << segmentFile 
-                      << ": " << e.what() << std::endl;
-            return entries;
-        }
-
-        // Filter by timestamp and format (similar to your decode_log_entry logic)
-        for (const auto& entry : logEntries) {
-            // Only include entries with timestamp before the threshold (like your old logger)
-            if (entry.getGDPRTimestamp() <= timestampThreshold) {
-                entries.push_back(formatGDPRLogEntryReadable(entry));
-            }
-        }
+        
+        std::cout << "Processed " << batchCount << " batches, found " << entries.size() << " entries total" << std::endl;
 
     } catch (const std::exception& e) {
         std::cerr << "LogExporter: Error processing segment file " << segmentFile 
@@ -287,8 +349,8 @@ bool LogExporter::exportToFile(const std::string& outputPath,
         }
 
         // Convert time points to nanoseconds
-        int64_t fromNanos = fromTimestamp.time_since_epoch().count();
-        int64_t toNanos = toTimestamp.time_since_epoch().count();
+        [[maybe_unused]] uint64_t fromNanos = fromTimestamp.time_since_epoch().count();
+        uint64_t toNanos = toTimestamp.time_since_epoch().count();
 
         // Get all logs and filter by time range
         auto allLogs = exportAllLogs(toNanos);

@@ -24,7 +24,7 @@ LoggingManager::LoggingManager(const LoggingConfig &config)
         config.baseRetryDelay,
         config.maxOpenFiles);
     m_logExporter = std::make_shared<LogExporter>(m_storage, m_useEncryption, m_compressionLevel);
-    
+
     Logger::getInstance().initialize(m_queue, config.appendTimeout);
 
     m_writers.reserve(m_numWriterThreads);
@@ -153,20 +153,4 @@ bool LoggingManager::appendBatch(std::vector<LogEntry> entries,
     }
 
     return Logger::getInstance().appendBatch(std::move(entries), token, filename);
-}
-
-bool LoggingManager::exportLogs(
-    const std::string &outputPath,
-    std::chrono::system_clock::time_point fromTimestamp,
-    std::chrono::system_clock::time_point toTimestamp)
-{
-    // This is a placeholder implementation for log export
-    // A complete solution would:
-    // 1. Read the encrypted segments from storage
-    // 2. Decrypt and decompress them
-    // 3. Filter by timestamp if requested
-    // 4. Write to the output path
-
-    std::cerr << "LoggingSystem: Export logs not fully implemented" << std::endl;
-    return false;
 }
