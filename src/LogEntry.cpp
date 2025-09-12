@@ -19,7 +19,7 @@ LogEntry::LogEntry()
 // GDPRuler constructor
 LogEntry::LogEntry(uint64_t timestamp,
                    uint32_t trustedCounter,
-                   std::bitset<128> userKeyMap,
+                   std::bitset<num_users> userKeyMap,
                    uint8_t operationValidity,
                    std::vector<uint8_t> newValue)
     : m_gdpr_timestamp(timestamp), m_gdpr_cnt(trustedCounter), 

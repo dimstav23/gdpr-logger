@@ -9,6 +9,7 @@ set(TEST_SOURCES
     tests/unit/test_Crypto.cpp
     tests/unit/test_Writer.cpp
     tests/unit/test_SegmentedStorage.cpp
+    tests/unit/test_LogExporter.cpp
     # integration tests
     tests/integration/test_CompressionCrypto.cpp
     tests/integration/test_WriterQueue.cpp

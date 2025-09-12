@@ -10,8 +10,15 @@
 class Crypto
 {
 private:
-    EVP_CIPHER_CTX *m_encryptCtx;
-    EVP_CIPHER_CTX *m_decryptCtx;
+    // EVP_CIPHER_CTX *m_encryptCtx;
+    // EVP_CIPHER_CTX *m_decryptCtx;
+    
+    // Thread-local storage for contexts
+    thread_local static EVP_CIPHER_CTX* getEncryptContext();
+    thread_local static EVP_CIPHER_CTX* getDecryptContext();
+    
+    // Cleanup function for thread-local contexts
+    static void cleanupThreadLocalContexts();
 
 public:
     Crypto();
