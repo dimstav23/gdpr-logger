@@ -311,6 +311,8 @@ std::string LogExporter::formatGDPRLogEntryReadable(const LogEntry& entry) const
     
     oss << "Timestamp: " << std::put_time(std::gmtime(&timeT), "%Y-%m-%d %H:%M:%S UTC");
     
+    oss << ", DB Key: " << entry.getGDPRKey();
+
     oss << ", User key: " << entry.getUserKeyMap().to_string();
     
     // Decode operation and validity (same logic as your decode_log_entry)

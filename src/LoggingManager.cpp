@@ -138,13 +138,15 @@ bool LoggingManager::append(LogEntry entry,
                             BufferQueue::ProducerToken &token,
                             const std::optional<std::string> &filename)
 {
-    if (!m_acceptingEntries.load(std::memory_order_acquire))
-    {
-        std::cerr << "LoggingSystem: Not accepting entries" << std::endl;
-        return false;
+    int maxAttempts = 100;
+    for (int i = 0; i< maxAttempts; i++) {
+      if (m_acceptingEntries.load(std::memory_order_acquire)) {
+          return Logger::getInstance().append(std::move(entry), token, filename);
+      }
+      std::this_thread::sleep_for(std::chrono::milliseconds(10)); // sleep max : 100 * 10ms = 1
     }
-
-    return Logger::getInstance().append(std::move(entry), token, filename);
+    std::cerr << "LoggingSystem: Failed to append after " << maxAttempts << " attempts" << std::endl;
+    return false;
 }
 
 bool LoggingManager::appendBatch(std::vector<LogEntry> entries,
