@@ -56,7 +56,7 @@ protected:
     // Helper to create a test log entry
     LogEntry createTestLogEntry(const std::string& key, 
                                uint64_t timestamp,
-                               uint32_t counter,
+                               const std::string& gdprKey,
                                uint8_t operation = 1, // get
                                bool valid = true,
                                const std::string& payload = "") {
@@ -73,31 +73,46 @@ protected:
             payloadBytes.assign(payload.begin(), payload.end());
         }
         
-        return LogEntry(timestamp, counter, userKey, operationResult, std::move(payloadBytes));
+        return LogEntry(timestamp, gdprKey, userKey, operationResult, std::move(payloadBytes));
     }
 
     // Helper to write test data to storage
     void writeTestData(const std::string& key, 
-                      std::vector<LogEntry> entries) {
+                      std::vector<LogEntry> entries,
+                      uint32_t batchCounter = 0) {
         
         // Serialize entries
         std::vector<uint8_t> serializedData = LogEntry::serializeBatchGDPR(std::move(entries));
         
+        // Prepend counter header
+        std::vector<uint8_t> dataWithCounter(sizeof(uint32_t) + serializedData.size());
+        std::memcpy(dataWithCounter.data(), &batchCounter, sizeof(uint32_t));
+        std::memcpy(dataWithCounter.data() + sizeof(uint32_t), serializedData.data(), serializedData.size());
+        
+        // Use the data with counter for compression/encryption
+        std::vector<uint8_t> processedData = std::move(dataWithCounter);
+
         // Compress if needed
         if (compressionLevel > 0) {
-            serializedData = Compression::compress(std::move(serializedData), compressionLevel);
+            processedData = Compression::compress(std::move(processedData), compressionLevel);
         }
-        
         // Encrypt if needed
         if (useEncryption) {
             Crypto crypto;
             std::vector<uint8_t> encryptionKey(crypto.KEY_SIZE, 0x42);
             std::vector<uint8_t> dummyIV(crypto.GCM_IV_SIZE, 0x24);
-            serializedData = crypto.encrypt(std::move(serializedData), encryptionKey, dummyIV);
+            processedData = crypto.encrypt(std::move(processedData), encryptionKey, dummyIV);
+        } else {
+          // Add size header for unencrypted data
+          size_t dataSize = processedData.size();
+          std::vector<uint8_t> sizedData(sizeof(uint32_t) + dataSize);
+          std::memcpy(sizedData.data(), &dataSize, sizeof(uint32_t));
+          std::memcpy(sizedData.data() + sizeof(uint32_t), processedData.data(), dataSize);
+          processedData = std::move(sizedData);
         }
         
         // Write to storage
-        storage->writeToFile(key, std::move(serializedData));
+        storage->writeToFile(key, std::move(processedData));
         storage->flush();
     }
 
@@ -122,9 +137,9 @@ TEST_F(LogExporterTest, BasicExportForKey)
     
     // Create test entries
     std::vector<LogEntry> entries;
-    entries.push_back(createTestLogEntry(testKey, timestamp - 1000, 1, 1, true, "test_value_1"));
-    entries.push_back(createTestLogEntry(testKey, timestamp - 500, 2, 2, true, "test_value_2"));
-    entries.push_back(createTestLogEntry(testKey, timestamp, 3, 3, false, ""));
+    entries.push_back(createTestLogEntry(testKey, timestamp - 1000, "gdpr_key_1", 1, true, "test_value_1"));
+    entries.push_back(createTestLogEntry(testKey, timestamp - 500, "gdpr_key_2", 2, true, "test_value_2"));
+    entries.push_back(createTestLogEntry(testKey, timestamp, "gdpr_key_3", 3, false, ""));
     
     // Write test data
     writeTestData(testKey, entries);
@@ -164,9 +179,9 @@ TEST_F(LogExporterTest, TimestampFiltering)
     
     // Create entries with different timestamps
     std::vector<LogEntry> entries;
-    entries.push_back(createTestLogEntry(testKey, pastTime, 1, 1, true, "old_entry"));
-    entries.push_back(createTestLogEntry(testKey, currentTime, 2, 2, true, "current_entry"));
-    entries.push_back(createTestLogEntry(testKey, futureTime, 3, 3, true, "future_entry"));
+    entries.push_back(createTestLogEntry(testKey, pastTime, "old_key", 1, true, "old_entry"));
+    entries.push_back(createTestLogEntry(testKey, currentTime, "current_key", 2, true, "current_entry"));
+    entries.push_back(createTestLogEntry(testKey, futureTime, "future_key", 3, true, "future_entry"));
     
     writeTestData(testKey, entries);
     
@@ -192,12 +207,12 @@ TEST_F(LogExporterTest, ExportAllLogs)
     
     // Create entries for different keys
     std::vector<LogEntry> entries1;
-    entries1.push_back(createTestLogEntry("key1", timestamp - 1000, 1, 1, true, "data1"));
+    entries1.push_back(createTestLogEntry("key1", timestamp - 1000, "gdpr_key1", 1, true, "data1"));
     writeTestData("key1", entries1);
     
     std::vector<LogEntry> entries2;
-    entries2.push_back(createTestLogEntry("key2", timestamp - 500, 1, 2, true, "data2"));
-    entries2.push_back(createTestLogEntry("key2", timestamp, 2, 3, false, "data3"));
+    entries2.push_back(createTestLogEntry("key2", timestamp - 500, "gdpr_key2", 2, true, "data2"));
+    entries2.push_back(createTestLogEntry("key2", timestamp, "gdpr_key3", 3, false, "data3"));
     writeTestData("key2", entries2);
     
     // Export all logs
@@ -223,7 +238,7 @@ TEST_F(LogExporterTest, GetLogFilesList)
     
     // Create some test files
     std::vector<LogEntry> entries;
-    entries.push_back(createTestLogEntry("testkey", timestamp, 1, 1, true, "test"));
+    entries.push_back(createTestLogEntry("testkey", timestamp, "gdpr_test_key", 1, true, "test"));
     
     writeTestData("file1", entries);
     writeTestData("file2", entries);
@@ -246,19 +261,20 @@ TEST_F(LogExporterTest, OperationStringConversion)
     
     // Test different operations
     std::vector<LogEntry> entries;
-    entries.push_back(createTestLogEntry(testKey, timestamp - 600, 1, 0, true, "")); // unknown
-    entries.push_back(createTestLogEntry(testKey, timestamp - 500, 2, 1, true, "")); // get
-    entries.push_back(createTestLogEntry(testKey, timestamp - 400, 3, 2, true, "")); // put
-    entries.push_back(createTestLogEntry(testKey, timestamp - 300, 4, 3, true, "")); // delete
-    entries.push_back(createTestLogEntry(testKey, timestamp - 200, 5, 4, true, "")); // getM
-    entries.push_back(createTestLogEntry(testKey, timestamp - 100, 6, 5, true, "")); // putM
-    entries.push_back(createTestLogEntry(testKey, timestamp, 7, 7, true, ""));       // getLogs
-    
+    entries.push_back(createTestLogEntry(testKey, timestamp - 600, "unknown_key", 0, true, ""));  // unknown
+    entries.push_back(createTestLogEntry(testKey, timestamp - 500, "get_key", 1, true, ""));      // get
+    entries.push_back(createTestLogEntry(testKey, timestamp - 400, "put_key", 2, true, ""));      // put
+    entries.push_back(createTestLogEntry(testKey, timestamp - 300, "delete_key", 3, true, ""));   // delete
+    entries.push_back(createTestLogEntry(testKey, timestamp - 200, "getM_key", 4, true, ""));     // getM
+    entries.push_back(createTestLogEntry(testKey, timestamp - 100, "putM_key", 5, true, ""));     // putM
+    entries.push_back(createTestLogEntry(testKey, timestamp, "putC_key", 6, true, ""));           // putC
+    entries.push_back(createTestLogEntry(testKey, timestamp, "getLogs_key", 7, true, ""));        // getLogs
+
     writeTestData(testKey, entries);
     
     auto exportedLogs = exporter->exportLogsForKey(testKey, timestamp + 1000);
     
-    ASSERT_EQ(exportedLogs.size(), 7);
+    ASSERT_EQ(exportedLogs.size(), entries.size());
     
     // Check operation strings
     EXPECT_TRUE(exportedLogs[0].find("unknown") != std::string::npos);
@@ -267,7 +283,8 @@ TEST_F(LogExporterTest, OperationStringConversion)
     EXPECT_TRUE(exportedLogs[3].find("delete") != std::string::npos);
     EXPECT_TRUE(exportedLogs[4].find("getM") != std::string::npos);
     EXPECT_TRUE(exportedLogs[5].find("putM") != std::string::npos);
-    EXPECT_TRUE(exportedLogs[6].find("getLogs") != std::string::npos);
+    EXPECT_TRUE(exportedLogs[6].find("putC") != std::string::npos);
+    EXPECT_TRUE(exportedLogs[7].find("getLogs") != std::string::npos);
 }
 
 // Test validity flag formatting
@@ -277,8 +294,8 @@ TEST_F(LogExporterTest, ValidityFormatting)
     uint64_t timestamp = getCurrentTimestamp();
     
     std::vector<LogEntry> entries;
-    entries.push_back(createTestLogEntry(testKey, timestamp - 1000, 1, 1, true, ""));  // valid
-    entries.push_back(createTestLogEntry(testKey, timestamp, 2, 1, false, ""));        // invalid
+    entries.push_back(createTestLogEntry(testKey, timestamp - 1000, "valid_key", 1, true, ""));  // valid
+    entries.push_back(createTestLogEntry(testKey, timestamp, "invalid_key", 1, false, ""));      // invalid
     
     writeTestData(testKey, entries);
     
@@ -298,7 +315,7 @@ TEST_F(LogExporterTest, LargePayloadExport)
     // Create entry with large payload
     std::string largePayload(1000, 'A'); // 1000 characters
     std::vector<LogEntry> entries;
-    entries.push_back(createTestLogEntry(testKey, timestamp, 1, 1, true, largePayload));
+    entries.push_back(createTestLogEntry(testKey, timestamp, "large_payload_key", 1, true, largePayload));
     
     writeTestData(testKey, entries);
     
@@ -318,8 +335,8 @@ TEST_F(LogExporterTest, ExportToFile)
     
     // Create test entries
     std::vector<LogEntry> entries;
-    entries.push_back(createTestLogEntry(testKey, timestamp - 1000, 1, 1, true, "export_test_1"));
-    entries.push_back(createTestLogEntry(testKey, timestamp, 2, 2, false, "export_test_2"));
+    entries.push_back(createTestLogEntry(testKey, timestamp - 1000, "export_key_1", 1, true, "export_test_1"));
+    entries.push_back(createTestLogEntry(testKey, timestamp, "export_key_2", 2, false, "export_test_2"));
     
     writeTestData(testKey, entries);
     
@@ -378,8 +395,9 @@ TEST_F(LogExporterTest, ConcurrentExport)
     // Create test data for multiple keys
     for (int i = 0; i < 5; ++i) {
         std::string key = "concurrent_key_" + std::to_string(i);
+        std::string gdprKey = "concurrent_gdpr_key_" + std::to_string(i);
         std::vector<LogEntry> entries;
-        entries.push_back(createTestLogEntry(key, timestamp + i, 1, 1, true, "data_" + std::to_string(i)));
+        entries.push_back(createTestLogEntry(key, timestamp + i, gdprKey, 1, true, "data_" + std::to_string(i)));
         writeTestData(key, entries);
     }
     
@@ -417,21 +435,13 @@ TEST_F(LogExporterTest, UnencryptedData)
     
     // Create test entry
     std::vector<LogEntry> entries;
-    entries.push_back(createTestLogEntry(testKey, timestamp, 1, 1, true, "unencrypted_data"));
-    
-    // Write without encryption
-    std::vector<uint8_t> serializedData = LogEntry::serializeBatchGDPR(std::move(entries));
-    if (compressionLevel > 0) {
-        serializedData = Compression::compress(std::move(serializedData), compressionLevel);
-    }
-    // Append the size header (even for non-encrypted data)
-    size_t dataSize = serializedData.size();
-    std::vector<uint8_t> sizedData(sizeof(uint32_t) + dataSize);
-    std::memcpy(sizedData.data(), &dataSize, sizeof(uint32_t));
-    std::memcpy(sizedData.data() + sizeof(uint32_t), serializedData.data(), dataSize);
-    
-    storage->writeToFile(testKey, std::move(sizedData));
-    storage->flush();
+    entries.push_back(createTestLogEntry(testKey, timestamp, "unencrypted_gdpr_key", 1, true, "unencrypted_data"));
+
+    // Disable encryption
+    useEncryption = false;
+    writeTestData(testKey, std::move(entries), 0);
+    // Re-enable encryption
+    useEncryption = true;
     
     // Export should work
     auto exportedLogs = unencryptedExporter->exportLogsForKey(testKey, timestamp + 1000);
@@ -451,18 +461,14 @@ TEST_F(LogExporterTest, UncompressedData)
     
     // Create test entry
     std::vector<LogEntry> entries;
-    entries.push_back(createTestLogEntry(testKey, timestamp, 1, 1, true, "uncompressed_data"));
+    entries.push_back(createTestLogEntry(testKey, timestamp, "uncompressed_gdpr_key", 1, true, "uncompressed_data"));
     
-    // Write without compression but with encryption
-    std::vector<uint8_t> serializedData = LogEntry::serializeBatchGDPR(std::move(entries));
-    if (useEncryption) {
-        Crypto crypto;
-        std::vector<uint8_t> encryptionKey(crypto.KEY_SIZE, 0x42);
-        std::vector<uint8_t> dummyIV(crypto.GCM_IV_SIZE, 0x24);
-        serializedData = crypto.encrypt(std::move(serializedData), encryptionKey, dummyIV);
-    }
-    storage->writeToFile(testKey, std::move(serializedData));
-    storage->flush();
+    // Disable compression
+    int oldCompressionLevel = compressionLevel;
+    compressionLevel = 0;
+    writeTestData(testKey, std::move(entries), 0);
+    // Re-enable compression
+    compressionLevel = oldCompressionLevel;
     
     // Export should work
     auto exportedLogs = uncompressedExporter->exportLogsForKey(testKey, timestamp + 1000);

@@ -17,12 +17,16 @@ LoggingManager::LoggingManager(const LoggingConfig &config)
     }
 
     m_queue = std::make_shared<BufferQueue>(config.queueCapacity, config.maxExplicitProducers);
+    
     m_storage = std::make_shared<SegmentedStorage>(
         config.basePath, config.baseFilename,
         config.maxSegmentSize,
         config.maxAttempts,
         config.baseRetryDelay,
         config.maxOpenFiles);
+    
+    m_trustedCounter = std::make_shared<TrustedCounter>();
+
     m_logExporter = std::make_shared<LogExporter>(m_storage, m_useEncryption, m_compressionLevel);
 
     Logger::getInstance().initialize(m_queue, config.appendTimeout);
@@ -50,7 +54,7 @@ bool LoggingManager::start()
 
     for (size_t i = 0; i < m_numWriterThreads; ++i)
     {
-        auto writer = std::make_unique<Writer>(*m_queue, m_storage, m_batchSize, m_useEncryption, m_compressionLevel);
+        auto writer = std::make_unique<Writer>(*m_queue, m_storage, m_trustedCounter, m_batchSize, m_useEncryption, m_compressionLevel);
         writer->start();
         m_writers.push_back(std::move(writer));
     }
@@ -76,7 +80,8 @@ bool LoggingManager::startGDPR()
 
     for (size_t i = 0; i < m_numWriterThreads; ++i)
     {
-        auto writer = std::make_unique<Writer>(*m_queue, m_storage, m_batchSize, m_useEncryption, m_compressionLevel);
+        auto writer = std::make_unique<Writer>(*m_queue, m_storage, m_trustedCounter, 
+                                                m_batchSize, m_useEncryption, m_compressionLevel);
         writer->startGDPR();
         m_writers.push_back(std::move(writer));
     }

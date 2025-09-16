@@ -160,7 +160,10 @@ std::vector<std::string> LogExporter::readAndDecodeSegmentFile(const std::string
         // Process multiple encrypted batches in the same file
         size_t offset = 0;
         int batchCount = 0;
-        
+        // Counter validation state - start from 0 for prototyping simplicity
+        uint32_t expectedCounter = 0;
+        bool counterSequentialityValid = true;
+
         while (offset < fileData.size()) {
             batchCount++;
             std::cout << "Processing batch " << batchCount << " at offset " << offset << std::endl;
@@ -234,7 +237,28 @@ std::vector<std::string> LogExporter::readAndDecodeSegmentFile(const std::string
                     exit(1);
                 }
             }
+            
+            // After decompression, extract counter from beginning of batch
+            uint32_t batchCounter = 0;
+            if (processedData.size() >= sizeof(uint32_t)) {
+                std::memcpy(&batchCounter, processedData.data(), sizeof(uint32_t));
+                // Remove counter from processed data
+                processedData.erase(processedData.begin(), processedData.begin() + sizeof(uint32_t));
+                std::cout << "Batch " << batchCount << " counter: " << batchCounter << std::endl;
 
+                if (batchCounter != expectedCounter) {
+                    std::cout << "ERROR: Counter sequentiality issue in batch " << batchCount 
+                             << " of file " << segmentFile
+                             << " - Expected: " << expectedCounter 
+                             << ", Got: " << batchCounter << std::endl;
+                    counterSequentialityValid = false;
+                }
+                expectedCounter++;
+            } else {
+                std::cout << "WARNING: Batch " << batchCount << " too small to extract counter" << std::endl;
+                counterSequentialityValid = false;
+            }
+            
             // Deserialize this batch
             std::vector<LogEntry> logEntries;
             try {
@@ -259,6 +283,14 @@ std::vector<std::string> LogExporter::readAndDecodeSegmentFile(const std::string
         }
         
         std::cout << "Processed " << batchCount << " batches, found " << entries.size() << " entries total" << std::endl;
+        
+        // Trusted counter validation warning
+        if (!counterSequentialityValid) {
+            std::cout << "WARNING: Counter sequentiality issues detected in file " << segmentFile << std::endl;
+        } else {
+            std::cout << "Counter sequentiality validation passed for file " << segmentFile 
+                     << " (final counter: " << (expectedCounter - 1) << ")" << std::endl;
+        }
 
     } catch (const std::exception& e) {
         std::cerr << "LogExporter: Error processing segment file " << segmentFile 

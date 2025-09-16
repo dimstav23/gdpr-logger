@@ -12,19 +12,21 @@ LogEntry::LogEntry()
       m_timestamp(std::chrono::system_clock::now()),
       m_payload(),
       m_gdpr_timestamp(0),
-      m_gdpr_cnt(0),
+      m_gdpr_key(""),
       m_gdpr_user_key(0),
       m_gdpr_operation_result(0),
       m_gdpr_payload() {}
 
 // GDPRuler constructor
 LogEntry::LogEntry(uint64_t timestamp,
-                   uint32_t trustedCounter,
+                   std::string gdprKey,
                    std::bitset<num_users> userKeyMap,
                    uint8_t operationValidity,
                    std::vector<uint8_t> newValue)
-    : m_gdpr_timestamp(timestamp), m_gdpr_cnt(trustedCounter), 
-      m_gdpr_user_key(userKeyMap), m_gdpr_operation_result(operationValidity),
+    : m_gdpr_timestamp(timestamp), 
+      m_gdpr_key(std::move(gdprKey)),
+      m_gdpr_user_key(userKeyMap), 
+      m_gdpr_operation_result(operationValidity),
       m_gdpr_payload(std::move(newValue)) {}
 
 LogEntry::LogEntry(ActionType actionType,
@@ -45,42 +47,48 @@ LogEntry::LogEntry(ActionType actionType,
 
 // Serialization for GDPRuler
 std::vector<uint8_t> LogEntry::serializeGDPR() const {
-  // Calculate total size: m_gdpr_timestamp(8) + m_gdpr_cnt(4) + m_gdpr_user_key(16) + m_gdpr_operation_result(1) + m_gdpr_payload_size(4) + m_gdpr_payload
-  size_t totalSize = sizeof(m_gdpr_timestamp) + sizeof(m_gdpr_cnt) + sizeof(m_gdpr_user_key) + sizeof(m_gdpr_operation_result) + sizeof(uint32_t) + m_gdpr_payload.size();
+    // Calculate total size: timestamp(8) + key_size(4) + key + user_key(16) + operation_result(1) + payload_size(4) + payload
+    size_t totalSize = sizeof(m_gdpr_timestamp) + 
+                       sizeof(uint32_t) + m_gdpr_key.size() + 
+                       sizeof(m_gdpr_user_key) + 
+                       sizeof(m_gdpr_operation_result) + 
+                       sizeof(uint32_t) + m_gdpr_payload.size();
 
-  std::vector<uint8_t> result;
-  result.reserve(totalSize);
+    std::vector<uint8_t> result;
+    result.reserve(totalSize);
 
-  // 1. Timestamp (64-bit)
-  appendToVector(result, &m_gdpr_timestamp, sizeof(m_gdpr_timestamp));
+    // 1. Timestamp (64-bit)
+    appendToVector(result, &m_gdpr_timestamp, sizeof(m_gdpr_timestamp));
 
-  // 2. Trusted counter (32-bit)
-  appendToVector(result, &m_gdpr_cnt, sizeof(m_gdpr_cnt));
-
-  // 3. User key map (128-bit = 16 bytes)
-  // Convert bitset to bytes manually for portability
-  for (size_t i = 0; i < 16; ++i) {
-    uint8_t byte = 0;
-    for (size_t bit = 0; bit < 8; ++bit) {
-      if (m_gdpr_user_key[i * 8 + bit]) {
-        byte |= (1 << bit);
-      }
+    // 2. GDPR key (length-prefixed string)
+    uint32_t keySize = static_cast<uint32_t>(m_gdpr_key.size());
+    appendToVector(result, &keySize, sizeof(keySize));
+    if (keySize > 0) {
+        appendToVector(result, m_gdpr_key.data(), keySize);
     }
-    result.push_back(byte);
-  }
 
-  // 4. Operation + validity (8-bit)
-  appendToVector(result, &m_gdpr_operation_result, sizeof(m_gdpr_operation_result));
+    // 3. User key map (128-bit = 16 bytes)
+    for (size_t i = 0; i < 16; ++i) {
+        uint8_t byte = 0;
+        for (size_t bit = 0; bit < 8; ++bit) {
+            if (m_gdpr_user_key[i * 8 + bit]) {
+                byte |= (1 << bit);
+            }
+        }
+        result.push_back(byte);
+    }
 
-  // 5. New value size (32-bit) + data
-  uint32_t payloadSize = static_cast<uint32_t>(m_gdpr_payload.size());
-  appendToVector(result, &payloadSize, sizeof(payloadSize));
-  
-  if (payloadSize > 0) {
-    appendToVector(result, m_gdpr_payload.data(), m_gdpr_payload.size());
-  }
+    // 4. Operation + validity (8-bit)
+    appendToVector(result, &m_gdpr_operation_result, sizeof(m_gdpr_operation_result));
 
-  return result;
+    // 5. New value size (32-bit) + data
+    uint32_t payloadSize = static_cast<uint32_t>(m_gdpr_payload.size());
+    appendToVector(result, &payloadSize, sizeof(payloadSize));
+    if (payloadSize > 0) {
+        appendToVector(result, m_gdpr_payload.data(), m_gdpr_payload.size());
+    }
+
+    return result;
 }
 
 // Move version that consumes the LogEntry
@@ -175,62 +183,69 @@ std::vector<uint8_t> LogEntry::serialize() const &
 
 // Deserialization for GDPRuler
 bool LogEntry::deserializeGDPR(const std::vector<uint8_t>& data) {
-  size_t offset = 0;
-  const size_t minSize = sizeof(m_gdpr_timestamp) + sizeof(m_gdpr_cnt) + sizeof(m_gdpr_user_key) + sizeof(m_gdpr_operation_result) + sizeof(uint32_t); // Minimum size without payload
-
-  if (data.size() < minSize) {
-    return false;
-  }
-
-  try {
-    // 1. Extract timestamp (64-bit)
-    if (!extractFromVector(data, offset, &m_gdpr_timestamp, sizeof(m_gdpr_timestamp))) {
-      return false;
+    size_t offset = 0;
+    const size_t minSize = sizeof(m_gdpr_timestamp) + sizeof(uint32_t) + sizeof(m_gdpr_user_key) + sizeof(m_gdpr_operation_result) + sizeof(uint32_t);
+    if (data.size() < minSize) {
+        return false;
     }
 
-    // 2. Extract trusted counter (32-bit)
-    if (!extractFromVector(data, offset, &m_gdpr_cnt, sizeof(m_gdpr_cnt))) {
-      return false;
-    }
-
-    // 3. Extract user key map (128-bit = 16 bytes)
-    m_gdpr_user_key.reset();
-    for (size_t i = 0; i < 16; ++i) {
-      if (offset >= data.size()) return false;
-      uint8_t byte = data[offset++];
-      for (size_t bit = 0; bit < 8; ++bit) {
-        if (byte & (1 << bit)) {
-          m_gdpr_user_key.set(i * 8 + bit);
+    try {
+        // 1. Extract timestamp (64-bit)
+        if (!extractFromVector(data, offset, &m_gdpr_timestamp, sizeof(m_gdpr_timestamp))) {
+            return false;
         }
-      }
-    }
 
-    // 4. Extract operation + validity (8-bit)
-    if (!extractFromVector(data, offset, &m_gdpr_operation_result, sizeof(m_gdpr_operation_result))) {
-      return false;
-    }
+        // 2. Extract GDPR key
+        uint32_t keySize;
+        if (!extractFromVector(data, offset, &keySize, sizeof(keySize))) {
+            return false;
+        }
+        if (offset + keySize > data.size()) {
+            return false;
+        }
+        if (keySize > 0) {
+            m_gdpr_key.assign(reinterpret_cast<const char*>(data.data() + offset), keySize);
+            offset += keySize;
+        } else {
+            m_gdpr_key.clear();
+        }
 
-    // 5. Extract new value size and data
-    uint32_t payloadSize;
-    if (!extractFromVector(data, offset, &payloadSize, sizeof(payloadSize))) {
-      return false;
-    }
+        // 3. Extract user key map (128-bit = 16 bytes)
+        m_gdpr_user_key.reset();
+        for (size_t i = 0; i < 16; ++i) {
+            if (offset >= data.size()) return false;
+            uint8_t byte = data[offset++];
+            for (size_t bit = 0; bit < 8; ++bit) {
+                if (byte & (1 << bit)) {
+                    m_gdpr_user_key.set(i * 8 + bit);
+                }
+            }
+        }
 
-    if (offset + payloadSize > data.size()) {
-      return false;
-    }
+        // 4. Extract operation + validity (8-bit)
+        if (!extractFromVector(data, offset, &m_gdpr_operation_result, sizeof(m_gdpr_operation_result))) {
+            return false;
+        }
 
-    if (payloadSize > 0) {
-      m_gdpr_payload.resize(payloadSize);
-      std::memcpy(m_gdpr_payload.data(), data.data() + offset, payloadSize);
-    } else {
-      m_gdpr_payload.clear();
-    }
+        // 5. Extract new value size and data
+        uint32_t payloadSize;
+        if (!extractFromVector(data, offset, &payloadSize, sizeof(payloadSize))) {
+            return false;
+        }
+        if (offset + payloadSize > data.size()) {
+            return false;
+        }
+        if (payloadSize > 0) {
+            m_gdpr_payload.resize(payloadSize);
+            std::memcpy(m_gdpr_payload.data(), data.data() + offset, payloadSize);
+        } else {
+            m_gdpr_payload.clear();
+        }
 
-    return true;
-  } catch (...) {
-    return false;
-  }
+        return true;
+    } catch (...) {
+        return false;
+    }
 }
 
 bool LogEntry::deserialize(std::vector<uint8_t> &&data)

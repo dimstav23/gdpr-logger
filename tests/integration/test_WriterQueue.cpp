@@ -2,6 +2,7 @@
 #include "Writer.hpp"
 #include "BufferQueue.hpp"
 #include "SegmentedStorage.hpp"
+#include "TrustedCounter.hpp"
 #include <chrono>
 #include <thread>
 #include <vector>
@@ -24,7 +25,9 @@ protected:
             1024 * 1024 // Maximum segment size (1 MB for testing)
         );
 
-        writer = std::make_unique<Writer>(*logQueue, storage);
+        trustedCounter = std::make_shared<TrustedCounter>();
+
+        writer = std::make_unique<Writer>(*logQueue, storage, trustedCounter);
     }
 
     void TearDown() override
@@ -39,6 +42,7 @@ protected:
     std::unique_ptr<BufferQueue> logQueue;
     std::unique_ptr<Writer> writer;
     std::shared_ptr<SegmentedStorage> storage;
+    std::shared_ptr<TrustedCounter> trustedCounter;
     std::string testDir;
 
     QueueItem createTestItem(int id)

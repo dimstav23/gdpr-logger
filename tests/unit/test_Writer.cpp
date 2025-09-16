@@ -2,6 +2,7 @@
 #include "Writer.hpp"
 #include "BufferQueue.hpp"
 #include "SegmentedStorage.hpp"
+#include "TrustedCounter.hpp"
 #include <chrono>
 #include <thread>
 #include <filesystem>
@@ -21,6 +22,7 @@ protected:
             "test_logsegment",
             1024 * 1024 // max segment size (e.g., 1 MB for test)
         );
+        trustedCounter = std::make_shared<TrustedCounter>();
         batchSize = 100;
         useEncryption = false;
         compressionLevel = 0;
@@ -38,6 +40,7 @@ protected:
 
     std::unique_ptr<BufferQueue> queue;
     std::shared_ptr<SegmentedStorage> storage;
+    std::shared_ptr<TrustedCounter> trustedCounter;
     std::unique_ptr<Writer> writer;
     std::string testDir;
     size_t batchSize;
@@ -48,7 +51,7 @@ protected:
 // Test that the writer starts and stops correctly
 TEST_F(WriterTest, StartAndStop)
 {
-    writer = std::make_unique<Writer>(*queue, storage);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter);
     EXPECT_FALSE(writer->isRunning());
 
     writer->start();
@@ -61,7 +64,7 @@ TEST_F(WriterTest, StartAndStop)
 // Test multiple start calls
 TEST_F(WriterTest, MultipleStartCalls)
 {
-    writer = std::make_unique<Writer>(*queue, storage);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter);
     writer->start();
     EXPECT_TRUE(writer->isRunning());
 
@@ -86,7 +89,7 @@ TEST_F(WriterTest, ProcessBatchEntries)
     queue->enqueueBatchBlocking(testItems, producerToken, std::chrono::milliseconds(100));
 
     // Instantiate writer with a batch size equal to number of test items
-    writer = std::make_unique<Writer>(*queue, storage, testItems.size());
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter, testItems.size());
     writer->start();
 
     // Give some time for the writer thread to process the entries.
@@ -103,7 +106,7 @@ TEST_F(WriterTest, EmptyQueue)
 {
     EXPECT_EQ(queue->size(), 0);
 
-    writer = std::make_unique<Writer>(*queue, storage);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter);
     writer->start();
 
     // Give some time to verify it handles empty queue gracefully
@@ -119,7 +122,7 @@ class WriterGDPRTest : public WriterTest {};
 // Test that the writer starts and stops correctly with GDPR mode
 TEST_F(WriterGDPRTest, StartAndStopGDPR)
 {
-    writer = std::make_unique<Writer>(*queue, storage);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter);
     EXPECT_FALSE(writer->isRunning());
 
     writer->startGDPR();
@@ -132,7 +135,7 @@ TEST_F(WriterGDPRTest, StartAndStopGDPR)
 // Test multiple start calls in GDPR mode
 TEST_F(WriterGDPRTest, MultipleStartCallsGDPR)
 {
-    writer = std::make_unique<Writer>(*queue, storage);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter);
     writer->startGDPR();
     EXPECT_TRUE(writer->isRunning());
 
@@ -163,9 +166,9 @@ TEST_F(WriterGDPRTest, ProcessGDPRBatchEntries)
     std::vector<uint8_t> payload3 = {0x08, 0x09, 0x0A, 0x0B, 0x0C};
 
     std::vector<QueueItem> testItems = {
-        QueueItem{LogEntry{1234567890, 42, userMap1, (1 << 1) | 1, payload1}}, // GET operation, valid
-        QueueItem{LogEntry{1234567891, 43, userMap2, (2 << 1) | 1, payload2}}, // PUT operation, valid
-        QueueItem{LogEntry{1234567892, 44, userMap3, (3 << 1) | 0, payload3}}  // DELETE operation, invalid
+        QueueItem{LogEntry{1234567890, "user_key_1", userMap1, (1 << 1) | 1, payload1}}, // GET operation, valid
+        QueueItem{LogEntry{1234567891, "user_key_2", userMap2, (2 << 1) | 1, payload2}}, // PUT operation, valid
+        QueueItem{LogEntry{1234567892, "user_key_3", userMap3, (3 << 1) | 0, payload3}}  // DELETE operation, invalid
     };
 
     BufferQueue::ProducerToken producerToken = queue->createProducerToken();
@@ -174,7 +177,7 @@ TEST_F(WriterGDPRTest, ProcessGDPRBatchEntries)
     queue->enqueueBatchBlocking(testItems, producerToken, std::chrono::milliseconds(100));
 
     // Instantiate writer with GDPR mode and batch size equal to number of test items
-    writer = std::make_unique<Writer>(*queue, storage, testItems.size());
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter, testItems.size());
     writer->startGDPR();
 
     // Give time for the writer thread to process the entries
@@ -191,7 +194,7 @@ TEST_F(WriterGDPRTest, EmptyQueueGDPR)
 {
     EXPECT_EQ(queue->size(), 0);
 
-    writer = std::make_unique<Writer>(*queue, storage);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter);
     writer->startGDPR();
 
     // Give some time to verify it handles empty queue gracefully
@@ -204,7 +207,7 @@ TEST_F(WriterGDPRTest, EmptyQueueGDPR)
 // Test GDPR entries with large payloads
 TEST_F(WriterGDPRTest, GDPRLargePayloadHandling)
 {
-    writer = std::make_unique<Writer>(*queue, storage, batchSize, useEncryption, compressionLevel);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter, batchSize, useEncryption, compressionLevel);
     writer->startGDPR();
 
     BufferQueue::ProducerToken token = queue->createProducerToken();
@@ -225,8 +228,8 @@ TEST_F(WriterGDPRTest, GDPRLargePayloadHandling)
     std::vector<uint8_t> veryLargePayload(50 * 1024, 0xCD);
 
     std::vector<QueueItem> largeItems;
-    largeItems.emplace_back(QueueItem{LogEntry{9876543210, 100, userMap1, (2 << 1) | 1, largePayload}});
-    largeItems.emplace_back(QueueItem{LogEntry{9876543211, 101, userMap2, (1 << 1) | 1, veryLargePayload}});
+    largeItems.emplace_back(QueueItem{LogEntry{9876543210, "large_payload_user", userMap1, (2 << 1) | 1, largePayload}});
+    largeItems.emplace_back(QueueItem{LogEntry{9876543211, "very_large_payload_user", userMap2, (1 << 1) | 1, veryLargePayload}});
 
     queue->enqueueBatchBlocking(largeItems, token, std::chrono::milliseconds(1000));
 
@@ -253,7 +256,7 @@ TEST_F(WriterGDPRTest, GDPRLargePayloadHandling)
 // Test GDPR entries with different operation types
 TEST_F(WriterGDPRTest, GDPRMixedOperationTypes)
 {
-    writer = std::make_unique<Writer>(*queue, storage);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter);
     writer->startGDPR();
 
     BufferQueue::ProducerToken token = queue->createProducerToken();
@@ -267,19 +270,19 @@ TEST_F(WriterGDPRTest, GDPRMixedOperationTypes)
     std::vector<uint8_t> payload = {0x01, 0x02, 0x03, 0x04, 0x05};
 
     // Invalid operation (0), valid
-    mixedItems.emplace_back(QueueItem{LogEntry{1000, 1, userMap, (0 << 1) | 1, {}}});
+    mixedItems.emplace_back(QueueItem{LogEntry{1000, "invalid_op_user", userMap, (0 << 1) | 1, {}}});
     
     // GET operation (1), valid  
-    mixedItems.emplace_back(QueueItem{LogEntry{1001, 2, userMap, (1 << 1) | 1, payload}});
+    mixedItems.emplace_back(QueueItem{LogEntry{1001, "get_user", userMap, (1 << 1) | 1, payload}});
     
     // PUT operation (2), invalid
-    mixedItems.emplace_back(QueueItem{LogEntry{1002, 3, userMap, (2 << 1) | 0, payload}});
+    mixedItems.emplace_back(QueueItem{LogEntry{1002, "put_user", userMap, (2 << 1) | 0, payload}});
     
     // DELETE operation (3), valid
-    mixedItems.emplace_back(QueueItem{LogEntry{1003, 4, userMap, (3 << 1) | 1, {}}});
+    mixedItems.emplace_back(QueueItem{LogEntry{1003, "delete_user", userMap, (3 << 1) | 1, {}}});
     
     // GETM operation (4), invalid
-    mixedItems.emplace_back(QueueItem{LogEntry{1004, 5, userMap, (4 << 1) | 0, payload}});
+    mixedItems.emplace_back(QueueItem{LogEntry{1004, "getm_user", userMap, (4 << 1) | 0, payload}});
 
     queue->enqueueBatchBlocking(mixedItems, token, std::chrono::milliseconds(500));
 
@@ -306,7 +309,7 @@ TEST_F(WriterGDPRTest, GDPRMixedOperationTypes)
 TEST_F(WriterGDPRTest, GDPRHighFrequencySmallBatches)
 {
     const int batchSize = 3;
-    writer = std::make_unique<Writer>(*queue, storage, batchSize);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter, batchSize);
     writer->startGDPR();
 
     BufferQueue::ProducerToken token = queue->createProducerToken();
@@ -323,12 +326,12 @@ TEST_F(WriterGDPRTest, GDPRHighFrequencySmallBatches)
             userMap.set(batch + i); // Different user for each item
             
             uint64_t timestamp = 2000000000 + batch * 100 + i;
-            uint32_t counter = batch * itemsPerBatch + i;
+            std::string gdprKey = "batch_" + std::to_string(batch) + "_user_" + std::to_string(i);
             uint8_t operationValidity = ((i % 4) << 1) | ((batch + i) % 2); // Vary operations and validity
             
             std::vector<uint8_t> payload(10, static_cast<uint8_t>(batch + i));
             
-            items.emplace_back(QueueItem{LogEntry{timestamp, counter, userMap, operationValidity, payload}});
+            items.emplace_back(QueueItem{LogEntry{timestamp, gdprKey, userMap, operationValidity, payload}});
         }
         
         queue->enqueueBatchBlocking(items, token, std::chrono::milliseconds(50));
@@ -349,7 +352,7 @@ TEST_F(WriterGDPRTest, GDPRHighFrequencySmallBatches)
 // Test GDPR mode with maximum user key map values
 TEST_F(WriterGDPRTest, GDPRMaxUserKeyMap)
 {
-    writer = std::make_unique<Writer>(*queue, storage, batchSize, useEncryption, compressionLevel);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter, batchSize, useEncryption, compressionLevel);
     writer->startGDPR();
 
     BufferQueue::ProducerToken token = queue->createProducerToken();
@@ -361,7 +364,7 @@ TEST_F(WriterGDPRTest, GDPRMaxUserKeyMap)
     std::vector<uint8_t> payload(1000, 0xFF);
 
     std::vector<QueueItem> maxItems;
-    maxItems.emplace_back(QueueItem{LogEntry{INT64_MAX, INT32_MAX, maxUserMap, 0xFF, payload}});
+    maxItems.emplace_back(QueueItem{LogEntry{INT64_MAX, "max_values_user", maxUserMap, 0xFF, payload}});
 
     queue->enqueueBatchBlocking(maxItems, token, std::chrono::milliseconds(500));
 
@@ -390,7 +393,7 @@ TEST_F(WriterGDPRTest, GDPRMaxUserKeyMap)
 // Test concurrent GDPR enqueueing with writer processing
 TEST_F(WriterGDPRTest, GDPRConcurrentEnqueuingAndProcessing)
 {
-    writer = std::make_unique<Writer>(*queue, storage, 8);
+    writer = std::make_unique<Writer>(*queue, storage, trustedCounter, 8);
     writer->startGDPR();
 
     BufferQueue::ProducerToken token = queue->createProducerToken();
@@ -408,11 +411,12 @@ TEST_F(WriterGDPRTest, GDPRConcurrentEnqueuingAndProcessing)
                 userMap.set(counter % num_users);
                 
                 uint64_t timestamp = 3000000000UL + counter;
+                std::string gdprKey = "concurrent_user_" + std::to_string(counter);
                 uint8_t operationValidity = ((counter % 4) << 1) | (counter % 2);
                 std::vector<uint8_t> payload{static_cast<uint8_t>(counter), 
                                            static_cast<uint8_t>(counter + 1)};
                 
-                items.emplace_back(QueueItem{LogEntry{timestamp, static_cast<uint32_t>(counter), 
+                items.emplace_back(QueueItem{LogEntry{timestamp, gdprKey,
                                                     userMap, operationValidity, payload}});
                 counter++;
             }

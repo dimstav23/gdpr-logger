@@ -8,6 +8,7 @@ set(LIBRARY_SOURCES
     src/SegmentedStorage.cpp
     src/LoggingManager.cpp
     src/LogExporter.cpp
+    src/TrustedCounter.cpp
     benchmarks/BenchmarkUtils.cpp
 )
 

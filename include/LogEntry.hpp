@@ -26,10 +26,10 @@ public:
 
     // GDPRuler constructor
     LogEntry(uint64_t timestamp,
-             uint32_t trustedCounter,
-             std::bitset<num_users> userKeyMap,
-             uint8_t operationValidity,
-             std::vector<uint8_t> payload = {});
+            std::string gdprKey,
+            std::bitset<num_users> userKeyMap,
+            uint8_t operationValidity,
+            std::vector<uint8_t> payload = {});
     
     LogEntry(ActionType actionType,
              std::string dataLocation,
@@ -52,7 +52,7 @@ public:
     
     // GDPRuler Getters
     uint64_t getGDPRTimestamp() const { return m_gdpr_timestamp; }
-    uint32_t getTrustedCounter() const { return m_gdpr_cnt; }
+    const std::string& getGDPRKey() const { return m_gdpr_key; }
     std::bitset<num_users> getUserKeyMap() const { return m_gdpr_user_key; }
     uint8_t getOperationValidity() const { return m_gdpr_operation_result; }
     const std::vector<uint8_t>& getNewValue() const { return m_gdpr_payload; }
@@ -83,7 +83,7 @@ private:
 
     // GDPRuler fields
     uint64_t m_gdpr_timestamp;                          // 64-bit timestamp
-    uint32_t m_gdpr_cnt;                                // 32-bit trusted counter
+    std::string m_gdpr_key;                             // key of logged operation
     std::bitset<num_users> m_gdpr_user_key;             // 128-bit user key bitmap
     uint8_t m_gdpr_operation_result;                    // Operation + validity bit
     std::vector<uint8_t> m_gdpr_payload;                // Arbitrary size new value

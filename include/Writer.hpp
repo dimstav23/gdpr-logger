@@ -8,15 +8,17 @@
 #include "QueueItem.hpp"
 #include "BufferQueue.hpp"
 #include "SegmentedStorage.hpp"
+#include "TrustedCounter.hpp"
 
 class Writer
 {
 public:
     explicit Writer(BufferQueue &queue,
                     std::shared_ptr<SegmentedStorage> storage,
+                    std::shared_ptr<TrustedCounter> trustedCounter,
                     size_t batchSize = 100,
                     bool useEncryption = true,
-                    int m_compressionLevel = 9);
+                    int compressionLevel = 9);
 
     ~Writer();
 
@@ -31,6 +33,7 @@ private:
 
     BufferQueue &m_queue;
     std::shared_ptr<SegmentedStorage> m_storage;
+    std::shared_ptr<TrustedCounter> m_trustedCounter;
     std::unique_ptr<std::thread> m_writerThread;
     std::atomic<bool> m_running{false};
     const size_t m_batchSize;

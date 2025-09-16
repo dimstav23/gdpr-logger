@@ -62,13 +62,13 @@ TEST(LogEntryTest3, GDPRConstructor_SetsFieldsCorrectly)
     
     std::vector<uint8_t> newValue = {0x01, 0x02, 0x03, 0xFF, 0xAB};
     uint64_t timestamp = 1234567890123456ULL;
-    uint32_t trustedCounter = 42;
+    std::string gdprKey = "user123";
     uint8_t operationValidity = (2 << 1) | 1; // UPDATE operation, valid=true
 
-    LogEntry entry(timestamp, trustedCounter, userKeyMap, operationValidity, newValue);
+    LogEntry entry(timestamp, gdprKey, userKeyMap, operationValidity, newValue);
 
     EXPECT_EQ(entry.getGDPRTimestamp(), timestamp);
-    EXPECT_EQ(entry.getTrustedCounter(), trustedCounter);
+    EXPECT_EQ(entry.getGDPRKey(), gdprKey);
     EXPECT_EQ(entry.getUserKeyMap(), userKeyMap);
     EXPECT_EQ(entry.getOperationValidity(), operationValidity);
     EXPECT_EQ(entry.getNewValue(), newValue);
@@ -232,10 +232,10 @@ TEST(LogEntryGDPRTest, SerializationDeserialization_WorksCorrectly)
 
     std::vector<uint8_t> newValue(50, 0xAB);
     uint64_t timestamp = 1234567890123456ULL;
-    uint32_t trustedCounter = 12345;
+    std::string gdprKey = "test_user_key";
     uint8_t operationValidity = (2 << 1) | 1; // UPDATE operation, valid=true
 
-    LogEntry entry(timestamp, trustedCounter, userKeyMap, operationValidity, newValue);
+    LogEntry entry(timestamp, gdprKey, userKeyMap, operationValidity, newValue);
 
     std::vector<uint8_t> serializedData = entry.serializeGDPR();
     LogEntry deserializedEntry;
@@ -243,7 +243,7 @@ TEST(LogEntryGDPRTest, SerializationDeserialization_WorksCorrectly)
 
     EXPECT_TRUE(success);
     EXPECT_EQ(deserializedEntry.getGDPRTimestamp(), timestamp);
-    EXPECT_EQ(deserializedEntry.getTrustedCounter(), trustedCounter);
+    EXPECT_EQ(deserializedEntry.getGDPRKey(), gdprKey);
     EXPECT_EQ(deserializedEntry.getUserKeyMap(), userKeyMap);
     EXPECT_EQ(deserializedEntry.getOperationValidity(), operationValidity);
     EXPECT_EQ(deserializedEntry.getNewValue(), newValue);
@@ -259,21 +259,21 @@ TEST(LogEntryGDPRTest, BatchSerializationDeserialization_WorksCorrectly)
     userMap1.set(1);
     userMap1.set(10);
     std::vector<uint8_t> payload1 = {0x01, 0x02, 0x03};
-    originalEntries.emplace_back(1000, 1, userMap1, (1 << 1) | 1, payload1);
+    originalEntries.emplace_back(1000, "key1", userMap1, (1 << 1) | 1, payload1);
 
     // Entry 2: DELETE operation, invalid
     std::bitset<128> userMap2;
     userMap2.set(50);
     userMap2.set(100);
     std::vector<uint8_t> payload2 = {0x04, 0x05, 0x06, 0x07};
-    originalEntries.emplace_back(2000, 2, userMap2, (3 << 1) | 0, payload2);
+    originalEntries.emplace_back(2000, "key2", userMap2, (3 << 1) | 0, payload2);
 
     // Entry 3: PUT operation with large payload, valid
     std::bitset<128> userMap3;
     userMap3.set(0);
     userMap3.set(127);
     std::vector<uint8_t> payload3(256, 0xFF);
-    originalEntries.emplace_back(3000, 3, userMap3, (2 << 1) | 1, payload3);
+    originalEntries.emplace_back(3000, "key3", userMap3, (2 << 1) | 1, payload3);
 
     // Serialize batch using GDPR format
     std::vector<uint8_t> batchData = LogEntry::serializeBatchGDPR(std::move(originalEntries));
@@ -285,21 +285,21 @@ TEST(LogEntryGDPRTest, BatchSerializationDeserialization_WorksCorrectly)
 
     // Verify entry 1
     EXPECT_EQ(recoveredEntries[0].getGDPRTimestamp(), 1000);
-    EXPECT_EQ(recoveredEntries[0].getTrustedCounter(), 1);
+    EXPECT_EQ(recoveredEntries[0].getGDPRKey(), "key1");
     EXPECT_EQ(recoveredEntries[0].getUserKeyMap(), userMap1);
     EXPECT_EQ(recoveredEntries[0].getOperationValidity(), (1 << 1) | 1);
     EXPECT_EQ(recoveredEntries[0].getNewValue(), payload1);
 
     // Verify entry 2
     EXPECT_EQ(recoveredEntries[1].getGDPRTimestamp(), 2000);
-    EXPECT_EQ(recoveredEntries[1].getTrustedCounter(), 2);
+    EXPECT_EQ(recoveredEntries[1].getGDPRKey(), "key2");
     EXPECT_EQ(recoveredEntries[1].getUserKeyMap(), userMap2);
     EXPECT_EQ(recoveredEntries[1].getOperationValidity(), (3 << 1) | 0);
     EXPECT_EQ(recoveredEntries[1].getNewValue(), payload2);
 
     // Verify entry 3
     EXPECT_EQ(recoveredEntries[2].getGDPRTimestamp(), 3000);
-    EXPECT_EQ(recoveredEntries[2].getTrustedCounter(), 3);
+    EXPECT_EQ(recoveredEntries[2].getGDPRKey(), "key3");
     EXPECT_EQ(recoveredEntries[2].getUserKeyMap(), userMap3);
     EXPECT_EQ(recoveredEntries[2].getOperationValidity(), (2 << 1) | 1);
     EXPECT_EQ(recoveredEntries[2].getNewValue(), payload3);
@@ -312,11 +312,11 @@ TEST(LogEntryGDPRTest, SerializationWithEmptyPayload_WorksCorrectly)
     userKeyMap.set(42);
 
     uint64_t timestamp = 9876543210ULL;
-    uint32_t trustedCounter = 999;
+    std::string gdprKey = "empty_payload_key";
     uint8_t operationValidity = (1 << 1) | 0; // GET operation, invalid
     std::vector<uint8_t> emptyPayload; // Empty payload
 
-    LogEntry entry(timestamp, trustedCounter, userKeyMap, operationValidity, emptyPayload);
+    LogEntry entry(timestamp, gdprKey, userKeyMap, operationValidity, emptyPayload);
 
     std::vector<uint8_t> serializedData = entry.serializeGDPR();
     LogEntry deserializedEntry;
@@ -324,7 +324,7 @@ TEST(LogEntryGDPRTest, SerializationWithEmptyPayload_WorksCorrectly)
 
     EXPECT_TRUE(success);
     EXPECT_EQ(deserializedEntry.getGDPRTimestamp(), timestamp);
-    EXPECT_EQ(deserializedEntry.getTrustedCounter(), trustedCounter);
+    EXPECT_EQ(deserializedEntry.getGDPRKey(), gdprKey);
     EXPECT_EQ(deserializedEntry.getUserKeyMap(), userKeyMap);
     EXPECT_EQ(deserializedEntry.getOperationValidity(), operationValidity);
     EXPECT_TRUE(deserializedEntry.getNewValue().empty());
@@ -338,11 +338,11 @@ TEST(LogEntryGDPRTest, SerializationWithMaxUserKeyMap_WorksCorrectly)
     userKeyMap.flip(); // Sets all bits to 1
 
     uint64_t timestamp = UINT64_MAX;
-    uint32_t trustedCounter = UINT32_MAX;
+    std::string gdprKey = "max_test_key_with_very_long_name_to_test_string_handling";
     uint8_t operationValidity = 0xFF; // All bits set
     std::vector<uint8_t> payload(1000, 0x55);
 
-    LogEntry entry(timestamp, trustedCounter, userKeyMap, operationValidity, payload);
+    LogEntry entry(timestamp, gdprKey, userKeyMap, operationValidity, payload);
 
     std::vector<uint8_t> serializedData = entry.serializeGDPR();
     LogEntry deserializedEntry;
@@ -350,7 +350,7 @@ TEST(LogEntryGDPRTest, SerializationWithMaxUserKeyMap_WorksCorrectly)
 
     EXPECT_TRUE(success);
     EXPECT_EQ(deserializedEntry.getGDPRTimestamp(), timestamp);
-    EXPECT_EQ(deserializedEntry.getTrustedCounter(), trustedCounter);
+    EXPECT_EQ(deserializedEntry.getGDPRKey(), gdprKey);
     EXPECT_EQ(deserializedEntry.getUserKeyMap(), userKeyMap);
     EXPECT_EQ(deserializedEntry.getOperationValidity(), operationValidity);
     EXPECT_EQ(deserializedEntry.getNewValue(), payload);
@@ -367,28 +367,30 @@ TEST(LogEntryGDPRTest, OperationValidityBitExtraction_WorksCorrectly)
         uint8_t operation;
         bool valid;
         uint8_t expected_encoded;
+        std::string testKey;
     };
 
     std::vector<TestCase> testCases = {
-        {0, false, (0 << 1) | 0}, // invalid operation, invalid
-        {0, true,  (0 << 1) | 1}, // invalid operation, valid  
-        {1, false, (1 << 1) | 0}, // get operation, invalid
-        {1, true,  (1 << 1) | 1}, // get operation, valid
-        {2, false, (2 << 1) | 0}, // put operation, invalid
-        {2, true,  (2 << 1) | 1}, // put operation, valid
-        {3, false, (3 << 1) | 0}, // delete operation, invalid
-        {3, true,  (3 << 1) | 1}, // delete operation, valid
-        {7, true,  (7 << 1) | 1}, // max operation (3 bits), valid
+        {0, false, (0 << 1) | 0, "key_op0_invalid"},
+        {0, true,  (0 << 1) | 1, "key_op0_valid"},  
+        {1, false, (1 << 1) | 0, "key_op1_invalid"},
+        {1, true,  (1 << 1) | 1, "key_op1_valid"},
+        {2, false, (2 << 1) | 0, "key_op2_invalid"},
+        {2, true,  (2 << 1) | 1, "key_op2_valid"},
+        {3, false, (3 << 1) | 0, "key_op3_invalid"},
+        {3, true,  (3 << 1) | 1, "key_op3_valid"},
+        {7, true,  (7 << 1) | 1, "key_op7_valid"},
     };
 
     for (const auto& testCase : testCases) {
-        LogEntry entry(1000, 1, userKeyMap, testCase.expected_encoded, payload);
-        
+        LogEntry entry(1000, testCase.testKey, userKeyMap, testCase.expected_encoded, payload);
+
         std::vector<uint8_t> serializedData = entry.serializeGDPR();
         LogEntry deserializedEntry;
         bool success = deserializedEntry.deserializeGDPR(serializedData);
 
         EXPECT_TRUE(success);
+        EXPECT_EQ(deserializedEntry.getGDPRKey(), testCase.testKey);
         EXPECT_EQ(deserializedEntry.getOperationValidity(), testCase.expected_encoded)
             << "Failed for operation=" << static_cast<int>(testCase.operation) 
             << ", valid=" << testCase.valid;
