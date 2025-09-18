@@ -61,6 +61,9 @@ LatencyStats calculateLatencyStats(const LatencyCollector &collector);
 
 // Modified to return latency measurements instead of using global state
 LatencyCollector appendLogEntries(LoggingManager &loggingManager, const std::vector<BatchWithDestination> &batches);
+LatencyCollector appendGDPREntriesIndividually(LoggingManager &loggingManager, 
+                                              const std::vector<std::pair<LogEntry, std::string>>& entries, 
+                                              int startIndex, int numEntries);
 
 void cleanupLogDirectory(const std::string &logDir);
 

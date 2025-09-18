@@ -65,10 +65,10 @@ def create_encryption_batch_analysis_plot(df, output_dir):
     
     # Define the specific variants we want to show
     variants = [
-        {'consumers': 4, 'entry_size_bytes': 128, 'label': '4 Writers, 128B', 'color': '#9467bd', 'marker': 'v'},
+        {'consumers': 4, 'entry_size_bytes': 256, 'label': '4 Writers, 256B', 'color': '#9467bd', 'marker': 'v'},
         {'consumers': 4, 'entry_size_bytes': 1024, 'label': '4 Writers, 1KB', 'color': '#1f77b4', 'marker': 'o'},
         {'consumers': 4, 'entry_size_bytes': 4096, 'label': '4 Writers, 4KB', 'color': '#ff7f0e', 'marker': 's'},
-        {'consumers': 8, 'entry_size_bytes': 128, 'label': '8 Writers, 128B', 'color': '#8c564b', 'marker': 'p'},
+        {'consumers': 8, 'entry_size_bytes': 256, 'label': '8 Writers, 256B', 'color': '#8c564b', 'marker': 'p'},
         {'consumers': 8, 'entry_size_bytes': 1024, 'label': '8 Writers, 1KB', 'color': '#2ca02c', 'marker': '^'},
         {'consumers': 8, 'entry_size_bytes': 4096, 'label': '8 Writers, 4KB', 'color': '#d62728', 'marker': 'D'}
     ]

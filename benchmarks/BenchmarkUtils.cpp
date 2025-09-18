@@ -1,5 +1,35 @@
 #include "BenchmarkUtils.hpp"
 
+LatencyCollector appendGDPREntriesIndividually(LoggingManager &loggingManager, 
+                                              const std::vector<std::pair<LogEntry, std::string>>& entries,
+                                              int startIndex, int numEntries) {
+    LatencyCollector localCollector;
+    localCollector.reserve(numEntries);
+
+    auto token = loggingManager.createProducerToken();
+
+    for (int i = 0; i < numEntries; ++i) {
+        const auto& [entry, filename] = entries[startIndex + i];
+        
+        // Measure latency for each append call
+        auto startTime = std::chrono::high_resolution_clock::now();
+
+        bool success = loggingManager.append(entry, token, filename);
+
+        auto endTime = std::chrono::high_resolution_clock::now();
+        auto latency = std::chrono::duration_cast<std::chrono::nanoseconds>(endTime - startTime);
+
+        // Record the latency measurement
+        localCollector.addMeasurement(latency);
+
+        if (!success) {
+            std::cerr << "Failed to append GDPR entry to " << filename << std::endl;
+        }
+    }
+
+    return localCollector;
+}
+
 LatencyCollector appendLogEntries(LoggingManager &loggingManager, const std::vector<BatchWithDestination> &batches)
 {
     LatencyCollector localCollector;

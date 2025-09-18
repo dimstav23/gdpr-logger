@@ -89,6 +89,7 @@ struct BenchmarkConfig {
     int numKeys;              // Total number of unique keys
     bool useEncryption;       // Encryption on/off
     int compressionLevel;     // Compression levels: 0, 5, 9
+    int repeats;              // Number of repeat runs
 };
 
 // Results for each benchmark run
@@ -138,19 +139,23 @@ void setupBenchmarkDirectory(const std::string& path) {
     }
 }
 
-// Generate realistic GDPR keys in the format: key6284781860667377211
+// Generate realistic GDPR keys in the format: user123456789123456789 or key123456789123456789
 std::string generateGDPRKey(int keyIndex) {
     // The keyIndex is already Zipfian distributed, so use it deterministically
     // to create a realistic-looking large number
-    uint64_t baseNumber = 1000000000000000000ULL; // Start of 19-digit range
-    uint64_t keyRange = 8999999999999999999ULL;   // Range size
+    uint64_t baseNumber = 100000000000000000ULL; // Start of 18-digit range
+    uint64_t keyRange = 899999999999999999ULL;   // Range size for 18 digits
     
     // Create deterministic but realistic number from keyIndex
-    // This ensures same keyIndex always produces same key
     uint64_t keyNumber = baseNumber + (static_cast<uint64_t>(keyIndex) * 7919ULL) % keyRange;
     
     std::stringstream ss;
-    ss << "key" << keyNumber;
+    // Alternate between "user" and "key" prefixes based on keyIndex
+    if (keyIndex % 2 == 0) {
+        ss << "user" << keyNumber;
+    } else {
+        ss << "key" << keyNumber;
+    }
     
     return ss.str();
 }
@@ -168,24 +173,67 @@ std::bitset<128> generateUserKeyMap() {
     return userMap;
 }
 
-// Generate payload with completely random data (no compression patterns)
-std::vector<uint8_t> generatePayload(int targetSize) {
+// Generate realistic payload data (semi-friendly to compression but not optimal)
+std::vector<uint8_t> generateRealisticPayload(int targetSize, int keyIndex) {
     // Account for fixed overhead: timestamp(8) + key_size(4) + user_key(16) + operation(1) + payload_size(4) = 33 bytes
     static const int FIXED_OVERHEAD = 33;
     
-    // Account for key size: "key" + 19 digits = 22 bytes
+    // Account for key size: "user" or "key" + 18 digits = 22 bytes  
     static const int KEY_SIZE = 22;
     
-    int payloadSize = std::max(1, targetSize - FIXED_OVERHEAD - KEY_SIZE);
+    size_t payloadSize = std::max(1, targetSize - FIXED_OVERHEAD - KEY_SIZE);
     
     std::vector<uint8_t> payload(payloadSize);
     
-    // Generate completely random payload data (no compression patterns)
+    // Create semi-realistic payload that mimics database values/JSON/XML data
     static std::mt19937 gen(std::random_device{}());
-    static std::uniform_int_distribution<uint8_t> dis(0, 255);
+    static std::uniform_int_distribution<uint8_t> charDis(32, 126); // Printable ASCII
+    static std::uniform_int_distribution<int> structureDis(0, 100);
+    static std::uniform_int_distribution<int> lengthDis(3, 15);
     
-    for (int i = 0; i < payloadSize; ++i) {
-        payload[i] = dis(gen);
+    // Common patterns in real data
+    std::vector<std::string> commonStrings = {
+        "null", "true", "false", "user", "admin", "guest", "data", "value", "name",
+        "email", "address", "phone", "status", "active", "inactive", "pending",
+        "json", "xml", "http", "https", "www", "com", "org", "net", "error",
+        "success", "failure", "timeout", "connection", "database", "table", "field"
+    };
+    
+    std::vector<std::string> numbers = {
+        "0", "1", "10", "100", "1000", "999", "404", "200", "500", "201", "301"
+    };
+    
+    size_t pos = 0;
+    while (pos < payloadSize) {
+        int chance = structureDis(gen);
+        
+        if (chance < 20 && pos < payloadSize - 10) {
+            // Add a common string (20% chance)
+            const auto& str = commonStrings[keyIndex % commonStrings.size()];
+            size_t len = std::min(str.length(), payloadSize - pos);
+            std::memcpy(&payload[pos], str.c_str(), len);
+            pos += len;
+        } else if (chance < 30 && pos < payloadSize - 5) {
+            // Add a number (10% chance)
+            const auto& num = numbers[keyIndex % numbers.size()];
+            size_t len = std::min(num.length(), payloadSize - pos);
+            std::memcpy(&payload[pos], num.c_str(), len);
+            pos += len;
+        } else if (chance < 35) {
+            // Add structure chars like {, }, [, ], :, , (5% chance)
+            char structChars[] = {'{', '}', '[', ']', ':', ',', '"', '='};
+            payload[pos] = structChars[keyIndex % sizeof(structChars)];
+            pos++;
+        } else if (chance < 45) {
+            // Add whitespace/newlines (10% chance)
+            char whitespace[] = {' ', ' ', ' ', '\t', '\n'};
+            payload[pos] = whitespace[keyIndex % sizeof(whitespace)];
+            pos++;
+        } else {
+            // Add random printable character (55% chance)
+            payload[pos] = charDis(gen);
+            pos++;
+        }
     }
     
     return payload;
@@ -210,7 +258,7 @@ std::vector<std::pair<LogEntry, std::string>> generateGDPREntries(const Benchmar
         
         std::string gdprKey = generateGDPRKey(keyIndex);
         auto userKeyMap = generateUserKeyMap();
-        auto payload = generatePayload(config.entrySize);
+        auto payload = generateRealisticPayload(config.entrySize, keyIndex);
         
         // Realistic operation validity (3 bits operation + 1 bit validity)
         uint8_t operationValidity = ((keyIndex % 7 + 1) << 1) | (keyIndex % 2);
@@ -231,24 +279,14 @@ std::vector<std::pair<LogEntry, std::string>> generateGDPREntries(const Benchmar
     return entries;
 }
 
-// Calculate actual data size for GDPR entries
-size_t calculateGDPRDataSize(const std::vector<BatchWithDestination>& batches, int numProducers) {
-    size_t totalSize = 0;
+// Run a single benchmark configuration with repeat functionality
+BenchmarkResult runBenchmarkWithRepeats(const BenchmarkConfig& config, 
+                                        const std::vector<std::pair<LogEntry, std::string>>& entries) {
+    std::vector<BenchmarkResult> results;
+    results.reserve(config.repeats);
     
-    for (const auto& batchWithDest : batches) {
-        for (const auto& entry : batchWithDest.first) {
-            totalSize += entry.serializeGDPR().size();
-        }
-    }
-    
-    return totalSize * numProducers;
-}
-
-// Run a single benchmark configuration
-BenchmarkResult runSingleBenchmark(const BenchmarkConfig& config, 
-                                  const std::vector<std::pair<LogEntry, std::string>>& entries) {
     std::cout << "\n=========================================" << std::endl;
-    std::cout << "Running benchmark: " 
+    std::cout << "Running benchmark (" << config.repeats << " repeats): " 
               << config.numConsumerThreads << " consumers, "
               << config.batchSize << " batch size, "
               << config.entrySize << " byte entries, "
@@ -257,116 +295,162 @@ BenchmarkResult runSingleBenchmark(const BenchmarkConfig& config,
               << "compression=" << config.compressionLevel << std::endl;
     std::cout << "=========================================" << std::endl;
     
-    // Setup logging configuration
-    LoggingConfig loggingConfig;
-    loggingConfig.basePath = "/scratch/dimitrios/gdpr_benchmark_logs";
-    loggingConfig.baseFilename = "gdpr";
-    loggingConfig.maxSegmentSize = 100 * 1024 * 1024; // 100 MB
-    loggingConfig.maxAttempts = 5;
-    loggingConfig.baseRetryDelay = std::chrono::milliseconds(1);
-    loggingConfig.queueCapacity = config.numProducers * config.entriesPerProducer * 2;
-    loggingConfig.maxExplicitProducers = config.numProducers;
-    loggingConfig.batchSize = config.batchSize;
-    loggingConfig.numWriterThreads = config.numConsumerThreads;
-    loggingConfig.appendTimeout = std::chrono::minutes(5);
-    loggingConfig.useEncryption = config.useEncryption;
-    loggingConfig.compressionLevel = config.compressionLevel;
-    
-    // Configure LogFileHasher and set reasonable maxOpenFiles
-    struct rlimit limits{};
-    if (getrlimit(RLIMIT_NOFILE, &limits) == 0) {
-        LogFileHasher::set_max_files(0.9 * static_cast<int>(limits.rlim_cur));
-    }
-    loggingConfig.maxOpenFiles = LogFileHasher::get_max_files();
-    
-    std::cout << "Using " << loggingConfig.maxOpenFiles << " max files for hash-based distribution" << std::endl;
-    
-    // Setup benchmark directory (delete and recreate)
-    setupBenchmarkDirectory(loggingConfig.basePath);
-    
-    // USE THE PRE-GENERATED ENTRIES
-
-    // Calculate expected data size
-    size_t totalEntries = config.numProducers * config.entriesPerProducer;
-    size_t estimatedDataSize = 0;
-    for (const auto& [entry, filename] : entries) {
-        estimatedDataSize += entry.serializeGDPR().size();
-    }
-    double estimatedDataSizeGiB = static_cast<double>(estimatedDataSize) / (1024 * 1024 * 1024);
-
-    std::cout << "Using pre-generated entries: " << entries.size() << " entries" << std::endl;
-    std::cout << "Estimated data size: " << estimatedDataSizeGiB << " GiB" << std::endl;
-
-    // Start logging system
-    LoggingManager loggingManager(loggingConfig);
-    loggingManager.startGDPR();
-
-    auto startTime = std::chrono::high_resolution_clock::now();
-
-    // Launch producer threads - each handles a portion of entries
-    std::vector<std::future<LatencyCollector>> futures;
-    int entriesPerProducer = totalEntries / config.numProducers;
-
-    for (int i = 0; i < config.numProducers; ++i) {
-        int startIndex = i * entriesPerProducer;
-        int numEntries = (i == config.numProducers - 1) ? 
-                        (totalEntries - startIndex) : entriesPerProducer;
+    for (int repeat = 0; repeat < config.repeats; ++repeat) {
+        std::cout << "\n--- Repeat " << (repeat + 1) << "/" << config.repeats << " ---" << std::endl;
         
-        futures.push_back(std::async(
-            std::launch::async,
-            appendGDPREntriesIndividually,
-            std::ref(loggingManager),
-            std::ref(entries),
-            startIndex,
-            numEntries));
+        // Setup logging configuration
+        LoggingConfig loggingConfig;
+        loggingConfig.basePath = "/scratch/dimitrios/gdpr_benchmark_logs";
+        loggingConfig.baseFilename = "gdpr";
+        loggingConfig.maxSegmentSize = 100 * 1024 * 1024; // 100 MB
+        loggingConfig.maxAttempts = 5;
+        loggingConfig.baseRetryDelay = std::chrono::milliseconds(1);
+        loggingConfig.queueCapacity = config.numProducers * config.entriesPerProducer * 2;
+        loggingConfig.maxExplicitProducers = config.numProducers;
+        loggingConfig.batchSize = config.batchSize;
+        loggingConfig.numWriterThreads = config.numConsumerThreads;
+        loggingConfig.appendTimeout = std::chrono::minutes(5);
+        loggingConfig.useEncryption = config.useEncryption;
+        loggingConfig.compressionLevel = config.compressionLevel;
+        
+        // Configure LogFileHasher and set reasonable maxOpenFiles
+        struct rlimit limits{};
+        if (getrlimit(RLIMIT_NOFILE, &limits) == 0) {
+            LogFileHasher::set_max_files(0.9 * static_cast<int>(limits.rlim_cur));
+        }
+        loggingConfig.maxOpenFiles = LogFileHasher::get_max_files();
+        
+        // Setup benchmark directory (delete and recreate for each repeat)
+        setupBenchmarkDirectory(loggingConfig.basePath);
+        
+        // Calculate expected data size
+        size_t totalEntries = config.numProducers * config.entriesPerProducer;
+        size_t estimatedDataSize = 0;
+        for (const auto& [entry, filename] : entries) {
+            estimatedDataSize += entry.serializeGDPR().size();
+        }
+        double estimatedDataSizeGiB = static_cast<double>(estimatedDataSize) / (1024 * 1024 * 1024);
+
+        std::cout << "Using pre-generated entries: " << entries.size() << " entries" << std::endl;
+        std::cout << "Estimated data size: " << estimatedDataSizeGiB << " GiB" << std::endl;
+
+        // Start logging system
+        LoggingManager loggingManager(loggingConfig);
+        loggingManager.startGDPR();
+
+        auto startTime = std::chrono::high_resolution_clock::now();
+
+        // Launch producer threads - each handles a portion of entries
+        std::vector<std::future<LatencyCollector>> futures;
+        int entriesPerProducer = totalEntries / config.numProducers;
+
+        for (int i = 0; i < config.numProducers; ++i) {
+            int startIndex = i * entriesPerProducer;
+            int numEntries = (i == config.numProducers - 1) ? 
+                            (totalEntries - startIndex) : entriesPerProducer;
+            
+            futures.push_back(std::async(
+                std::launch::async,
+                appendGDPREntriesIndividually,
+                std::ref(loggingManager),
+                std::ref(entries),
+                startIndex,
+                numEntries));
+        }
+        
+        // Collect results from all producers
+        LatencyCollector masterCollector;
+        for (auto& future : futures) {
+            LatencyCollector threadCollector = future.get();
+            masterCollector.merge(threadCollector);
+        }
+        
+        loggingManager.stop();
+        auto endTime = std::chrono::high_resolution_clock::now();
+        
+        // Calculate metrics
+        std::chrono::duration<double> elapsed = endTime - startTime;
+        double elapsedSeconds = elapsed.count();
+        
+        size_t finalStorageSize = calculateDirectorySize(loggingConfig.basePath);
+        double finalStorageSizeGiB = static_cast<double>(finalStorageSize) / (1024 * 1024 * 1024);
+        double writeAmplification = static_cast<double>(finalStorageSize) / estimatedDataSize;
+        
+        double entriesThroughput = totalEntries / elapsedSeconds;
+        double logicalThroughputGiB = estimatedDataSizeGiB / elapsedSeconds;
+        double physicalThroughputGiB = finalStorageSizeGiB / elapsedSeconds;
+        double avgEntrySize = static_cast<double>(estimatedDataSize) / totalEntries;
+        
+        auto latencyStats = calculateLatencyStats(masterCollector);
+        
+        // Create result for this repeat
+        BenchmarkResult result;
+        result.config = config;
+        result.executionTimeSeconds = elapsedSeconds;
+        result.totalEntries = totalEntries;
+        result.avgEntrySize = avgEntrySize;
+        result.totalDataSizeGiB = estimatedDataSizeGiB;
+        result.finalStorageSizeGiB = finalStorageSizeGiB;
+        result.writeAmplification = writeAmplification;
+        result.entriesThroughput = entriesThroughput;
+        result.logicalThroughputGiB = logicalThroughputGiB;
+        result.physicalThroughputGiB = physicalThroughputGiB;
+        result.avgLatencyMs = latencyStats.avgMs;
+        result.medianLatencyMs = latencyStats.medianMs;
+        result.maxLatencyMs = latencyStats.maxMs;
+        
+        results.push_back(result);
+        
+        std::cout << "Repeat " << (repeat + 1) << " completed: " << entriesThroughput << " entries/sec, "
+                  << "write amplification: " << writeAmplification << std::endl;
     }
     
-    // Collect results from all producers
-    LatencyCollector masterCollector;
-    for (auto& future : futures) {
-        LatencyCollector threadCollector = future.get();
-        masterCollector.merge(threadCollector);
+    // Calculate averages across all repeats
+    BenchmarkResult avgResult;
+    avgResult.config = config;
+    avgResult.totalEntries = results[0].totalEntries;
+    avgResult.avgEntrySize = results[0].avgEntrySize;
+    avgResult.totalDataSizeGiB = results[0].totalDataSizeGiB;
+    
+    // Average the performance metrics
+    avgResult.executionTimeSeconds = 0;
+    avgResult.finalStorageSizeGiB = 0;
+    avgResult.writeAmplification = 0;
+    avgResult.entriesThroughput = 0;
+    avgResult.logicalThroughputGiB = 0;
+    avgResult.physicalThroughputGiB = 0;
+    avgResult.avgLatencyMs = 0;
+    avgResult.medianLatencyMs = 0;
+    avgResult.maxLatencyMs = 0;
+    
+    for (const auto& result : results) {
+        avgResult.executionTimeSeconds += result.executionTimeSeconds;
+        avgResult.finalStorageSizeGiB += result.finalStorageSizeGiB;
+        avgResult.writeAmplification += result.writeAmplification;
+        avgResult.entriesThroughput += result.entriesThroughput;
+        avgResult.logicalThroughputGiB += result.logicalThroughputGiB;
+        avgResult.physicalThroughputGiB += result.physicalThroughputGiB;
+        avgResult.avgLatencyMs += result.avgLatencyMs;
+        avgResult.medianLatencyMs += result.medianLatencyMs;
+        avgResult.maxLatencyMs += result.maxLatencyMs;
     }
     
-    loggingManager.stop();
-    auto endTime = std::chrono::high_resolution_clock::now();
+    int numResults = static_cast<int>(results.size());
+    avgResult.executionTimeSeconds /= numResults;
+    avgResult.finalStorageSizeGiB /= numResults;
+    avgResult.writeAmplification /= numResults;
+    avgResult.entriesThroughput /= numResults;
+    avgResult.logicalThroughputGiB /= numResults;
+    avgResult.physicalThroughputGiB /= numResults;
+    avgResult.avgLatencyMs /= numResults;
+    avgResult.medianLatencyMs /= numResults;
+    avgResult.maxLatencyMs /= numResults;
     
-    // Calculate metrics
-    std::chrono::duration<double> elapsed = endTime - startTime;
-    double elapsedSeconds = elapsed.count();
+    std::cout << "\n--- Average across " << config.repeats << " repeats ---" << std::endl;
+    std::cout << "Average throughput: " << avgResult.entriesThroughput << " entries/sec" << std::endl;
+    std::cout << "Average write amplification: " << avgResult.writeAmplification << std::endl;
     
-    size_t finalStorageSize = calculateDirectorySize(loggingConfig.basePath);
-    double finalStorageSizeGiB = static_cast<double>(finalStorageSize) / (1024 * 1024 * 1024);
-    double writeAmplification = static_cast<double>(finalStorageSize) / estimatedDataSize;
-    
-    double entriesThroughput = totalEntries / elapsedSeconds;
-    double logicalThroughputGiB = estimatedDataSizeGiB / elapsedSeconds;
-    double physicalThroughputGiB = finalStorageSizeGiB / elapsedSeconds;
-    double avgEntrySize = static_cast<double>(estimatedDataSize) / totalEntries;
-    
-    auto latencyStats = calculateLatencyStats(masterCollector);
-    
-    // Create result
-    BenchmarkResult result;
-    result.config = config;
-    result.executionTimeSeconds = elapsedSeconds;
-    result.totalEntries = totalEntries;
-    result.avgEntrySize = avgEntrySize;
-    result.totalDataSizeGiB = estimatedDataSizeGiB;
-    result.finalStorageSizeGiB = finalStorageSizeGiB;
-    result.writeAmplification = writeAmplification;
-    result.entriesThroughput = entriesThroughput;
-    result.logicalThroughputGiB = logicalThroughputGiB;
-    result.physicalThroughputGiB = physicalThroughputGiB;
-    result.avgLatencyMs = latencyStats.avgMs;
-    result.medianLatencyMs = latencyStats.medianMs;
-    result.maxLatencyMs = latencyStats.maxMs;
-    
-    std::cout << "Completed: " << entriesThroughput << " entries/sec, "
-              << logicalThroughputGiB << " GiB/sec logical, "
-              << "compression ratio: " << (estimatedDataSize > 0 ? (double)finalStorageSize / estimatedDataSize : 1.0) << std::endl;
-    
-    return result;
+    return avgResult;
 }
 
 // Export results to CSV
@@ -376,9 +460,9 @@ void exportResultsToCSV(const std::vector<BenchmarkResult>& results, const std::
         throw std::runtime_error("Failed to open CSV file: " + csvPath);
     }
     
-    // Write CSV header (updated with new fields)
+    // Write CSV header (updated with repeats field)
     csvFile << "consumers,batch_size,entry_size_bytes,num_producers,entries_per_producer,"
-            << "zipfian_theta,num_keys,use_encryption,compression_level,max_files,"
+            << "zipfian_theta,num_keys,use_encryption,compression_level,repeats,max_files,"
             << "execution_time_sec,total_entries,avg_entry_size_bytes,"
             << "total_data_gib,final_storage_gib,write_amplification,entries_per_sec,"
             << "logical_throughput_gib_sec,physical_throughput_gib_sec,avg_latency_ms,"
@@ -395,6 +479,7 @@ void exportResultsToCSV(const std::vector<BenchmarkResult>& results, const std::
                 << result.config.numKeys << ","
                 << (result.config.useEncryption ? 1 : 0) << ","
                 << result.config.compressionLevel << ","
+                << result.config.repeats << ","
                 << LogFileHasher::get_max_files() << ","
                 << result.executionTimeSeconds << ","
                 << result.totalEntries << ","
@@ -422,11 +507,14 @@ int main() {
         
         // Define benchmark parameters
         std::vector<int> consumerThreadCounts = {4, 8};
-        std::vector<int> batchSizes = {128, 512, 2048, 8192};
-        std::vector<int> entrySizes = {128, 1024, 2048};
+        std::vector<int> batchSizes = {512, 2048, 8192};
+        std::vector<int> entrySizes = {256, 1024, 4096};
         std::vector<int> producerCounts = {16};
         std::vector<bool> encryptionSettings = {false, true};
         std::vector<int> compressionLevels = {0, 5, 9};
+        
+        // Number of repeats for each configuration
+        const int numRepeats = 3;
 
         // Target 10GB of logical data per benchmark
         const double targetDataSizeGB = 10.0;
@@ -437,6 +525,7 @@ int main() {
         
         std::cout << "Configuration:" << std::endl;
         std::cout << "- Target data size per benchmark: " << targetDataSizeGB << " GB" << std::endl;
+        std::cout << "- Number of repeats per configuration: " << numRepeats << std::endl;
         std::cout << "- Producer counts: ";
         for (size_t i = 0; i < producerCounts.size(); ++i) {
             std::cout << producerCounts[i];
@@ -465,6 +554,7 @@ int main() {
         int totalConfigurations = consumerThreadCounts.size() * batchSizes.size() * entrySizes.size() 
                                   * producerCounts.size() * encryptionSettings.size() * compressionLevels.size();
         std::cout << "\nTotal configurations to test: " << totalConfigurations << std::endl;
+        std::cout << "Total benchmark runs (including repeats): " << totalConfigurations * numRepeats << std::endl;
         
         std::vector<BenchmarkResult> results;
         results.reserve(totalConfigurations);
@@ -484,6 +574,7 @@ int main() {
             tempConfig.entriesPerProducer = static_cast<int>(entriesPerProducer);
             tempConfig.zipfianTheta = zipfianTheta;
             tempConfig.numKeys = numKeys;
+            tempConfig.repeats = numRepeats;
             
             auto entries = generateGDPREntries(tempConfig);
             
@@ -507,14 +598,15 @@ int main() {
                                 config.numKeys = numKeys;
                                 config.useEncryption = useEncryption;
                                 config.compressionLevel = compressionLevel;
+                                config.repeats = numRepeats;
                                 
                                 std::cout << "\nProgress: " << currentConfig << "/" << totalConfigurations << std::endl;
-                                std::cout << "Target: " << totalEntries << " entries (" << std::fixed << std::setprecision(2) 
+                                std::cout << "Configuration: " << totalEntries << " entries (" << std::fixed << std::setprecision(2) 
                                           << actualDataSizeGB << " GB) with " << entrySize << " byte entries" << std::endl;
                                 
                                 try {
-                                    // PASS THE PRE-GENERATED ENTRIES
-                                    BenchmarkResult result = runSingleBenchmark(config, entries);
+                                    // Run benchmark with repeats and get averaged results
+                                    BenchmarkResult result = runBenchmarkWithRepeats(config, entries);
                                     results.push_back(result);
                                 } catch (const std::exception& e) {
                                     std::cerr << "Benchmark failed: " << e.what() << std::endl;
@@ -552,7 +644,8 @@ int main() {
                       << maxThroughput.config.batchSize << " batch size, "
                       << maxThroughput.config.entrySize << " byte entries, "
                       << "encryption=" << (maxThroughput.config.useEncryption ? "ON" : "OFF") << ", "
-                      << "compression=" << maxThroughput.config.compressionLevel << std::endl;
+                      << "compression=" << maxThroughput.config.compressionLevel 
+                      << " (averaged over " << maxThroughput.config.repeats << " repeats)" << std::endl;
             
             // Find best compression ratio
             auto bestCompression = *std::min_element(results.begin(), results.end(),
@@ -567,24 +660,8 @@ int main() {
                       << bestCompression.config.batchSize << " batch size, "
                       << bestCompression.config.entrySize << " byte entries, "
                       << "encryption=" << (bestCompression.config.useEncryption ? "ON" : "OFF") << ", "
-                      << "compression=" << bestCompression.config.compressionLevel << std::endl;
-            
-            // Print data size statistics
-            std::cout << "\n=== Data Size Statistics ===" << std::endl;
-            double avgDataSize = 0.0;
-            double minDataSize = std::numeric_limits<double>::max();
-            double maxDataSize = 0.0;
-            
-            for (const auto& result : results) {
-                avgDataSize += result.totalDataSizeGiB;
-                minDataSize = std::min(minDataSize, result.totalDataSizeGiB);
-                maxDataSize = std::max(maxDataSize, result.totalDataSizeGiB);
-            }
-            avgDataSize /= results.size();
-            
-            std::cout << "Average data size: " << std::fixed << std::setprecision(2) << avgDataSize << " GiB" << std::endl;
-            std::cout << "Min data size: " << minDataSize << " GiB" << std::endl;
-            std::cout << "Max data size: " << maxDataSize << " GiB" << std::endl;
+                      << "compression=" << bestCompression.config.compressionLevel 
+                      << " (averaged over " << bestCompression.config.repeats << " repeats)" << std::endl;
         }
         
     } catch (const std::exception& e) {
