@@ -29,6 +29,13 @@ LABEL_FONTSIZE = FONTSIZE
 TICK_FONTSIZE = FONTSIZE - 1
 LEGEND_FONTSIZE = FONTSIZE - 1
 
+FONTSIZE = 6
+TITLE_FONTSIZE = FONTSIZE
+LABEL_FONTSIZE = FONTSIZE
+TICK_FONTSIZE = FONTSIZE - 1
+LEGEND_FONTSIZE = FONTSIZE
+ANNOTATION_FONTSIZE = FONTSIZE / 2 - 1
+
 # Patterns for bar plots
 hatches = ['', '///', '\\\\\\', 'xxx', '...', '+++', '|||', '---', 'ooo', '***']
 
@@ -54,7 +61,7 @@ def create_encryption_batch_analysis_plot(df, output_dir):
         return
     
     # Create figure with 2 subplots side by side
-    fig, axes = plt.subplots(1, 2, figsize=(figwidth_half, 2))
+    fig, axes = plt.subplots(1, 2, figsize=(figwidth_half, 1.5))
     
     # Define the specific variants we want to show
     variants = [
@@ -103,7 +110,7 @@ def create_encryption_batch_analysis_plot(df, output_dir):
     
     ax_left.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
     ax_left.set_ylabel('Throughput (K entries/sec)', fontsize=LABEL_FONTSIZE)
-    ax_left.set_title('(a) Throughput', fontsize=TITLE_FONTSIZE)
+    ax_left.set_title('(a) Throughput\n(Higher is better ↑)', color="navy", fontsize=TITLE_FONTSIZE)
     ax_left.set_xticks(x_positions)
     ax_left.set_xticklabels(batch_labels)
     ax_left.grid(True, alpha=0.3)
@@ -143,7 +150,7 @@ def create_encryption_batch_analysis_plot(df, output_dir):
     
     ax_right.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
     ax_right.set_ylabel('Write Amplification (%)', fontsize=LABEL_FONTSIZE)
-    ax_right.set_title('(b) Write Amplification', fontsize=TITLE_FONTSIZE)
+    ax_right.set_title('(b) Write Amplification\n(Lower is better ↓)', color="navy", fontsize=TITLE_FONTSIZE)
     ax_right.set_xticks(x_positions)
     ax_right.set_xticklabels(batch_labels)
     ax_right.grid(True, alpha=0.3)
@@ -151,7 +158,7 @@ def create_encryption_batch_analysis_plot(df, output_dir):
     
     # Add single legend to the figure (centered between subplots)
     handles, labels = ax_left.get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, -0.01), 
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.52, -0.05), 
                ncol=3, fontsize=LEGEND_FONTSIZE)
     
     # Adjust layout to make room for legend
