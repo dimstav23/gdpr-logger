@@ -300,7 +300,7 @@ BenchmarkResult runBenchmarkWithRepeats(const BenchmarkConfig& config,
         
         // Setup logging configuration
         LoggingConfig loggingConfig;
-        loggingConfig.basePath = "/scratch/dimitrios/gdpr_benchmark_logs";
+        loggingConfig.basePath = "/scratch/dimitrios/gdpruler_fs/gdpr_benchmark_logs";
         loggingConfig.baseFilename = "gdpr";
         loggingConfig.maxSegmentSize = 100 * 1024 * 1024; // 100 MB
         loggingConfig.maxAttempts = 5;
