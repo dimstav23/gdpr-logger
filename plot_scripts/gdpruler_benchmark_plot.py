@@ -54,18 +54,22 @@ def create_encryption_batch_analysis_plot(df, output_dir):
         return
     
     # Create figure with 2 subplots side by side
-    fig, axes = plt.subplots(1, 2, figsize=(figwidth_full, 3))
+    fig, axes = plt.subplots(1, 2, figsize=(figwidth_half, 2))
     
     # Define the specific variants we want to show
     variants = [
+        {'consumers': 4, 'entry_size_bytes': 128, 'label': '4 Writers, 128B', 'color': '#9467bd', 'marker': 'v'},
         {'consumers': 4, 'entry_size_bytes': 1024, 'label': '4 Writers, 1KB', 'color': '#1f77b4', 'marker': 'o'},
         {'consumers': 4, 'entry_size_bytes': 4096, 'label': '4 Writers, 4KB', 'color': '#ff7f0e', 'marker': 's'},
+        {'consumers': 8, 'entry_size_bytes': 128, 'label': '8 Writers, 128B', 'color': '#8c564b', 'marker': 'p'},
         {'consumers': 8, 'entry_size_bytes': 1024, 'label': '8 Writers, 1KB', 'color': '#2ca02c', 'marker': '^'},
         {'consumers': 8, 'entry_size_bytes': 4096, 'label': '8 Writers, 4KB', 'color': '#d62728', 'marker': 'D'}
     ]
     
-    # Get batch sizes from data
+    # Get batch sizes from data and prepare x-axis mapping
     batch_sizes = sorted(filtered_df['batch_size'].unique())
+    x_positions = list(range(1, len(batch_sizes) + 1))  # Linear positions: 1, 2, 3, ...
+    batch_labels = [str(bs) for bs in batch_sizes]  # Labels: "512", "2048", "8192", etc.
     
     # Left subplot: Throughput vs Batch Size
     ax_left = axes[0]
@@ -84,24 +88,24 @@ def create_encryption_batch_analysis_plot(df, output_dir):
             # Prepare data for plotting
             x_vals = []
             y_vals = []
-            for bs in batch_sizes:
+            for i, bs in enumerate(batch_sizes):
                 if bs in throughput_data.index:
-                    x_vals.append(bs)
+                    x_vals.append(x_positions[i])  # Use linear position
                     y_vals.append(throughput_data[bs] / 1000)  # Convert to K entries/sec
             
-            # Plot line with markers
+            # Plot line with markers (thinner lines, smaller markers)
             ax_left.plot(x_vals, y_vals, 
                         marker=variant['marker'], 
                         color=variant['color'],
-                        linewidth=2,
-                        markersize=6,
+                        linewidth=1,  # Thinner lines
+                        markersize=2,   # Smaller markers
                         label=variant['label'])
     
     ax_left.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
     ax_left.set_ylabel('Throughput (K entries/sec)', fontsize=LABEL_FONTSIZE)
-    ax_left.set_title('(a) Throughput vs Batch Size\nEncryption: ON, Compression: OFF', 
-                     fontsize=TITLE_FONTSIZE, pad=10)
-    ax_left.legend(fontsize=LEGEND_FONTSIZE, loc='best')
+    ax_left.set_title('(a) Throughput', fontsize=TITLE_FONTSIZE)
+    ax_left.set_xticks(x_positions)
+    ax_left.set_xticklabels(batch_labels)
     ax_left.grid(True, alpha=0.3)
     ax_left.tick_params(axis='both', labelsize=TICK_FONTSIZE)
     
@@ -122,39 +126,47 @@ def create_encryption_batch_analysis_plot(df, output_dir):
             # Prepare data for plotting
             x_vals = []
             y_vals = []
-            for bs in batch_sizes:
+            for i, bs in enumerate(batch_sizes):
                 if bs in wa_data.index:
-                    x_vals.append(bs)
-                    y_vals.append(wa_data[bs])
+                    x_vals.append(x_positions[i])  # Use linear position
+                    # Convert write amplification to percentage
+                    y_vals.append((wa_data[bs] - 1) * 100)
+                    # y_vals.append(wa_data[bs])
             
-            # Plot line with markers
+            # Plot line with markers (thinner lines, smaller markers)
             ax_right.plot(x_vals, y_vals, 
                          marker=variant['marker'], 
                          color=variant['color'],
-                         linewidth=2,
-                         markersize=6,
+                         linewidth=1,  # Thinner lines
+                         markersize=2,   # Smaller markers
                          label=variant['label'])
     
     ax_right.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
-    ax_right.set_ylabel('Write Amplification', fontsize=LABEL_FONTSIZE)
-    ax_right.set_title('(b) Write Amplification vs Batch Size\nEncryption: ON, Compression: OFF', 
-                      fontsize=TITLE_FONTSIZE, pad=10)
-    ax_right.legend(fontsize=LEGEND_FONTSIZE, loc='best')
+    ax_right.set_ylabel('Write Amplification (%)', fontsize=LABEL_FONTSIZE)
+    ax_right.set_title('(b) Write Amplification', fontsize=TITLE_FONTSIZE)
+    ax_right.set_xticks(x_positions)
+    ax_right.set_xticklabels(batch_labels)
     ax_right.grid(True, alpha=0.3)
     ax_right.tick_params(axis='both', labelsize=TICK_FONTSIZE)
     
-    # Adjust layout
+    # Add single legend to the figure (centered between subplots)
+    handles, labels = ax_left.get_legend_handles_labels()
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, -0.01), 
+               ncol=3, fontsize=LEGEND_FONTSIZE)
+    
+    # Adjust layout to make room for legend
     plt.tight_layout()
+    plt.subplots_adjust(bottom=0.15)  # Make room for legend at bottom
     
     # Save the plot
-    plt.savefig(os.path.join(output_dir, 'encryption_batch_analysis.png'), 
+    plt.savefig(os.path.join(output_dir, 'batch_analysis.png'), 
                 bbox_inches='tight', dpi=300)
-    plt.savefig(os.path.join(output_dir, 'encryption_batch_analysis.pdf'), 
+    plt.savefig(os.path.join(output_dir, 'batch_analysis.pdf'), 
                 bbox_inches='tight')
     plt.close()
     
     # Print data summary
-    print(f"Generated encryption batch analysis plot with {len(variants)} variants:")
+    print(f"Generated batch analysis paper plot with {len(variants)} variants:")
     for variant in variants:
         variant_df = filtered_df[
             (filtered_df['consumers'] == variant['consumers']) & 
@@ -162,7 +174,7 @@ def create_encryption_batch_analysis_plot(df, output_dir):
         ]
         data_points = len(variant_df)
         print(f"  - {variant['label']}: {data_points} data points")
-
+        
 def create_encryption_effect_plots(df, output_dir):
     """Plot 1-2: Effect of Encryption on Performance across all configurations"""
     fig, axes = plt.subplots(2, 2, figsize=(figwidth_full, 6))
@@ -702,7 +714,10 @@ def print_plot_summary():
          "4-panel analysis of batch size impact: (a) throughput vs encryption/compression combinations, (b) throughput vs entry sizes, (c) latency vs writer threads, (d) write amplification trends."),
         
         ("heatmaps.png", 
-         "4 heatmaps showing: (a) throughput vs batch size/compression, (b) write amplification vs entry size/encryption, (c) throughput vs writers/entry size, (d) latency vs batch size/writers.")
+         "4 heatmaps showing: (a) throughput vs batch size/compression, (b) write amplification vs entry size/encryption, (c) throughput vs writers/entry size, (d) latency vs batch size/writers."),
+        
+        ("batch_analysis.png", 
+         "2-panel analysis of batch size impact (with encryption=ON and compression=OFF): (a) throughput vs batch size, (b) write amplification vs batch size.")
     ]
     
     for i, (filename, description) in enumerate(plots, 1):
