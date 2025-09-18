@@ -24,6 +24,7 @@ set(WORKLOAD_BENCHMARKS
     main
     multi_producer_small_batches
     single_entry_appends
+    gdpruler
 )
 
 foreach(benchmark ${VALIDATION_BENCHMARKS})
