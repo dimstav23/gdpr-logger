@@ -103,12 +103,22 @@ bool LoggingManager::stop()
 
     m_acceptingEntries.store(false, std::memory_order_release);
 
+    // Wait for queue to empty
+    size_t queueSize = m_queue->size();
+    while (queueSize > 0) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(10));
+        queueSize = m_queue->size();
+    }
+
+    assert(m_queue->size() == 0 && "Queue should be empty before stopping writers");
+
     if (m_queue)
     {
-        // std::cout << "LoggingSystem: Waiting for queue to empty..." << std::endl;
+        std::cout << "LoggingSystem: Waiting for queue to empty..." << std::endl;
         m_queue->flush();
     }
 
+    
     for (auto &writer : m_writers)
     {
         writer->stop();
