@@ -13,6 +13,7 @@ set(LIBRARY_SOURCES
 )
 
 add_library(gdpr_logging_lib ${LIBRARY_SOURCES})
+set_target_properties(gdpr_logging_lib PROPERTIES POSITION_INDEPENDENT_CODE ON)
 
 # Use absolute paths with PUBLIC visibility
 target_include_directories(gdpr_logging_lib
