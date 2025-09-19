@@ -19,7 +19,7 @@ Crypto::Crypto()
 Crypto::~Crypto()
 {
     // Clean up OpenSSL
-    EVP_cleanup();
+    // EVP_cleanup(); // deprecated
 }
 
 EVP_CIPHER_CTX* Crypto::getEncryptContext()
@@ -28,6 +28,13 @@ EVP_CIPHER_CTX* Crypto::getEncryptContext()
         encrypt_ctx = EVP_CIPHER_CTX_new();
         if (!encrypt_ctx) {
             throw std::runtime_error("Failed to create thread-local encryption context");
+        }
+        
+        // Pre-initialize with cipher
+        if (EVP_EncryptInit_ex(encrypt_ctx, EVP_aes_256_gcm(), nullptr, nullptr, nullptr) != 1) {
+            EVP_CIPHER_CTX_free(encrypt_ctx);
+            encrypt_ctx = nullptr;
+            throw std::runtime_error("Failed to pre-initialize encryption context");
         }
     }
     return encrypt_ctx;
@@ -39,6 +46,13 @@ EVP_CIPHER_CTX* Crypto::getDecryptContext()
         decrypt_ctx = EVP_CIPHER_CTX_new();
         if (!decrypt_ctx) {
             throw std::runtime_error("Failed to create thread-local decryption context");
+        }
+        
+        // Pre-initialize with cipher
+        if (EVP_DecryptInit_ex(decrypt_ctx, EVP_aes_256_gcm(), nullptr, nullptr, nullptr) != 1) {
+            EVP_CIPHER_CTX_free(decrypt_ctx);
+            decrypt_ctx = nullptr;
+            throw std::runtime_error("Failed to pre-initialize decryption context");
         }
     }
     return decrypt_ctx;
@@ -62,12 +76,12 @@ std::vector<uint8_t> Crypto::encrypt(std::vector<uint8_t> &&plaintext,
     if (iv.size() != GCM_IV_SIZE)
         throw std::runtime_error("Invalid IV size");
 
-    // Reset the existing context instead of creating a new one
+    // Get the initialized encryption context with the cipher
     EVP_CIPHER_CTX* m_encryptCtx = getEncryptContext();
-    EVP_CIPHER_CTX_reset(m_encryptCtx);
+    // EVP_CIPHER_CTX_reset(m_encryptCtx);
 
     // Initialize encryption operation
-    if (EVP_EncryptInit_ex(m_encryptCtx, EVP_aes_256_gcm(), nullptr, key.data(), iv.data()) != 1)
+    if (EVP_EncryptInit_ex(m_encryptCtx, nullptr, nullptr, key.data(), iv.data()) != 1)
     {
         throw std::runtime_error("Failed to initialize encryption");
     }
@@ -134,8 +148,6 @@ std::vector<uint8_t> Crypto::decrypt(const std::vector<uint8_t> &encryptedData,
                                      const std::vector<uint8_t> &iv)
 {
     // std::cout << "Crypto::decrypt - Input size: " << encryptedData.size() << " bytes" << std::endl;
-    
-    EVP_CIPHER_CTX* m_decryptCtx = getDecryptContext();
     try
     {
         if (encryptedData.empty())
@@ -197,12 +209,12 @@ std::vector<uint8_t> Crypto::decrypt(const std::vector<uint8_t> &encryptedData,
         std::memcpy(tag.data(), encryptedData.data() + position, GCM_TAG_SIZE);
 
         // std::cout << "Crypto::decrypt - Extracted tag: " << tag.size() << " bytes" << std::endl;
-
-        // Reset the existing context instead of creating a new one
-        EVP_CIPHER_CTX_reset(m_decryptCtx);
+        
+        // Get the initialized encryption context with the cipher
+        EVP_CIPHER_CTX* m_decryptCtx = getDecryptContext();
 
         // Initialize decryption operation
-        if (EVP_DecryptInit_ex(m_decryptCtx, EVP_aes_256_gcm(), nullptr, key.data(), iv.data()) != 1)
+        if (EVP_DecryptInit_ex(m_decryptCtx, nullptr, nullptr, key.data(), iv.data()) != 1)
         {
             throw std::runtime_error("Failed to initialize decryption");
         }
