@@ -6,10 +6,6 @@
 #include <cstring>
 #include <iostream>
 
-// Thread-local storage
-thread_local EVP_CIPHER_CTX* encrypt_ctx = nullptr;
-thread_local EVP_CIPHER_CTX* decrypt_ctx = nullptr;
-
 Crypto::Crypto()
 {
     // Initialize OpenSSL
@@ -24,6 +20,8 @@ Crypto::~Crypto()
 
 EVP_CIPHER_CTX* Crypto::getEncryptContext()
 {
+    static thread_local EVP_CIPHER_CTX* encrypt_ctx = nullptr;
+
     if (!encrypt_ctx) {
         encrypt_ctx = EVP_CIPHER_CTX_new();
         if (!encrypt_ctx) {
@@ -42,6 +40,8 @@ EVP_CIPHER_CTX* Crypto::getEncryptContext()
 
 EVP_CIPHER_CTX* Crypto::getDecryptContext()
 {
+    static thread_local EVP_CIPHER_CTX* decrypt_ctx = nullptr;
+    
     if (!decrypt_ctx) {
         decrypt_ctx = EVP_CIPHER_CTX_new();
         if (!decrypt_ctx) {
@@ -263,19 +263,3 @@ std::vector<uint8_t> Crypto::decrypt(const std::vector<uint8_t> &encryptedData,
         return std::vector<uint8_t>();
     }
 }
-
-// Thread-local destructor (automatic cleanup)
-struct ThreadLocalCleanup {
-    ~ThreadLocalCleanup() {
-        if (encrypt_ctx) {
-            EVP_CIPHER_CTX_free(encrypt_ctx);
-            encrypt_ctx = nullptr;
-        }
-        if (decrypt_ctx) {
-            EVP_CIPHER_CTX_free(decrypt_ctx);
-            decrypt_ctx = nullptr;
-        }
-    }
-};
-
-thread_local ThreadLocalCleanup cleanup_helper;
