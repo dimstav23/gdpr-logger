@@ -45,7 +45,6 @@ private:
     size_t m_maxSegmentSize;
     size_t m_maxAttempts;
     std::chrono::milliseconds m_baseRetryDelay;
-    size_t m_maxOpenFiles; // Max number of cache entries
 
     struct CacheEntry
     {

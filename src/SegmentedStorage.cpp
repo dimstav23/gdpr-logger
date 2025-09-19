@@ -15,7 +15,6 @@ SegmentedStorage::SegmentedStorage(const std::string &basePath,
       m_maxSegmentSize(maxSegmentSize),
       m_maxAttempts(maxAttempts),
       m_baseRetryDelay(baseRetryDelay),
-      m_maxOpenFiles(maxOpenFiles),
       m_cache(maxOpenFiles, this)
 {
     std::filesystem::create_directories(m_basePath);
