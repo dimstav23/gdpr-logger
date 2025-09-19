@@ -65,12 +65,12 @@ def create_encryption_batch_analysis_plot(df, output_dir):
     
     # Define the specific variants we want to show
     variants = [
-        {'consumers': 4, 'entry_size_bytes': 256, 'label': '4 Writers, 256B', 'color': '#9467bd', 'marker': 'v'},
-        {'consumers': 4, 'entry_size_bytes': 1024, 'label': '4 Writers, 1KB', 'color': '#1f77b4', 'marker': 'o'},
-        {'consumers': 4, 'entry_size_bytes': 4096, 'label': '4 Writers, 4KB', 'color': '#ff7f0e', 'marker': 's'},
-        {'consumers': 8, 'entry_size_bytes': 256, 'label': '8 Writers, 256B', 'color': '#8c564b', 'marker': 'p'},
-        {'consumers': 8, 'entry_size_bytes': 1024, 'label': '8 Writers, 1KB', 'color': '#2ca02c', 'marker': '^'},
-        {'consumers': 8, 'entry_size_bytes': 4096, 'label': '8 Writers, 4KB', 'color': '#d62728', 'marker': 'D'}
+        {'consumers': 4, 'entry_size_bytes': 256, 'label': '4 Writers, 256B Entry', 'color': '#9467bd', 'marker': 'v'},
+        {'consumers': 8, 'entry_size_bytes': 256, 'label': '8 Writers, 256B Entry', 'color': '#8c564b', 'marker': 'p'},
+        {'consumers': 4, 'entry_size_bytes': 1024, 'label': '4 Writers, 1KB Entry', 'color': '#1f77b4', 'marker': 'o'},
+        {'consumers': 8, 'entry_size_bytes': 1024, 'label': '8 Writers, 1KB Entry', 'color': '#2ca02c', 'marker': '^'},
+        {'consumers': 4, 'entry_size_bytes': 4096, 'label': '4 Writers, 4KB Entry', 'color': '#ff7f0e', 'marker': 's'},        
+        {'consumers': 8, 'entry_size_bytes': 4096, 'label': '8 Writers, 4KB Entry', 'color': '#d62728', 'marker': 'D'}
     ]
     
     # Get batch sizes from data and prepare x-axis mapping
@@ -104,8 +104,8 @@ def create_encryption_batch_analysis_plot(df, output_dir):
             ax_left.plot(x_vals, y_vals, 
                         marker=variant['marker'], 
                         color=variant['color'],
-                        linewidth=1,  # Thinner lines
-                        markersize=2,   # Smaller markers
+                        linewidth=0.8,  # Thinner lines
+                        markersize=1.5,   # Smaller markers
                         label=variant['label'])
     
     ax_left.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
@@ -144,8 +144,8 @@ def create_encryption_batch_analysis_plot(df, output_dir):
             ax_right.plot(x_vals, y_vals, 
                          marker=variant['marker'], 
                          color=variant['color'],
-                         linewidth=1,  # Thinner lines
-                         markersize=2,   # Smaller markers
+                         linewidth=0.8,  # Thinner lines
+                         markersize=1.5,   # Smaller markers
                          label=variant['label'])
     
     ax_right.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
@@ -158,12 +158,12 @@ def create_encryption_batch_analysis_plot(df, output_dir):
     
     # Add single legend to the figure (centered between subplots)
     handles, labels = ax_left.get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.52, -0.05), 
-               ncol=3, fontsize=LEGEND_FONTSIZE)
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), 
+               ncol=3, fontsize=LEGEND_FONTSIZE,
+               borderaxespad=0.5, columnspacing=0.45, labelspacing=0.35, borderpad=0.25, handletextpad=0.35, handlelength=1.2)
     
     # Adjust layout to make room for legend
     plt.tight_layout()
-    plt.subplots_adjust(bottom=0.15)  # Make room for legend at bottom
     
     # Save the plot
     plt.savefig(os.path.join(output_dir, 'batch_analysis.png'), 
