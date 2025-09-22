@@ -165,3 +165,106 @@ The system was executed on a single NUMA node with **16 physical cores**. At **1
 | **Final Storage Footprint** | 13.62 GiB for 124.6 GiB input                |
 
 These results demonstrate the system’s ability to sustain high-throughput logging with low latency and low storage overhead, even under encryption and compression.
+
+
+### GDPRuler Benchmark Suite
+
+To thoroughly evaluate the logging system's performance characteristics and compression efficiency, two specialized benchmark tools have been developed that complement the main benchmark results presented above.
+
+#### Performance Benchmark (`gdpruler_log_performance.cpp`)
+
+This comprehensive benchmark systematically evaluates the system across a wide range of configurations to identify optimal settings for different workloads and hardware constraints.
+
+##### Configuration Matrix
+
+The performance benchmark explores the following parameter space:
+
+- **Writer Threads**: 4, 8 (evaluating scaling with available CPU cores)
+- **Batch Sizes**: 512, 2048, 8192 (throughput vs latency optimization)
+- **Entry Sizes**: 256B, 1KB, 4KB (typical GDPR log entry sizes)
+- **Producer Threads**: 16 (fixed high-concurrency scenario)
+- **Encryption**: OFF/ON (security vs performance trade-off)
+- **Compression Levels**: 0, 3, 6 (none, fast, balanced)
+- **Repeats**: 3 (statistical reliability with averaged results)
+
+##### Key Features
+
+- **Realistic Data Generation**: Uses semi-compressible payloads that mimic real database values, JSON, and XML data patterns with Zipfian key distribution (θ=0.99) for realistic access patterns
+- **Comprehensive Metrics**: Measures throughput (entries/sec), write amplification, latency distribution, and data compression ratios
+- **Statistical Reliability**: Each configuration is repeated 3 times with results averaged to account for system variance
+- **Target Data Volume**: 10GB per configuration ensuring meaningful I/O patterns
+
+##### Sample Results
+
+The benchmark generates detailed CSV output enabling analysis of:
+- **Encryption overhead**: Quantifies performance cost across different entry sizes and batch configurations
+- **Compression efficiency**: Evaluates storage savings vs CPU overhead for different compression levels
+- **Scaling characteristics**: Shows how writer threads and batch sizes affect throughput and latency
+- **Configuration optimization**: Identifies optimal settings for different use cases (throughput vs latency vs storage)
+
+#### Compression Rate Benchmark (`gdpruler_compression_rate.cpp`)
+
+This specialized benchmark focuses exclusively on compression effectiveness and storage efficiency, using a fixed high-performance configuration to isolate compression-related metrics.
+
+##### Fixed Configuration
+
+To ensure consistent comparison of compression algorithms, the following parameters are held constant:
+
+- **Writer Threads**: 4
+- **Batch Size**: 8192 (optimal for compression efficiency)
+- **Max Segment Size**: 100MB per file
+- **Producer Threads**: 32 (high concurrency)
+- **Queue Capacity**: 65,536 entries
+- **Target Data Volume**: 10GB per test
+
+##### Test Matrix
+
+The compression benchmark systematically evaluates:
+
+- **Entry Sizes**: 1KB, 4KB (common GDPR log entry sizes)
+- **Compression Levels**: 0, 3, 6, 9 (none, low, medium, high)
+- **Encryption**: OFF/ON (impact on compressibility)
+- **Total Configurations**: 16 tests (2 × 4 × 2)
+
+##### Compression Metrics
+
+The benchmark provides detailed compression analysis including:
+
+- **Compression Ratio**: Original size / compressed size (e.g., 3.2:1)
+- **Space Reduction**: Percentage storage savings (e.g., 68.7% reduction)
+- **Performance Impact**: Throughput changes due to compression CPU overhead
+- **Encryption Effects**: How authenticated encryption affects compression ratios
+
+##### Sample Analysis Output
+```
+Compression Level Comparison:
+1KB entries:
+Without encryption:
+Level 0: 1.00:1 ratio (0.0% reduction)
+Level 3: 2.45:1 ratio (59.2% reduction)
+Level 6: 2.78:1 ratio (64.0% reduction)
+Level 9: 2.91:1 ratio (65.6% reduction)
+With encryption:
+Level 0: 1.00:1 ratio (0.0% reduction)
+Level 3: 2.32:1 ratio (56.9% reduction)
+Level 6: 2.65:1 ratio (62.3% reduction)
+Level 9: 2.74:1 ratio (63.5% reduction)
+```
+
+#### Running the Benchmarks
+
+Both benchmarks can be executed from the build directory:
+**Comprehensive performance evaluation**
+```
+./gdpruler_log_performance_benchmark
+```
+
+**Compression analysis**
+```
+./gdpruler_compression_rate_benchmark
+```
+
+The benchmarks generate CSV output files (`gdpr_logger_benchmark_results.csv` and `gdpruler_compression_rate_results.csv`).
+
+#### Plotting & Result Analysis
+Please consult the [`README.md`](./plot_scripts/README.md) in the respective [directory](./plot_scripts/).
