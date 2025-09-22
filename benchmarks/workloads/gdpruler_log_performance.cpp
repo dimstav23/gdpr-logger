@@ -88,7 +88,7 @@ struct BenchmarkConfig {
     double zipfianTheta;      // Zipfian distribution parameter
     int numKeys;              // Total number of unique keys
     bool useEncryption;       // Encryption on/off
-    int compressionLevel;     // Compression levels: 0, 5, 9
+    int compressionLevel;     // Compression levels: 0, 3, 6
     int repeats;              // Number of repeat runs
 };
 
@@ -511,7 +511,7 @@ int main() {
         std::vector<int> entrySizes = {256, 1024, 4096};
         std::vector<int> producerCounts = {16};
         std::vector<bool> encryptionSettings = {false, true};
-        std::vector<int> compressionLevels = {0, 1, 5};
+        std::vector<int> compressionLevels = {0, 3, 6};
         
         // Number of repeats for each configuration
         const int numRepeats = 3;

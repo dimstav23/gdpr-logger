@@ -18,7 +18,7 @@ public:
                     std::shared_ptr<TrustedCounter> trustedCounter,
                     size_t batchSize = 100,
                     bool useEncryption = true,
-                    int compressionLevel = 9);
+                    int compressionLevel = 3);
 
     ~Writer();
 

@@ -28,7 +28,7 @@ protected:
         testPath = "./test_export_";
         baseFilename = "test_export";
         useEncryption = true;
-        compressionLevel = 6;
+        compressionLevel = 3;
 
         // Clean up any existing test files
         if (std::filesystem::exists(testPath)) {

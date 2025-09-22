@@ -488,7 +488,7 @@ int main() {
         const int64_t targetDataSizeBytes = static_cast<int64_t>(targetDataSizeGB * 1024 * 1024 * 1024);
         const double zipfianTheta = 0.99;
         const int numKeys = 100000;
-        const int numProducers = 32;
+        const int numProducers = 16;
         
         std::cout << "Configuration:" << std::endl;
         std::cout << "- Target data size per benchmark: " << targetDataSizeGB << " GB" << std::endl;
