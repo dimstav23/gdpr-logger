@@ -24,7 +24,8 @@ set(WORKLOAD_BENCHMARKS
     main
     multi_producer_small_batches
     single_entry_appends
-    gdpruler
+    gdpruler_log_performance
+    gdpruler_compression_rate
 )
 
 foreach(benchmark ${VALIDATION_BENCHMARKS})
