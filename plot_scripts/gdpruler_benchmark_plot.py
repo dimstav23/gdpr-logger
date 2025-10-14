@@ -34,7 +34,7 @@ TITLE_FONTSIZE = FONTSIZE
 LABEL_FONTSIZE = FONTSIZE
 TICK_FONTSIZE = FONTSIZE - 1
 LEGEND_FONTSIZE = FONTSIZE
-ANNOTATION_FONTSIZE = FONTSIZE / 2 - 1
+ANNOTATION_FONTSIZE = FONTSIZE / 2
 
 # Patterns for bar plots
 hatches = ['', '///', '\\\\\\', 'xxx', '...', '+++', '|||', '---', 'ooo', '***']
@@ -47,7 +47,7 @@ def load_gdpr_data(input_file):
     df['encryption_label'] = df['use_encryption'].map({0: 'No Encryption', 1: 'With Encryption'})
     df['compression_label'] = df['compression_level'].map({0: 'No Compression', 5: 'Medium (5)', 9: 'High (9)'})
     df['entry_size_label'] = df['entry_size_bytes'].map({1024: '1KB', 2048: '2KB', 4096: '4KB'})
-    
+
     return df
 
 def create_encryption_batch_analysis_plot(df, output_dir):
@@ -61,7 +61,7 @@ def create_encryption_batch_analysis_plot(df, output_dir):
         return
     
     # Create figure with 2 subplots side by side
-    fig, axes = plt.subplots(1, 2, figsize=(figwidth_half, 1.5))
+    fig, axes = plt.subplots(1, 2, figsize=(figwidth_half, 1.3))
     
     # Define the specific variants we want to show
     variants = [
@@ -109,12 +109,12 @@ def create_encryption_batch_analysis_plot(df, output_dir):
                         label=variant['label'])
     
     ax_left.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
-    ax_left.set_ylabel('Throughput (K entries/sec)', fontsize=LABEL_FONTSIZE)
-    ax_left.set_title('(a) Throughput\n(Higher is better ↑)', color="navy", fontsize=TITLE_FONTSIZE)
+    ax_left.set_ylabel('Throughput (K entries/s)', fontsize=LABEL_FONTSIZE, labelpad=2)
+    ax_left.set_title('(a) Throughput\n(Higher is better ↑)', color="navy", fontsize=TITLE_FONTSIZE, pad=3)
     ax_left.set_xticks(x_positions)
     ax_left.set_xticklabels(batch_labels)
-    ax_left.grid(True, alpha=0.3)
     ax_left.tick_params(axis='both', labelsize=TICK_FONTSIZE)
+    ax_left.grid(True, alpha=0.3, axis='y')
     
     # Right subplot: Write Amplification vs Batch Size
     ax_right = axes[1]
@@ -149,16 +149,16 @@ def create_encryption_batch_analysis_plot(df, output_dir):
                          label=variant['label'])
     
     ax_right.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
-    ax_right.set_ylabel('Write Amplification (%)', fontsize=LABEL_FONTSIZE)
-    ax_right.set_title('(b) Write Amplification\n(Lower is better ↓)', color="navy", fontsize=TITLE_FONTSIZE)
+    ax_right.set_ylabel('Write Amplification (%)', fontsize=LABEL_FONTSIZE, labelpad=2)
+    ax_right.set_title('(b) Write Amplification\n(Lower is better ↓)', color="navy", fontsize=TITLE_FONTSIZE, pad=3)
     ax_right.set_xticks(x_positions)
     ax_right.set_xticklabels(batch_labels)
-    ax_right.grid(True, alpha=0.3)
     ax_right.tick_params(axis='both', labelsize=TICK_FONTSIZE)
+    ax_right.grid(True, alpha=0.3, axis='y')
     
     # Add single legend to the figure (centered between subplots)
     handles, labels = ax_left.get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.15), 
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.2), 
                ncol=3, fontsize=LEGEND_FONTSIZE,
                borderaxespad=0.5, columnspacing=0.45, labelspacing=0.35, borderpad=0.25, handletextpad=0.35, handlelength=1.2)
     
@@ -766,12 +766,12 @@ def main():
     
     # Generate all plots
     print("Generating plots...")
-    create_encryption_effect_plots(df, args.output_dir)
-    create_compression_effect_plots(df, args.output_dir)
-    create_entry_size_effect_plots(df, args.output_dir)
-    create_writer_threads_effect_plots(df, args.output_dir)
-    create_batch_size_effect_plots(df, args.output_dir)
-    create_heatmaps(df, args.output_dir)
+    # create_encryption_effect_plots(df, args.output_dir)
+    # create_compression_effect_plots(df, args.output_dir)
+    # create_entry_size_effect_plots(df, args.output_dir)
+    # create_writer_threads_effect_plots(df, args.output_dir)
+    # create_batch_size_effect_plots(df, args.output_dir)
+    # create_heatmaps(df, args.output_dir)
     create_encryption_batch_analysis_plot(df, args.output_dir)
     
     print(f"All plots saved to {args.output_dir}/")
