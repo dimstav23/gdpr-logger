@@ -532,7 +532,7 @@ int main() {
             if (i < producerCounts.size() - 1) std::cout << ", ";
         }
         std::cout << std::endl;
-        std::cout << "- Encryption settings: OFF, ON" << std::endl;
+        std::cout << "- Encryption settings: ON" << std::endl;
         std::cout << "- Compression levels: ";
         for (size_t i = 0; i < compressionLevels.size(); ++i) {
             std::cout << compressionLevels[i];
