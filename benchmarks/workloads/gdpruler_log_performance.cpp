@@ -510,8 +510,8 @@ int main() {
         std::vector<int> batchSizes = {512, 2048, 8192};
         std::vector<int> entrySizes = {256, 1024, 4096};
         std::vector<int> producerCounts = {16};
-        std::vector<bool> encryptionSettings = {false, true};
-        std::vector<int> compressionLevels = {0, 3, 6};
+        std::vector<bool> encryptionSettings = {true};
+        std::vector<int> compressionLevels = {0};
         
         // Number of repeats for each configuration
         const int numRepeats = 3;
