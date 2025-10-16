@@ -1,4 +1,4 @@
-import pandas as pd
+import pandas as pd 
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 import seaborn as sns
@@ -29,11 +29,11 @@ LABEL_FONTSIZE = FONTSIZE
 TICK_FONTSIZE = FONTSIZE - 1
 LEGEND_FONTSIZE = FONTSIZE - 1
 
-FONTSIZE = 6
+FONTSIZE = 7
 TITLE_FONTSIZE = FONTSIZE
 LABEL_FONTSIZE = FONTSIZE
 TICK_FONTSIZE = FONTSIZE - 1
-LEGEND_FONTSIZE = FONTSIZE
+LEGEND_FONTSIZE = FONTSIZE - 0.5
 ANNOTATION_FONTSIZE = FONTSIZE / 2
 
 # Patterns for bar plots
@@ -61,16 +61,24 @@ def create_encryption_batch_analysis_plot(df, output_dir):
         return
     
     # Create figure with 2 subplots side by side
-    fig, axes = plt.subplots(1, 2, figsize=(figwidth_half, 1.3))
+    fig, axes = plt.subplots(1, 2, figsize=(figwidth_half, 1.4))
     
     # Define the specific variants we want to show
+    # variants = [
+    #     {'consumers': 4, 'entry_size_bytes': 256, 'label': '4 Writers, 256B Entry', 'color': '#9467bd', 'marker': 'v'},
+    #     {'consumers': 8, 'entry_size_bytes': 256, 'label': '8 Writers, 256B Entry', 'color': '#8c564b', 'marker': 'p'},
+    #     {'consumers': 4, 'entry_size_bytes': 1024, 'label': '4 Writers, 1KB Entry', 'color': '#1f77b4', 'marker': 'o'},
+    #     {'consumers': 8, 'entry_size_bytes': 1024, 'label': '8 Writers, 1KB Entry', 'color': '#2ca02c', 'marker': '^'},
+    #     {'consumers': 4, 'entry_size_bytes': 4096, 'label': '4 Writers, 4KB Entry', 'color': '#ff7f0e', 'marker': 's'},        
+    #     {'consumers': 8, 'entry_size_bytes': 4096, 'label': '8 Writers, 4KB Entry', 'color': '#d62728', 'marker': 'D'}
+    # ]
     variants = [
-        {'consumers': 4, 'entry_size_bytes': 256, 'label': '4 Writers, 256B Entry', 'color': '#9467bd', 'marker': 'v'},
-        {'consumers': 8, 'entry_size_bytes': 256, 'label': '8 Writers, 256B Entry', 'color': '#8c564b', 'marker': 'p'},
-        {'consumers': 4, 'entry_size_bytes': 1024, 'label': '4 Writers, 1KB Entry', 'color': '#1f77b4', 'marker': 'o'},
-        {'consumers': 8, 'entry_size_bytes': 1024, 'label': '8 Writers, 1KB Entry', 'color': '#2ca02c', 'marker': '^'},
-        {'consumers': 4, 'entry_size_bytes': 4096, 'label': '4 Writers, 4KB Entry', 'color': '#ff7f0e', 'marker': 's'},        
-        {'consumers': 8, 'entry_size_bytes': 4096, 'label': '8 Writers, 4KB Entry', 'color': '#d62728', 'marker': 'D'}
+        {'consumers': 4, 'entry_size_bytes': 256, 'label': 'W:4,E:256', 'color': '#9467bd', 'marker': 'v'},
+        {'consumers': 8, 'entry_size_bytes': 256, 'label': 'W:8,E:256', 'color': '#8c564b', 'marker': 'p'},
+        {'consumers': 4, 'entry_size_bytes': 1024, 'label': 'W:4,E:1K', 'color': '#1f77b4', 'marker': 'o'},
+        {'consumers': 8, 'entry_size_bytes': 1024, 'label': 'W:8,E:1K', 'color': '#2ca02c', 'marker': '^'},
+        {'consumers': 4, 'entry_size_bytes': 4096, 'label': 'W:4,E:4K', 'color': '#ff7f0e', 'marker': 's'},        
+        {'consumers': 8, 'entry_size_bytes': 4096, 'label': 'W:8,E:4K', 'color': '#d62728', 'marker': 'D'}
     ]
     
     # Get batch sizes from data and prepare x-axis mapping
@@ -108,13 +116,15 @@ def create_encryption_batch_analysis_plot(df, output_dir):
                         markersize=1.5,   # Smaller markers
                         label=variant['label'])
     
-    ax_left.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
-    ax_left.set_ylabel('Throughput (K entries/s)', fontsize=LABEL_FONTSIZE, labelpad=2)
+    ax_left.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE, labelpad=1)
+    ax_left.set_ylabel('Throughput (K entries/s)', fontsize=LABEL_FONTSIZE, labelpad=0)
     ax_left.set_title('(a) Throughput\n(Higher is better ↑)', color="navy", fontsize=TITLE_FONTSIZE, pad=3)
     ax_left.set_xticks(x_positions)
+    ax_left.tick_params(axis='x', length=2)
     ax_left.set_xticklabels(batch_labels)
-    ax_left.tick_params(axis='both', labelsize=TICK_FONTSIZE)
+    ax_left.tick_params(axis='both', labelsize=TICK_FONTSIZE, pad=1)
     ax_left.grid(True, alpha=0.3, axis='y')
+    ax_left.tick_params(axis='y', length=2)
     
     # Right subplot: Write Amplification vs Batch Size
     ax_right = axes[1]
@@ -148,28 +158,30 @@ def create_encryption_batch_analysis_plot(df, output_dir):
                          markersize=1.5,   # Smaller markers
                          label=variant['label'])
     
-    ax_right.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE)
-    ax_right.set_ylabel('Write Amplification (%)', fontsize=LABEL_FONTSIZE, labelpad=2)
+    ax_right.set_xlabel('Batch Size', fontsize=LABEL_FONTSIZE, labelpad=1)
+    ax_right.set_ylabel('Write Amplification (%)', fontsize=LABEL_FONTSIZE, labelpad=0)
     ax_right.set_title('(b) Write Amplification\n(Lower is better ↓)', color="navy", fontsize=TITLE_FONTSIZE, pad=3)
     ax_right.set_xticks(x_positions)
     ax_right.set_xticklabels(batch_labels)
-    ax_right.tick_params(axis='both', labelsize=TICK_FONTSIZE)
+    ax_right.tick_params(axis='x', length=2)
+    ax_right.tick_params(axis='y', length=2)
+    ax_right.tick_params(axis='both', labelsize=TICK_FONTSIZE, pad=1)
     ax_right.grid(True, alpha=0.3, axis='y')
     
     # Add single legend to the figure (centered between subplots)
     handles, labels = ax_left.get_legend_handles_labels()
-    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.2), 
-               ncol=3, fontsize=LEGEND_FONTSIZE,
-               borderaxespad=0.5, columnspacing=0.45, labelspacing=0.35, borderpad=0.25, handletextpad=0.35, handlelength=1.2)
+    fig.legend(handles, labels, loc='upper center', bbox_to_anchor=(0.5, 1.1), 
+               ncol=6, fontsize=LEGEND_FONTSIZE,
+               borderaxespad=0.4, columnspacing=0.3, labelspacing=0.25, borderpad=0.15, handletextpad=0.3, handlelength=0.8)
     
     # Adjust layout to make room for legend
     plt.tight_layout()
     
     # Save the plot
     plt.savefig(os.path.join(output_dir, 'batch_analysis.png'), 
-                bbox_inches='tight', dpi=300)
+                bbox_inches='tight', dpi=300, pad_inches=0)
     plt.savefig(os.path.join(output_dir, 'batch_analysis.pdf'), 
-                bbox_inches='tight')
+                bbox_inches='tight', dpi=300, pad_inches=0)
     plt.close()
     
     # Print data summary
